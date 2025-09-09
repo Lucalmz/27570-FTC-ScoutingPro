@@ -19,6 +19,8 @@ public class ScoreEntry implements Serializable {
     private String submitter;
     private String submissionTime;
 
+    private static final long serialVersionUID = 3L;
+
     // 计分权重
     private static final int AUTO_ARTIFACT_SCORE = 7;
     private static final int TELEOP_ARTIFACT_SCORE = 3;

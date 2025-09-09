@@ -15,142 +15,238 @@ import java.util.function.Consumer;
 
 public class NetworkService {
 
-    public static final int TCP_PORT = 54321; // 定义一个固定的TCP端口
-    public static final int UDP_PORT = 54322; // 定义一个固定的UDP端口
+    // --- Singleton Pattern Implementation ---
+    private static NetworkService instance;
+
+    public static synchronized NetworkService getInstance() {
+        if (instance == null) {
+            instance = new NetworkService();
+        }
+        return instance;
+    }
+    // --- End Singleton Pattern ---
+
+    public static final int TCP_PORT = 54321;
+    public static final int UDP_PORT = 54322;
+
     private ServerSocket serverSocket;
     private Socket clientSocket;
-    private ObjectOutputStream out;
-    private final List<ObjectOutputStream> clientOutputs = Collections.synchronizedList(new ArrayList<>());
+    private DatagramSocket udpSocket;
 
-    // --- 主机模式 ---
-    public void startHostMode(Competition competition, Consumer<ScoreEntry> onScoreReceived) {
-        // 1. 启动TCP服务器线程，等待客户端连接
-        new Thread(() -> {
-            try {
-                serverSocket = new ServerSocket(TCP_PORT);
-                System.out.println("Host started on port " + TCP_PORT);
-                while (true) {
-                    Socket client = serverSocket.accept();
-                    System.out.println("Client connected: " + client.getInetAddress());
-                    ObjectOutputStream clientOut = new ObjectOutputStream(client.getOutputStream());
-                    clientOutputs.add(clientOut);
-                    new ClientHandler(client, clientOut, onScoreReceived).start();
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }).start();
+    private ObjectOutputStream outToServer;
+    private final List<ObjectOutputStream> clientOutputStreams = Collections.synchronizedList(new ArrayList<>());
 
-        // 2. 启动UDP广播线程，宣告比赛的存在
-        new Thread(() -> {
-            try (DatagramSocket socket = new DatagramSocket()) {
-                socket.setBroadcast(true);
-                String message = "FTC_SCOUTER_HOST;" + competition.getName() + ";" + competition.getCreatorUsername();
-                byte[] buffer = message.getBytes();
-                DatagramPacket packet = new DatagramPacket(buffer, buffer.length, InetAddress.getByName("255.255.255.255"), UDP_PORT);
-                while (true) {
-                    socket.send(packet);
-                    Thread.sleep(2000); // 每2秒广播一次
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
+    private volatile boolean running = false;
+    private Thread udpDiscoveryThread;
+    private Thread tcpServerThread;
+    private Thread hostBroadcastThread;
+
+    // ** 构造函数设为私有！**
+    private NetworkService() {
     }
 
-    // 主机用来处理单个客户端的线程
+    // --- Service State ---
+    private enum State {IDLE, HOSTING, DISCOVERING, CLIENT}
+
+    private State currentState = State.IDLE;
+
+    // --- HOST METHODS ---
+    public synchronized void startHost(Competition competition, Consumer<ScoreEntry> onScoreReceived) {
+        if (currentState != State.IDLE) {
+            System.out.println("Cannot start host, service is busy in state: " + currentState);
+            return;
+        }
+        stop();
+        running = true;
+        currentState = State.HOSTING;
+        System.out.println("Transitioning to HOSTING state.");
+
+        tcpServerThread = new Thread(() -> {
+            try {
+                serverSocket = new ServerSocket(TCP_PORT);
+                System.out.println("Host TCP Server started on port " + TCP_PORT);
+                while (running) {
+                    Socket client = serverSocket.accept();
+                    System.out.println("Client connected: " + client.getInetAddress().getHostAddress());
+                    ObjectOutputStream out = new ObjectOutputStream(client.getOutputStream());
+                    clientOutputStreams.add(out);
+                    new ClientHandler(client, out, onScoreReceived).start();
+                }
+            } catch (IOException e) {
+                if (running) System.err.println("TCP Server Error: " + e.getMessage());
+            } finally {
+                System.out.println("TCP Server stopped.");
+            }
+        });
+        tcpServerThread.start();
+
+        hostBroadcastThread = new Thread(() -> {
+            try (DatagramSocket broadcastSocket = new DatagramSocket()) {
+                broadcastSocket.setBroadcast(true);
+                String message = String.format("FTC_SCOUTER;%s;%s", competition.getName(), competition.getCreatorUsername());
+                byte[] buffer = message.getBytes();
+                DatagramPacket packet = new DatagramPacket(buffer, buffer.length, InetAddress.getByName("255.255.255.255"), UDP_PORT);
+                while (running) {
+                    broadcastSocket.send(packet);
+                    Thread.sleep(2000);
+                }
+            } catch (Exception e) {
+                if (running) System.err.println("UDP Broadcast Error: " + e.getMessage());
+            } finally {
+                System.out.println("UDP Broadcast stopped.");
+            }
+        });
+        hostBroadcastThread.start();
+    }
+
     private class ClientHandler extends Thread {
         private final Socket socket;
+        private final ObjectOutputStream out;
         private final Consumer<ScoreEntry> onScoreReceived;
-        private ObjectInputStream in;
 
-        public ClientHandler(Socket socket, ObjectOutputStream out, Consumer<ScoreEntry> onScoreReceived) {
+        ClientHandler(Socket socket, ObjectOutputStream out, Consumer<ScoreEntry> onScoreReceived) {
             this.socket = socket;
+            this.out = out;
             this.onScoreReceived = onScoreReceived;
-            try {
-                this.in = new ObjectInputStream(socket.getInputStream());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }
+
         @Override
         public void run() {
-            try {
-                while (true) {
+            try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+                while (running) {
                     NetworkPacket packet = (NetworkPacket) in.readObject();
                     if (packet.getType() == NetworkPacket.PacketType.SUBMIT_SCORE) {
-                        // 使用 Platform.runLater 将任务交回给 JavaFX 主线程处理
                         Platform.runLater(() -> onScoreReceived.accept(packet.getScoreEntry()));
                     }
                 }
             } catch (Exception e) {
-                System.out.println("Client disconnected: " + socket.getInetAddress());
-                clientOutputs.remove(out);
+                System.out.println("Client disconnected: " + socket.getInetAddress().getHostAddress());
+            } finally {
+                clientOutputStreams.remove(out);
             }
         }
     }
 
-    // 主机用来广播数据给所有客户端的方法
-    public void broadcastUpdate(NetworkPacket updatePacket) {
-        synchronized (clientOutputs) {
-            for (ObjectOutputStream out : clientOutputs) {
+    public void broadcastUpdateToClients(NetworkPacket updatePacket) {
+        synchronized (clientOutputStreams) {
+            clientOutputStreams.removeIf(out -> {
                 try {
                     out.writeObject(updatePacket);
-                    out.reset(); // 清除缓存，确保发送的是最新对象
+                    out.reset();
+                    return false;
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    System.err.println("Failed to broadcast to a client, removing it.");
+                    return true;
                 }
-            }
+            });
         }
     }
 
-    // --- 客户端模式 ---
-    public void findHosts(ObservableList<String> discoveredHosts) {
-        new Thread(() -> {
-            try (DatagramSocket socket = new DatagramSocket(UDP_PORT)) {
+    // --- CLIENT METHODS ---
+    public synchronized void startDiscovery(ObservableList<Competition> discoveredCompetitions) {
+        if (currentState != State.IDLE) return;
+        stop(); // 先确保一切都已停止
+
+        running = true;
+        currentState = State.DISCOVERING;
+        System.out.println("Transitioning to DISCOVERING state.");
+
+        udpDiscoveryThread = new Thread(() -> {
+            try {
+                udpSocket = new DatagramSocket(UDP_PORT);
+                // --- 核心改动：设置1秒超时 ---
+                udpSocket.setSoTimeout(1000);
+
                 byte[] buffer = new byte[1024];
-                while (true) {
-                    DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                    socket.receive(packet);
-                    String message = new String(packet.getData(), 0, packet.getLength());
-                    if (message.startsWith("FTC_SCOUTER_HOST;")) {
-                        String hostAddress = packet.getAddress().getHostAddress();
-                        // 确保在JavaFX主线程上更新UI
-                        Platform.runLater(() -> {
-                            if (!discoveredHosts.contains(hostAddress)) {
-                                discoveredHosts.add(hostAddress);
-                            }
-                        });
+                System.out.println("UDP Discovery listener started on port " + UDP_PORT);
+
+                while (running) {
+                    try {
+                        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                        udpSocket.receive(packet); // 最多阻塞1秒
+
+                        String message = new String(packet.getData(), 0, packet.getLength());
+                        if (message.startsWith("FTC_SCOUTER;")) {
+                            String[] parts = message.split(";");
+                            Competition discovered = new Competition(parts[1], parts[2]);
+                            discovered.setHostAddress(packet.getAddress().getHostAddress());
+
+                            Platform.runLater(() -> {
+                                if (discoveredCompetitions.stream().noneMatch(c -> c.getName().equals(discovered.getName()))) {
+                                    discoveredCompetitions.add(discovered);
+                                }
+                            });
+                        }
+                    } catch (SocketTimeoutException e) {
+                        // 这是预期的超时，什么都不做，直接进入下一次循环检查 while(running)
                     }
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
+            } catch (IOException e) {
+                if (running) System.err.println("UDP Discovery IO Error: " + e.getMessage());
+            } finally {
+                if (udpSocket != null && !udpSocket.isClosed()) {
+                    udpSocket.close(); // 确保最终关闭
+                }
+                System.out.println("UDP Discovery listener thread finished.");
             }
-        }).start();
+        });
+        udpDiscoveryThread.start();
     }
+    public synchronized void connectToHost(String hostAddress, Consumer<NetworkPacket> onUpdateReceived) throws IOException {
+        stop();
 
-    public void connectToHost(String hostIp, Consumer<NetworkPacket> onUpdateReceived) throws IOException {
-        clientSocket = new Socket(hostIp, TCP_PORT);
-        out = new ObjectOutputStream(clientSocket.getOutputStream());
+        running = true;
+        currentState = State.CLIENT;
+        System.out.println("Transitioning to CLIENT state.");
+
+        clientSocket = new Socket(hostAddress, TCP_PORT);
+        outToServer = new ObjectOutputStream(clientSocket.getOutputStream());
         new Thread(() -> {
-            try (ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream())) {
-                while (true) {
-                    NetworkPacket updatePacket = (NetworkPacket) in.readObject();
+            try (ObjectInputStream inFromServer = new ObjectInputStream(clientSocket.getInputStream())) {
+                while (running) {
+                    NetworkPacket updatePacket = (NetworkPacket) inFromServer.readObject();
                     Platform.runLater(() -> onUpdateReceived.accept(updatePacket));
                 }
             } catch (Exception e) {
-                System.out.println("Disconnected from host.");
+                if (running) System.out.println("Disconnected from host.");
             }
         }).start();
     }
 
     public void sendScoreToServer(ScoreEntry scoreEntry) {
-        if (out != null) {
+        if (outToServer != null) {
             try {
-                out.writeObject(new NetworkPacket(scoreEntry));
+                outToServer.writeObject(new NetworkPacket(scoreEntry));
+                outToServer.reset();
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+    }
+
+    // --- GENERAL METHODS (最终强化版) ---
+    public synchronized void stop() {
+        if (currentState == State.IDLE) {
+            return;
+        }
+
+        running = false; // **这是最重要的指令**
+
+        // 关闭套接字以中断阻塞
+        try { if (serverSocket != null && !serverSocket.isClosed()) serverSocket.close(); } catch (IOException e) { /* ignore */ }
+        try { if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close(); } catch (IOException e) { /* ignore */ }
+
+        // 对于 UDP，close() 仍然是必须的，但线程现在会因为 running=false 而自行退出
+        if (udpSocket != null && !udpSocket.isClosed()) {
+            udpSocket.close();
+        }
+
+        // 中断线程作为最后的保险
+        if (tcpServerThread != null) tcpServerThread.interrupt();
+        if (hostBroadcastThread != null) hostBroadcastThread.interrupt();
+        if (udpDiscoveryThread != null) udpDiscoveryThread.interrupt();
+
+        currentState = State.IDLE;
+        System.out.println("Stop command issued. State is now IDLE.");
     }
 }

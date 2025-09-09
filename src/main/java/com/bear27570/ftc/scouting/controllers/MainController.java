@@ -2,18 +2,23 @@ package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.MainApplication;
 import com.bear27570.ftc.scouting.models.Competition;
+import com.bear27570.ftc.scouting.models.NetworkPacket;
 import com.bear27570.ftc.scouting.models.ScoreEntry;
 import com.bear27570.ftc.scouting.models.TeamRanking;
 import com.bear27570.ftc.scouting.services.DatabaseService;
+import com.bear27570.ftc.scouting.services.NetworkService;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.VBox;
 import org.h2.engine.Database;
 
 import java.io.IOException;
+import java.util.List;
 
 public class MainController {
 
@@ -39,27 +44,128 @@ public class MainController {
     @FXML private TableView<ScoreEntry> historyTableView;
     @FXML private TableColumn<ScoreEntry, Integer> histMatchCol, histTotalCol;
     @FXML private TableColumn<ScoreEntry, String> histAllianceCol, histTeamsCol, histSubmitterCol, histTimeCol;
-
     private MainApplication mainApp;
     private Competition currentCompetition;
     private String currentUsername;
+    private boolean isHost;
+
     private ObservableList<ScoreEntry> scoreHistoryList = FXCollections.observableArrayList();
 
-    public void setMainApp(MainApplication mainApp, Competition competition, String username) {
+    public void setMainApp(MainApplication mainApp, Competition competition, String username, boolean isHost) {
         this.mainApp = mainApp;
         this.currentCompetition = competition;
         this.currentUsername = username;
+        this.isHost = isHost;
 
-        competitionNameLabel.setText(competition.getName());
+        competitionNameLabel.setText(competition.getName() + (isHost ? " (HOSTING)" : " (CLIENT)"));
         submitterLabel.setText("Submitter: " + username);
 
         setupScoringTab();
         setupRankingsTab();
         setupHistoryTab();
 
-        refreshAllData();
+        if (isHost) {
+            startAsHost();
+        } else {
+            startAsClient();
+        }
     }
 
+    private void startAsHost() {
+        // As host, we read from our DB and start the server
+        refreshAllDataFromDatabase();
+        NetworkService.getInstance().startHost(currentCompetition, this::handleScoreReceivedFromClient);
+    }
+
+    private void startAsClient() {
+        // As client, our UI is disabled until we connect and get data from the host
+        setUIEnabled(false);
+        try {
+            NetworkService.getInstance().connectToHost(currentCompetition.getHostAddress(), this::handleUpdateReceivedFromHost);
+            statusLabel.setText("Connected to host. Waiting for data...");
+        } catch (IOException e) {
+            statusLabel.setText("Failed to connect to host: " + e.getMessage());
+        }
+    }
+
+    // --- HOST-SIDE LOGIC ---
+    private void handleScoreReceivedFromClient(ScoreEntry scoreEntry) {
+        // A client sent us a score.
+        // 1. Save it to our authoritative database.
+        DatabaseService.saveScoreEntry(currentCompetition.getName(), scoreEntry);
+        // 2. Refresh our own data and UI.
+        List<ScoreEntry> fullHistory = DatabaseService.getScoresForCompetition(currentCompetition.getName());
+        List<TeamRanking> newRankings = DatabaseService.calculateTeamRankings(currentCompetition.getName());
+        updateUIAfterDataChange(fullHistory, newRankings);
+        // 3. Broadcast the complete new state to all clients.
+        NetworkService.getInstance().broadcastUpdateToClients(new NetworkPacket(fullHistory, newRankings));
+    }
+
+    // --- CLIENT-SIDE LOGIC ---
+    private void handleUpdateReceivedFromHost(NetworkPacket packet) {
+        // The host sent us a complete data refresh.
+        if (packet.getType() == NetworkPacket.PacketType.UPDATE_DATA) {
+            updateUIAfterDataChange(packet.getScoreHistory(), packet.getTeamRankings());
+            setUIEnabled(true);
+            statusLabel.setText("Data updated from host.");
+        }
+    }
+
+    // --- SHARED LOGIC ---
+    @FXML
+    private void handleSubmitButtonAction() {
+        try {
+            ToggleButton selectedToggle = (ToggleButton) allianceToggleGroup.getSelectedToggle();
+            if (selectedToggle == null) throw new IllegalArgumentException("Please select an alliance.");
+
+            String alliance = selectedToggle.getText().startsWith("Red") ? "RED" : "BLUE";
+            ScoreEntry newEntry = new ScoreEntry(
+                    Integer.parseInt(matchNumberField.getText()), alliance, Integer.parseInt(team1Field.getText()),
+                    Integer.parseInt(team2Field.getText()), Integer.parseInt(autoArtifactsField.getText()),
+                    Integer.parseInt(teleopArtifactsField.getText()), team1SequenceCheck.isSelected(),
+                    team2SequenceCheck.isSelected(), team1L2ClimbCheck.isSelected(),
+                    team2L2ClimbCheck.isSelected(), currentUsername);
+
+            if (isHost) {
+                // Host processes it directly
+                handleScoreReceivedFromClient(newEntry);
+            } else {
+                // Client sends it to the server
+                NetworkService.getInstance().sendScoreToServer(newEntry);
+                statusLabel.setText("Score sent to host.");
+            }
+            errorLabel.setText("Score submitted successfully!");
+
+        } catch (Exception e) {
+            errorLabel.setText("Error: " + e.getMessage());
+        }
+    }
+
+    private void refreshAllDataFromDatabase() {
+        // This is now ONLY called by the HOST
+        List<ScoreEntry> fullHistory = DatabaseService.getScoresForCompetition(currentCompetition.getName());
+        List<TeamRanking> newRankings = DatabaseService.calculateTeamRankings(currentCompetition.getName());
+        updateUIAfterDataChange(fullHistory, newRankings);
+    }
+
+    private void updateUIAfterDataChange(List<ScoreEntry> history, List<TeamRanking> rankings) {
+        // This method is now the single point of truth for updating the UI,
+        // whether the data comes from the host's DB or a client's network packet.
+        Platform.runLater(() -> {
+            rankingsTableView.setItems(FXCollections.observableArrayList(rankings));
+            scoreHistoryList.setAll(history);
+        });
+    }
+
+    private void setUIEnabled(boolean enabled) {
+        // Disable form for clients until connected
+        scoringFormVBox.setDisable(!enabled);
+        if(!enabled) statusLabel.setText("Connecting to host...");
+    }
+
+    // You need to add fx:id="scoringFormVBox" to the VBox in MainView.fxml that contains the scoring form
+    @FXML private VBox scoringFormVBox;
+    @FXML private Label statusLabel;
     private void setupScoringTab() {
         allianceToggleGroup = new ToggleGroup();
         redAllianceToggle.setToggleGroup(allianceToggleGroup);
@@ -106,27 +212,6 @@ public class MainController {
         scoreHistoryList.setAll(DatabaseService.getScoresForCompetition(currentCompetition.getName()));
     }
 
-    @FXML
-    private void handleSubmitButtonAction() {
-        try {
-            ToggleButton selectedToggle = (ToggleButton) allianceToggleGroup.getSelectedToggle();
-            if (selectedToggle == null) throw new IllegalArgumentException("Please select an alliance.");
-
-            String alliance = selectedToggle.getText().startsWith("Red") ? "RED" : "BLUE";
-            ScoreEntry newEntry = new ScoreEntry(
-                    Integer.parseInt(matchNumberField.getText()), alliance, Integer.parseInt(team1Field.getText()),
-                    Integer.parseInt(team2Field.getText()), Integer.parseInt(autoArtifactsField.getText()),
-                    Integer.parseInt(teleopArtifactsField.getText()), team1SequenceCheck.isSelected(),
-                    team2SequenceCheck.isSelected(), team1L2ClimbCheck.isSelected(),
-                    team2L2ClimbCheck.isSelected(), currentUsername);
-
-            DatabaseService.saveScoreEntry(currentCompetition.getName(), newEntry);
-            refreshAllData();
-            errorLabel.setText("Score submitted successfully!");
-        } catch (Exception e) {
-            errorLabel.setText("Error: " + e.getMessage());
-        }
-    }
 
     @FXML
     private void handleBackButton() throws IOException {

@@ -5,29 +5,40 @@
 <BorderPane prefHeight="600.0" prefWidth="800.0" style="-fx-background-color: #1C2533;" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.HubController">
     <top>
         <HBox alignment="CENTER_LEFT" spacing="10" style="-fx-background-color: #2A3B4F;">
-            <padding><Insets left="20" right="20" top="10" bottom="10" /></padding>
+            <padding><Insets top="10" right="20" bottom="10" left="20" /></padding>
             <Label fx:id="welcomeLabel" styleClass="header-label" text="Welcome, User!" />
             <Region HBox.hgrow="ALWAYS" />
             <Button onAction="#handleLogout" text="Logout" styleClass="logout-button" />
         </HBox>
     </top>
     <center>
-        <VBox spacing="10" alignment="TOP_CENTER">
-            <padding><Insets top="20" right="20" bottom="20" left="20"/></padding>
-            <Label styleClass="table-header-label" text="Available Competitions"/>
-            <ListView fx:id="competitionListView" />
-            <HBox spacing="10" alignment="CENTER">
-                <Button fx:id="joinButton" onAction="#handleJoinButton" text="Join / Enter Competition" prefWidth="200" />
+        <VBox spacing="20" alignment="TOP_CENTER">
+            <padding><Insets top="20" right="20" bottom="20" left="20" /></padding>
+            <HBox alignment="CENTER" spacing="10">
+                <children>
+                    <!-- 改为普通按钮 -->
+                    <Button fx:id="hostModeButton" onAction="#selectHostMode" text="Host a Competition" />
+                    <Button fx:id="joinModeButton" onAction="#selectJoinMode" text="Join a Competition" />
+                </children>
             </HBox>
-            <Label fx:id="statusLabel" text=""/>
+
+            <VBox fx:id="hostPane" spacing="10" alignment="TOP_CENTER" managed="false" visible="false">
+                <Label styleClass="table-header-label" text="Select a Competition You Created to Host"/>
+                <ListView fx:id="myCompetitionsListView" />
+                <Button onAction="#handleHostButton" text="Start Hosting Selected Competition" prefWidth="300" />
+                <Separator/>
+                <Label text="Or, Create a New Competition"/>
+                <TextField fx:id="newCompetitionField" promptText="New Competition Name" maxWidth="300"/>
+                <Button onAction="#handleCreateButton" text="Create Competition"/>
+            </VBox>
+
+            <VBox fx:id="joinPane" spacing="10" alignment="TOP_CENTER" managed="false" visible="false">
+                <Label styleClass="table-header-label" text="Select a Competition on the Network to Join"/>
+                <ListView fx:id="discoveredCompetitionsListView" />
+                <Button onAction="#handleJoinButton" text="Request to Join Selected Competition" prefWidth="300" />
+            </VBox>
+
+            <Label fx:id="statusLabel" text="Select a mode to begin."/>
         </VBox>
     </center>
-    <bottom>
-        <VBox spacing="10" alignment="CENTER" style="-fx-background-color: #2A3B4F;">
-            <padding><Insets top="20" right="20" bottom="20" left="20"/></padding>
-            <Label text="Or, Create a New Competition"/>
-            <TextField fx:id="newCompetitionField" promptText="New Competition Name" maxWidth="300"/>
-            <Button onAction="#handleCreateButton" text="Create Competition"/>
-        </VBox>
-    </bottom>
 </BorderPane>

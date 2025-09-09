@@ -13,6 +13,8 @@ public class TeamRanking implements Serializable {
     private boolean canSequence = false;
     private boolean l2Capable = false;
 
+    private static final long serialVersionUID = 4L;
+
     public TeamRanking(int teamNumber) {
         this.teamNumber = teamNumber;
     }
