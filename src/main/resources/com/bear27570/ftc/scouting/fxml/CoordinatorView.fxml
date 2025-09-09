@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<VBox spacing="10" alignment="CENTER" style="-fx-background-color: #1C2533;" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.CoordinatorController">
+    <padding><Insets top="20" right="20" bottom="20" left="20" /></padding>
+    <GridPane hgap="10" vgap="10" alignment="CENTER">
+        <VBox spacing="5" GridPane.columnIndex="0" GridPane.rowIndex="0">
+            <Label text="Pending Applications"/>
+            <ListView fx:id="pendingListView" prefHeight="200" prefWidth="200"/>
+        </VBox>
+        <VBox spacing="10" alignment="CENTER" GridPane.columnIndex="1" GridPane.rowIndex="0">
+            <Button onAction="#handleApprove" text="--&gt; Approve --&gt;" prefWidth="120"/>
+            <Button onAction="#handleDeny" text="Deny Application" styleClass="logout-button" prefWidth="120"/>
+            <Button onAction="#handleKick" text="&lt;-- Kick Member &lt;--" prefWidth="120"/>
+        </VBox>
+        <VBox spacing="5" GridPane.columnIndex="2" GridPane.rowIndex="0">
+            <Label text="Approved Members"/>
+            <ListView fx:id="approvedListView" prefHeight="200" prefWidth="200"/>
+        </VBox>
+        <columnConstraints>
+            <ColumnConstraints/>
+            <ColumnConstraints/>
+            <ColumnConstraints/>
+        </columnConstraints>
+        <rowConstraints>
+            <RowConstraints/>
+        </rowConstraints>
+    </GridPane>
+    <Button onAction="#handleClose" text="Close"/>
+</VBox>

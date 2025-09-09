@@ -1,0 +1,196 @@
+.root {
+    -fx-background-color: #1C2533;
+    -fx-font-family: 'Segoe UI', sans-serif;
+}
+
+.sidebar {
+    -fx-background-color: #2A3B4F;
+}
+
+.label {
+    -fx-text-fill: #E0E0E0;
+    -fx-font-size: 14px;
+}
+
+.header-label {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #4DD0E1; /* Cyan */
+}
+
+.sub-header-label {
+    -fx-font-size: 16px;
+    -fx-text-fill: #B0BEC5;
+}
+
+.table-header-label {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #E0E0E0;
+}
+
+.text-field {
+    -fx-background-color: #1C2533;
+    -fx-text-fill: #E0E0E0;
+    -fx-border-color: #4A5C70;
+    -fx-border-radius: 4;
+    -fx-background-insets: 0;
+}
+
+.text-field:focused {
+    -fx-border-color: #007BFF; /* Bright Blue */
+}
+
+.button {
+    -fx-background-color: #007BFF;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4;
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: #0056b3;
+}
+
+.error-label {
+    -fx-text-fill: #FF5252; /* Red for errors */
+}
+
+/* TableView Styling */
+.table-view {
+    -fx-background-color: transparent;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #2A3B4F;
+}
+
+.table-view .column-header, .table-view .filler {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent #1C2533 transparent;
+    -fx-size: 35;
+}
+
+.table-view .column-header .label {
+    -fx-text-fill: #E0E0E0;
+    -fx-font-weight: bold;
+}
+
+.table-view .table-cell {
+    -fx-text-fill: #B0BEC5;
+    -fx-border-color: transparent transparent #2A3B4F transparent;
+    -fx-padding: 8px;
+}
+
+.table-view .table-row-cell {
+    -fx-background-color: #1C2533;
+}
+
+.table-view .table-row-cell:odd {
+    -fx-background-color: #212B3B;
+}
+
+.table-view .table-row-cell:selected {
+    -fx-background-color: #0056b3;
+}
+.check-box .text {
+    -fx-fill: #E0E0E0; /* 设置为浅灰色 */
+}
+
+/* 联盟选择器 ToggleButton 样式 */
+.toggle-button {
+    -fx-background-color: #2A3B4F;
+    -fx-text-fill: #E0E0E0;
+    -fx-border-color: #4A5C70;
+}
+.toggle-button:selected {
+    -fx-background-color: #007BFF;
+    -fx-text-fill: white;
+    -fx-border-color: #007BFF;
+}
+
+/* 登出按钮样式 */
+.logout-button {
+    -fx-background-color: #C62828; /* 红色 */
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+}
+.logout-button:hover {
+    -fx-background-color: #A52121;
+}
+.list-view {
+    -fx-background-color: #1C2533; /* 设置整个列表的背景为深蓝黑色 */
+    -fx-border-color: #4A5C70;    /* 使用主题中的灰色作为边框颜色 */
+    -fx-border-radius: 4;
+}
+
+.list-view .list-cell {
+    -fx-background-color: transparent; /* 列表项背景设为透明，以显示列表的背景色 */
+    -fx-text-fill: #E0E0E0;         /* 列表项的文字颜色设为浅灰色 */
+    -fx-padding: 10px;             /* 增加内边距，使其更易读 */
+    -fx-font-size: 14px;
+}
+
+/* 当鼠标悬停在列表项上时的样式 */
+.list-view .list-cell:hover {
+    -fx-background-color: #2A3B4F; /* 悬停时背景变为稍亮的蓝色 */
+}
+
+/* 当列表项被选中时的样式 */
+.list-view .list-cell:selected {
+    -fx-background-color: #007BFF; /* 选中时背景变为主题的高亮蓝色 */
+    -fx-text-fill: white;          /* 选中的文字变为纯白色，以保证对比度 */
+}
+
+/* 确保我们自定义单元格内的 Label 在被选中时也变成白色 */
+.list-view .list-cell:selected .label {
+    -fx-text-fill: white;
+}
+/* --- TabPane Styling (for MainView) --- */
+.tab-pane {
+    -fx-background-color: transparent; /* 使 TabPane 本身透明，以显示父容器的颜色 */
+}
+
+/* 标签栏区域（所有标签所在的那一行） */
+.tab-pane .tab-header-area .tab-header-background {
+    -fx-background-color: #2A3B4F; /* 设置标签栏的背景为侧边栏的颜色 */
+}
+
+/* 单个标签的样式 */
+.tab-pane .tab {
+    -fx-background-color: #1C2533; /* 未选中标签的背景色 */
+    -fx-background-insets: 0;
+    -fx-border-color: #4A5C70 transparent transparent transparent; /* 顶部边框线 */
+    -fx-border-width: 2;
+    -fx-padding: 8 15 8 15; /* 上 右 下 左 的内边距 */
+}
+
+/* 标签内文字的样式 */
+.tab-pane .tab .tab-label {
+    -fx-text-fill: #E0E0E0; /* 未选中标签的文字颜色 */
+    -fx-font-size: 14px;
+}
+
+/* 鼠标悬停在未选中的标签上 */
+.tab-pane .tab:hover {
+    -fx-background-color: #212B3B; /* 悬停时颜色变亮一点 */
+}
+
+/* 被选中的标签的样式 */
+.tab-pane .tab:selected {
+    -fx-background-color: #1C2533; /* 选中时背景色与内容区一致 */
+    -fx-border-color: #007BFF transparent transparent transparent; /* 顶部的蓝色高亮线 */
+}
+
+/* 被选中的标签内文字的样式 */
+.tab-pane .tab:selected .tab-label {
+    -fx-text-fill: white; /* 选中的文字变为纯白色 */
+}
+
+/* 标签页内容的区域 */
+.tab-pane .tab-content-area {
+    -fx-background-color: #1C2533; /* 内容区的背景颜色 */
+    -fx-padding: 20px; /* 为内容区添加一些内边距，使其不贴边 */
+}

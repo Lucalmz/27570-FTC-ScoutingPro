@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<BorderPane prefHeight="600.0" prefWidth="800.0" style="-fx-background-color: #1C2533;" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.HubController">
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="10" style="-fx-background-color: #2A3B4F;">
+            <padding><Insets left="20" right="20" top="10" bottom="10" /></padding>
+            <Label fx:id="welcomeLabel" styleClass="header-label" text="Welcome, User!" />
+            <Region HBox.hgrow="ALWAYS" />
+            <Button onAction="#handleLogout" text="Logout" styleClass="logout-button" />
+        </HBox>
+    </top>
+    <center>
+        <VBox spacing="10" alignment="TOP_CENTER">
+            <padding><Insets top="20" right="20" bottom="20" left="20"/></padding>
+            <Label styleClass="table-header-label" text="Available Competitions"/>
+            <ListView fx:id="competitionListView" />
+            <HBox spacing="10" alignment="CENTER">
+                <Button fx:id="joinButton" onAction="#handleJoinButton" text="Join / Enter Competition" prefWidth="200" />
+            </HBox>
+            <Label fx:id="statusLabel" text=""/>
+        </VBox>
+    </center>
+    <bottom>
+        <VBox spacing="10" alignment="CENTER" style="-fx-background-color: #2A3B4F;">
+            <padding><Insets top="20" right="20" bottom="20" left="20"/></padding>
+            <Label text="Or, Create a New Competition"/>
+            <TextField fx:id="newCompetitionField" promptText="New Competition Name" maxWidth="300"/>
+            <Button onAction="#handleCreateButton" text="Create Competition"/>
+        </VBox>
+    </bottom>
+</BorderPane>
