@@ -5,6 +5,7 @@ import com.bear27570.ftc.scouting.models.Membership;
 import com.bear27570.ftc.scouting.models.ScoreEntry;
 import com.bear27570.ftc.scouting.models.TeamRanking;
 
+import java.io.File;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,20 +14,34 @@ import java.util.Map;
 
 public class DatabaseService {
 
-    private static final String DB_URL = "jdbc:h2:./ftc_scouting_master_db"; // 统一的主数据库
+    private static final String DB_FOLDER_PATH = System.getProperty("user.home") + File.separator + ".ftcscoutingpro";
+    private static final String DB_URL = "jdbc:h2:" + DB_FOLDER_PATH + File.separator + "ftc_scouting_master_db";
 
     public static void initializeMasterDatabase() {
-        try (Connection conn = DriverManager.getConnection(DB_URL); Statement stmt = conn.createStatement()) {
-            // 用户表
-            stmt.execute("CREATE TABLE IF NOT EXISTS users (username VARCHAR(255) PRIMARY KEY, password VARCHAR(255))");
-            // 比赛表
-            stmt.execute("CREATE TABLE IF NOT EXISTS competitions (name VARCHAR(255) PRIMARY KEY, creatorUsername VARCHAR(255), FOREIGN KEY (creatorUsername) REFERENCES users(username))");
-            // 成员资格表
-            stmt.execute("CREATE TABLE IF NOT EXISTS memberships (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(255), competitionName VARCHAR(255), status VARCHAR(50), FOREIGN KEY (username) REFERENCES users(username), FOREIGN KEY (competitionName) REFERENCES competitions(name), UNIQUE(username, competitionName))");
-            // 计分记录表
-            stmt.execute("CREATE TABLE IF NOT EXISTS scores (id INT AUTO_INCREMENT PRIMARY KEY, competitionName VARCHAR(255), matchNumber INT, alliance VARCHAR(10), team1 INT, team2 INT, autoArtifacts INT, teleopArtifacts INT, team1CanSequence BOOLEAN, team2CanSequence BOOLEAN, team1L2Climb BOOLEAN, team2L2Climb BOOLEAN, totalScore INT, submitter VARCHAR(255), submissionTime VARCHAR(255), FOREIGN KEY (competitionName) REFERENCES competitions(name))");
+        try {
+            // 确保数据文件夹存在
+            File dbFolder = new File(DB_FOLDER_PATH);
+            if (!dbFolder.exists()) {
+                dbFolder.mkdirs(); // 如果不存在，则创建文件夹
+                System.out.println("Created database directory at: " + DB_FOLDER_PATH);
+            }
+
+            // 连接数据库并创建表
+            try (Connection conn = DriverManager.getConnection(DB_URL); Statement stmt = conn.createStatement()) {
+                // 用户表
+                stmt.execute("CREATE TABLE IF NOT EXISTS users (username VARCHAR(255) PRIMARY KEY, password VARCHAR(255))");
+                // 比赛表
+                stmt.execute("CREATE TABLE IF NOT EXISTS competitions (name VARCHAR(255) PRIMARY KEY, creatorUsername VARCHAR(255), FOREIGN KEY (creatorUsername) REFERENCES users(username))");
+                // 成员资格表
+                stmt.execute("CREATE TABLE IF NOT EXISTS memberships (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(255), competitionName VARCHAR(255), status VARCHAR(50), FOREIGN KEY (username) REFERENCES users(username), FOREIGN KEY (competitionName) REFERENCES competitions(name), UNIQUE(username, competitionName))");
+                // 计分记录表
+                stmt.execute("CREATE TABLE IF NOT EXISTS scores (id INT AUTO_INCREMENT PRIMARY KEY, competitionName VARCHAR(255), matchNumber INT, alliance VARCHAR(10), team1 INT, team2 INT, autoArtifacts INT, teleopArtifacts INT, team1CanSequence BOOLEAN, team2CanSequence BOOLEAN, team1L2Climb BOOLEAN, team2L2Climb BOOLEAN, totalScore INT, submitter VARCHAR(255), submissionTime VARCHAR(255), FOREIGN KEY (competitionName) REFERENCES competitions(name))");
+            }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to initialize master database", e);
+            // 如果这里出错，我们需要一种方式让用户看到错误
+            // 在实际发布版中，这里会写入日志文件
+            e.printStackTrace();
+            throw new RuntimeException("CRITICAL: Failed to initialize master database", e);
         }
     }
 

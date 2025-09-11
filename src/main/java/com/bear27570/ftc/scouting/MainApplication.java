@@ -11,10 +11,12 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.util.Objects;
 
 public class MainApplication extends Application {
     private Stage primaryStage;
@@ -23,6 +25,8 @@ public class MainApplication extends Application {
     @Override
     public void start(Stage stage) throws IOException {
         this.primaryStage = stage;
+        Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/bear27570/ftc/scouting/images/logo.png")));
+        primaryStage.getIcons().add(icon);
         DatabaseService.initializeMasterDatabase();
         primaryStage.setOnCloseRequest(event -> {
             shutdown();
