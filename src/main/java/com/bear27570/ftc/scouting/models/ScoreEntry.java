@@ -13,8 +13,8 @@ public class ScoreEntry implements Serializable {
     private int teleopArtifacts;
     private boolean team1CanSequence;
     private boolean team2CanSequence;
-    private boolean team1L2Climb; // 分队伍
-    private boolean team2L2Climb; // 分队伍
+    private boolean team1L2Climb;
+    private boolean team2L2Climb;
     private int totalScore;
     private String submitter;
     private String submissionTime;
