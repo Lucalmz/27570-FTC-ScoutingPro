@@ -1,8 +1,6 @@
-
-
 # FTC Scouting Pro - FTC 27570 赛季计分工具
 
-![JavaFX](https://img.shields.io/badge/JavaFX-21-blue) ![JDK](https://img.shields.io/badge/JDK-21-orange) ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-lightgrey) ![GitHub release](https://img.shields.io/github/v/release/Lucalmz/27570-FTC-ScoutingPro) ![GitHub all releases](https://img.shields.io/github/downloads/Lucalmz/27570-FTC-ScoutingPro/total) ![Build Status](https://img.shields.io/github/actions/workflow/status/Lucalmz/27570-FTC-ScoutingPro/release-packager.yml?branch=main)    
+![JavaFX](https://img.shields.io/badge/JavaFX-21-blue) ![JDK](https://img.shields.io/badge/JDK-21-orange)  ![GitHub release](https://img.shields.io/github/v/release/Lucalmz/27570-FTC-ScoutingPro) ![GitHub all releases](https://img.shields.io/github/downloads/Lucalmz/27570-FTC-ScoutingPro/total) ![Build Status](https://img.shields.io/github/actions/workflow/status/Lucalmz/27570-FTC-ScoutingPro/release-packager.yml?branch=main)    
 
 **FTC Scouting Pro** 是一款专为 FIRST Tech Challenge (FTC) 赛季设计的现代化、跨平台的桌面计分应用程序。它旨在为比赛现场的计分员、教练和队员提供一个强大、易用且支持实时协作的工具。
 
