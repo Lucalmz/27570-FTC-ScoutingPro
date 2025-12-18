@@ -1,5 +1,3 @@
----
-
 # 🤖 FTC Scouting Pro
 
 **FTC Scouting Pro** 是一款专为 FIRST Tech Challenge (FTC) 机器人竞赛设计的现代化、高性能侦查与数据分析应用。
