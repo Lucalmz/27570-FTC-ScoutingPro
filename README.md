@@ -2,7 +2,7 @@
 
 **FTC Scouting Pro** 是一款专为 FIRST Tech Challenge (FTC) 机器人竞赛设计的现代化、高性能侦查与数据分析应用。
 
-它摒弃了传统的纸笔记录和简陋的电子表格，采用 **Host-Client (主机-客户端)** 架构，支持多台电脑实时局域网联机，实现数据的无缝同步。v1.3.0 版本更是引入了**可视化射点记录**、**热力图分析**以及**自定义评分公式**，助您的队伍在选人与战术制定上抢占先机。
+它摒弃了传统的纸笔记录和简陋的电子表格，采用 **Host-Client (主机-客户端)** 架构，支持多台电脑实时局域网联机，实现数据的无缝同步。v2.0.0 版本更是引入了**可视化射点记录**、**热力图分析**以及**自定义评分公式**，助您的队伍在选人与战术制定上抢占先机。
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Java](https://img.shields.io/badge/Java-21-orange) ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey)
 
