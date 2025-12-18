@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.canvas.Canvas?>
+<?import javafx.scene.control.Label?>
+
+<VBox alignment="CENTER" spacing="10" style="-fx-background-color: #1C2533;" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.HeatmapController">
+    <Label fx:id="teamTitleLabel" style="-fx-font-size: 20px; -fx-text-fill: white; -fx-font-weight: bold;"/>
+    <Label text="Heatmap shows scoring density. Red Alliance data is mirrored." style="-fx-text-fill: gray;"/>
+
+    <StackPane>
+        <ImageView fitHeight="600" fitWidth="600" preserveRatio="true">
+            <image><Image url="@../images/field.png"/></image>
+        </ImageView>
+        <Canvas fx:id="heatCanvas" height="600" width="600"/>
+    </StackPane>
+</VBox>

@@ -1,6 +1,7 @@
 package com.bear27570.ftc.scouting;
 
 import com.bear27570.ftc.scouting.controllers.CoordinatorController;
+import com.bear27570.ftc.scouting.controllers.FormulaEditController;
 import com.bear27570.ftc.scouting.controllers.HubController;
 import com.bear27570.ftc.scouting.controllers.LoginController;
 import com.bear27570.ftc.scouting.controllers.MainController;
@@ -20,23 +21,24 @@ import java.util.Objects;
 
 public class MainApplication extends Application {
     private Stage primaryStage;
-    // 不再需要 NetworkService 成员变量
 
     @Override
     public void start(Stage stage) throws IOException {
         this.primaryStage = stage;
-        Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/bear27570/ftc/scouting/images/logo.png")));
-        primaryStage.getIcons().add(icon);
+        try {
+            Image icon = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/com/bear27570/ftc/scouting/images/logo.png")));
+            primaryStage.getIcons().add(icon);
+        } catch (Exception e) {
+            System.out.println("Logo not found, skipping.");
+        }
+
         DatabaseService.initializeMasterDatabase();
-        primaryStage.setOnCloseRequest(event -> {
-            shutdown();
-        });
+        primaryStage.setOnCloseRequest(event -> shutdown());
 
         showLoginView();
     }
 
     public void showLoginView() throws IOException {
-        // 在显示登录页时，确保网络服务是停止的
         NetworkService.getInstance().stop();
         FXMLLoader loader = new FXMLLoader(getClass().getResource("fxml/LoginView.fxml"));
         primaryStage.setScene(new Scene(loader.load()));
@@ -76,15 +78,28 @@ public class MainApplication extends Application {
         dialogStage.showAndWait();
     }
 
+    // 新增：打开公式编辑窗口
+    public void showFormulaEditView(Competition competition) throws IOException {
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("fxml/FormulaEditView.fxml"));
+        Stage dialogStage = new Stage();
+        dialogStage.setTitle("Edit Rating Formula - " + competition.getName());
+        dialogStage.initModality(Modality.WINDOW_MODAL);
+        dialogStage.initOwner(primaryStage);
+        dialogStage.setScene(new Scene(loader.load()));
+
+        FormulaEditController controller = loader.getController();
+        controller.setDialogStage(dialogStage, competition);
+        dialogStage.showAndWait();
+    }
+
     @Override
     public void stop() {
         shutdown();
     }
     private void shutdown() {
-        System.out.println("Shutdown requested. Stopping network services...");
         NetworkService.getInstance().stop();
-        System.out.println("Application is shutting down.");
         Platform.exit();
+        System.exit(0);
     }
     public static void main(String[] args) {
         launch(args);
