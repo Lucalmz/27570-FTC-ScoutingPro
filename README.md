@@ -1,7 +1,5 @@
 # FTC Scouting Pro - FTC 27570 赛季计分工具
 
-
-
 ![JavaFX](https://img.shields.io/badge/JavaFX-21-blue) ![JDK](https://img.shields.io/badge/JDK-21-orange)  ![GitHub release](https://img.shields.io/github/v/release/Lucalmz/27570-FTC-ScoutingPro) ![GitHub all releases](https://img.shields.io/github/downloads/Lucalmz/27570-FTC-ScoutingPro/total) ![Build Status](https://img.shields.io/github/actions/workflow/status/Lucalmz/27570-FTC-ScoutingPro/release-packager.yml?branch=main)    
 
 下载最新版本
