@@ -5,6 +5,7 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -13,10 +14,8 @@ jobs:
         os: [windows-latest, macos-latest]
         include:
           - os: windows-latest
-            javafx_platform: win
             installer_ext: exe
           - os: macos-latest
-            javafx_platform: mac
             installer_ext: dmg
 
     runs-on: ${{ matrix.os }}
@@ -31,29 +30,15 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      # 下载并解压 JavaFX JMODs (用于 jpackage 打包 JRE)
-      - name: Download JavaFX JMODs
-        shell: bash
-        run: |
-          JAVAFX_VERSION=21.0.1
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            curl -L "https://download2.gluonhq.com/openjfx/${JAVAFX_VERSION}/openjfx-${JAVAFX_VERSION}_windows-x64_bin-jmods.zip" -o javafx-jmods.zip
-            unzip javafx-jmods.zip
-            echo "JAVAFX_JMODS_PATH=$(pwd)/javafx-jmods-${JAVAFX_VERSION}/jmods" >> $GITHUB_ENV
-          else
-            curl -L "https://download2.gluonhq.com/openjfx/${JAVAFX_VERSION}/openjfx-${JAVAFX_VERSION}_osx-x64_bin-jmods.zip" -o javafx-jmods.zip
-            unzip javafx-jmods.zip
-            echo "JAVAFX_JMODS_PATH=$(pwd)/javafx-jmods-${JAVAFX_VERSION}/jmods" >> $GITHUB_ENV
-          fi
-
-      # 1. 打包 Fat Jar (Shade)
+      # 1. 打包 Fat Jar (Shade 插件会把 JavaFX 库打包进 jar)
+      # 这一步会自动根据当前系统 (Windows/Mac) 下载对应的 JavaFX 本地库
       - name: Build with Maven
         run: mvn clean package -DskipTests
 
       # 2. 运行 JPackage 生成安装包
+      # 注意：这里不再需要传入 -Djavafx.jmods.path，因为 Jar 包里已经全都有了
       - name: Create Installer with JPackage
-        run: |
-          mvn jpackage:jpackage -Djavafx.jmods.path="${{ env.JAVAFX_JMODS_PATH }}"
+        run: mvn jpackage:jpackage
 
       # 3. 上传产物
       - name: Upload Installer
