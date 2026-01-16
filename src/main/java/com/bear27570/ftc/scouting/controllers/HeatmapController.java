@@ -16,11 +16,9 @@ public class HeatmapController {
     @FXML private Label teamTitleLabel;
 
     // --- 概率云参数配置 ---
-    // 带宽 (Bandwidth/Sigma): 控制云的扩散程度。
-    // 值越大越模糊（概括性强），值越小越精确（特异性强）。推荐 25-40。
-    private static final double SIGMA = 30.0;
-
-    // 核半径：通常取 3 * Sigma，覆盖 99% 的高斯分布区域
+    // 为了让渐变更柔和，稍微增加一点扩散半径 (Sigma 30 -> 35)
+    // 这样边缘的下降坡度会更缓，有利于渐变渲染
+    private static final double SIGMA = 35.0;
     private static final int KERNEL_RADIUS = (int) (SIGMA * 3);
 
     private static class Point {
@@ -29,14 +27,10 @@ public class HeatmapController {
     }
 
     public void setData(int teamNumber, List<ScoreEntry> matches) {
-        teamTitleLabel.setText("Probability Cloud Analysis - Team " + teamNumber);
+        teamTitleLabel.setText("Probability Cloud - Team " + teamNumber);
 
-        // 异步计算以防止界面卡顿（虽然优化后很快，但在大量数据下保持UI响应是个好习惯）
         new Thread(() -> {
-            // 1. 提取有效点
             List<Point> validPoints = extractPoints(teamNumber, matches);
-
-            // 2. 渲染
             Platform.runLater(() -> {
                 if (validPoints.isEmpty()) return;
                 drawProbabilityCloud(validPoints);
@@ -53,8 +47,6 @@ public class HeatmapController {
             if (locs == null || locs.isEmpty()) continue;
 
             boolean isRedAlliance = "RED".equalsIgnoreCase(match.getAlliance());
-
-            // 确定目标队伍在这场比赛中是 Team 1 还是 Team 2
             int targetIndexInMatch = 0;
             if (match.getTeam1() == targetTeam) targetIndexInMatch = 1;
             else if (match.getTeam2() == targetTeam) targetIndexInMatch = 2;
@@ -71,7 +63,6 @@ public class HeatmapController {
                 try {
                     int teamIdx = 1;
                     String coordsStr = pStr;
-
                     if (pStr.contains(":")) {
                         String[] parts = pStr.split(":");
                         teamIdx = Integer.parseInt(parts[0]);
@@ -83,7 +74,6 @@ public class HeatmapController {
                         double x = Double.parseDouble(coords[0]);
                         double y = Double.parseDouble(coords[1]);
 
-                        // 统一坐标系：红方镜像翻转，使得所有投篮看起来都像是在同一侧进攻
                         if (isRedAlliance) {
                             x = width - x;
                         }
@@ -95,18 +85,13 @@ public class HeatmapController {
         return points;
     }
 
-    /**
-     * 使用高斯核密度估计 (Gaussian KDE) 绘制概率云
-     */
     private void drawProbabilityCloud(List<Point> points) {
         int w = (int) heatCanvas.getWidth();
         int h = (int) heatCanvas.getHeight();
 
-        // 1. 初始化密度矩阵
         double[][] densityMap = new double[w][h];
 
-        // 2. 预计算高斯核 (Optimization: Pre-computed Stencil)
-        // 这避免了对每个像素重复计算 Math.exp，大幅提升性能
+        // 预计算高斯核
         int kernelSize = KERNEL_RADIUS * 2 + 1;
         double[][] gaussianKernel = new double[kernelSize][kernelSize];
         double sigmaSq2 = 2 * SIGMA * SIGMA;
@@ -116,19 +101,15 @@ public class HeatmapController {
                 double dy = Ky - KERNEL_RADIUS;
                 double dx = Kx - KERNEL_RADIUS;
                 double distSq = dx*dx + dy*dy;
-                // 高斯公式: e^(-d^2 / 2σ^2)
                 gaussianKernel[Kx][Ky] = Math.exp(-distSq / sigmaSq2);
             }
         }
 
-        // 3. 将核叠加到密度图上 (Accumulate Density)
+        // 累积密度
         double maxDensity = 0;
-
         for (Point p : points) {
             int cx = (int) p.x;
             int cy = (int) p.y;
-
-            // 仅遍历受影响的矩形区域
             int startX = Math.max(0, cx - KERNEL_RADIUS);
             int endX = Math.min(w, cx + KERNEL_RADIUS);
             int startY = Math.max(0, cy - KERNEL_RADIUS);
@@ -136,39 +117,33 @@ public class HeatmapController {
 
             for (int x = startX; x < endX; x++) {
                 for (int y = startY; y < endY; y++) {
-                    // 从预计算核中获取值
                     int kx = x - cx + KERNEL_RADIUS;
                     int ky = y - cy + KERNEL_RADIUS;
-
-                    // 边界检查（理论上循环边界已处理，但为了安全）
                     if (kx >= 0 && kx < kernelSize && ky >= 0 && ky < kernelSize) {
                         double val = gaussianKernel[kx][ky];
                         densityMap[x][y] += val;
-                        if (densityMap[x][y] > maxDensity) {
-                            maxDensity = densityMap[x][y];
-                        }
+                        if (densityMap[x][y] > maxDensity) maxDensity = densityMap[x][y];
                     }
                 }
             }
         }
 
-        // 4. 渲染 (Rendering)
         PixelWriter pw = heatCanvas.getGraphicsContext2D().getPixelWriter();
 
-        // 阈值处理：如果 maxDensity 太小（数据点极少），强制提高基准，避免单一的点变成深红色
-        // 这让单次投篮看起来像淡淡的云，而不是强烈的热点
+        // 使用动态归一化因子
+        // Math.max(maxDensity, 1.5) 确保即使只有一个点，也不会红得刺眼，而是保持柔和
         double normalizationFactor = Math.max(maxDensity, 1.5);
 
         for (int x = 0; x < w; x++) {
             for (int y = 0; y < h; y++) {
                 double density = densityMap[x][y];
 
-                if (density > 0.01) { // 极小值忽略，优化透明度
-                    // 归一化 (0.0 - 1.0)
+                // 核心修改 1: 极低阈值 (0.0001)，几乎不做截断，保证边缘有数据
+                if (density > 0.0001) {
                     double ratio = density / normalizationFactor;
                     if (ratio > 1.0) ratio = 1.0;
 
-                    pw.setColor(x, y, getProbabilityColor(ratio));
+                    pw.setColor(x, y, getSmoothGradientColor(ratio));
                 } else {
                     pw.setColor(x, y, Color.TRANSPARENT);
                 }
@@ -177,34 +152,42 @@ public class HeatmapController {
     }
 
     /**
-     * 专业的概率密度色阶映射
-     * 0.0 - 0.2 : 透明 -> 蓝色 (Cold/Low Probability)
-     * 0.2 - 0.5 : 蓝色 -> 绿色 -> 黄色
-     * 0.5 - 1.0 : 黄色 -> 红色 (Hot/High Probability)
+     * 丝滑渐变算法：
+     * 透明 -> 紫色 -> 蓝色 -> 青色 -> 绿色 -> 黄色 -> 红色
      */
-    private Color getProbabilityColor(double ratio) {
-        // 只有当概率密度超过一定阈值才开始显示颜色，制造"云"的边缘淡出效果
-        double opacity = Math.min(0.85, ratio * 1.5); // 最高透明度 0.85，保留背景可见性
-
-        // 使用 HSB 色彩空间进行平滑过渡
-        // Hue: 240(Blue) -> 120(Green) -> 60(Yellow) -> 0(Red)
-        // 我们希望主要分布在 240 -> 0 区间
+    private Color getSmoothGradientColor(double ratio) {
+        // 核心修改 2: Opacity 不再有基数 (0.2)，而是从 0.0 开始
+        // 使用 pow(ratio, 0.4) 是为了让低密度区域也能稍微显色（提亮暗部），否则边缘太淡看不清
+        // 限制最大透明度为 0.9，保留一点背景纹理
+        double opacity = Math.min(0.9, Math.pow(ratio, 0.45));
 
         double hue;
         double saturation = 1.0;
-        double brightness = 1.0;
+        // 亮度随密度稍微增加，边缘稍微暗一点，中心亮一点，增加体积感
+        double brightness = 0.8 + (ratio * 0.2);
 
-        // 非线性映射，让红色区域（高密度）更集中，蓝色区域（低密度）范围更广
-        // 这样视觉上更容易区分“偶尔出现”和“经常出现”
-        if (ratio < 0.3) {
-            // 0.0 - 0.3: Blue range (240 - 200)
-            hue = 240 - (ratio / 0.3) * 40;
-        } else if (ratio < 0.6) {
-            // 0.3 - 0.6: Cyan to Green to Yellow (200 - 60)
-            hue = 200 - ((ratio - 0.3) / 0.3) * 140;
+        // --- 调整后的色相映射 ---
+        // 我们利用 0.0 - 0.5 的广阔空间来做 紫色->蓝色 的过渡
+
+        if (ratio < 0.4) {
+            // [0.0 - 0.4] 极低密度边缘 -> 冷色
+            // Hue: 280 (Deep Purple) -> 200 (Light Blue)
+            // 这里覆盖了大部分边缘区域，紫色会慢慢融化在背景里
+            double localRatio = ratio / 0.4;
+            hue = 280 - (localRatio * 80);
+
+        } else if (ratio < 0.75) {
+            // [0.4 - 0.75] 中等密度 -> 过渡色
+            // Hue: 200 (Light Blue) -> 80 (Green/Lime)
+            double localRatio = (ratio - 0.4) / 0.35;
+            hue = 200 - (localRatio * 120);
+
         } else {
-            // 0.6 - 1.0: Yellow to Red (60 - 0)
-            hue = 60 - ((ratio - 0.6) / 0.4) * 60;
+            // [0.75 - 1.0] 高密度核心 -> 暖色警告
+            // Hue: 80 (Lime) -> 0 (Red)
+            // 只有最后 25% 的高频区域会变暖
+            double localRatio = (ratio - 0.75) / 0.25;
+            hue = 80 - (localRatio * 80);
         }
 
         return Color.hsb(hue, saturation, brightness, opacity);
