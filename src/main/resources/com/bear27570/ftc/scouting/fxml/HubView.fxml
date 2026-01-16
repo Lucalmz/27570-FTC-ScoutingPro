@@ -31,7 +31,10 @@
                 <TextField fx:id="newCompetitionField" promptText="New Competition Name" maxWidth="300"/>
                 <Button onAction="#handleCreateButton" text="Create Competition"/>
             </VBox>
-
+            <HBox spacing="10" alignment="CENTER">
+                <Button onAction="#handleHostButton" text="Start Hosting" prefWidth="200" style="-fx-base: #007BFF;"/>
+                <Button onAction="#handleManageMembers" text="Manage Members" prefWidth="150" style="-fx-base: #FF9800;"/>
+            </HBox>
             <VBox fx:id="joinPane" spacing="10" alignment="TOP_CENTER" managed="false" visible="false">
                 <Label styleClass="table-header-label" text="Select a Competition on the Network to Join"/>
                 <ListView fx:id="discoveredCompetitionsListView" />

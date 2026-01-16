@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 public class HubController {
 
     @FXML private Label welcomeLabel, statusLabel;
-    @FXML private Button hostModeButton, joinModeButton; // 改为 Button
+    @FXML private Button hostModeButton, joinModeButton;
     @FXML private VBox hostPane, joinPane;
     @FXML private ListView<Competition> myCompetitionsListView;
     @FXML private ListView<Competition> discoveredCompetitionsListView;
@@ -36,16 +36,12 @@ public class HubController {
 
     @FXML
     private void selectHostMode() {
-        // 停止所有网络活动，以防万一
         NetworkService.getInstance().stop();
-
         hostPane.setVisible(true); hostPane.setManaged(true);
         joinPane.setVisible(false); joinPane.setManaged(false);
         statusLabel.setText("Select a competition to host or create a new one.");
-
-        // 更新按钮视觉样式
-        hostModeButton.setStyle("-fx-background-color: #007BFF;"); // 选中样式
-        joinModeButton.setStyle(""); // 恢复默认样式
+        hostModeButton.setStyle("-fx-background-color: #007BFF;");
+        joinModeButton.setStyle("");
     }
 
     @FXML
@@ -53,19 +49,15 @@ public class HubController {
         hostPane.setVisible(false); hostPane.setManaged(false);
         joinPane.setVisible(true); joinPane.setManaged(true);
         statusLabel.setText("Searching for competitions on the network...");
-
-        // 更新按钮视觉样式
-        joinModeButton.setStyle("-fx-background-color: #007BFF;"); // 选中样式
-        hostModeButton.setStyle(""); // 恢复默认样式
-
-        // 开始服务发现
+        joinModeButton.setStyle("-fx-background-color: #007BFF;");
+        hostModeButton.setStyle("");
         startDiscovery();
     }
 
     private void startDiscovery() {
         discoveredCompetitions.clear();
         discoveredCompetitionsListView.setItems(discoveredCompetitions);
-        NetworkService.getInstance().startDiscovery(discoveredCompetitions); // 使用单例
+        NetworkService.getInstance().startDiscovery(discoveredCompetitions);
     }
 
     private void refreshMyCompetitionsList() {
@@ -75,6 +67,7 @@ public class HubController {
                         .collect(Collectors.toList())
         ));
     }
+
     @FXML
     private void handleCreateButton() {
         String newName = newCompetitionField.getText();
@@ -98,8 +91,26 @@ public class HubController {
             statusLabel.setText("Please select one of your competitions to host.");
             return;
         }
-        mainApp.showScoringView(selected, currentUsername, true); // true for isHost
+        mainApp.showScoringView(selected, currentUsername, true);
     }
+
+    // --- 新增：处理管理成员按钮点击 ---
+    @FXML
+    private void handleManageMembers() {
+        Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            statusLabel.setText("Please select a competition to manage.");
+            return;
+        }
+        try {
+            // 调用 MainApplication 中的方法打开弹窗
+            mainApp.showCoordinatorView(selected);
+        } catch (IOException e) {
+            e.printStackTrace();
+            statusLabel.setText("Error opening manager: " + e.getMessage());
+        }
+    }
+    // -------------------------------
 
     @FXML
     private void handleJoinButton() throws IOException {
@@ -108,13 +119,12 @@ public class HubController {
             statusLabel.setText("Please select a competition from the list to join.");
             return;
         }
-        // 我们不再需要在这里 stop，因为 connectToHost 内部会处理
         mainApp.showScoringView(selected, currentUsername, false);
     }
 
     @FXML
     private void handleLogout() throws IOException {
-        NetworkService.getInstance().stop(); // 使用单例
+        NetworkService.getInstance().stop();
         mainApp.showLoginView();
     }
 }
