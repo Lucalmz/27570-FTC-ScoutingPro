@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 public class ScoreEntry implements Serializable {
-    private static final long serialVersionUID = 7L; // Version updated
+    private static final long serialVersionUID = 9L;
 
     public enum Type { ALLIANCE, SINGLE }
 
@@ -20,16 +20,25 @@ public class ScoreEntry implements Serializable {
     private boolean team2CanSequence;
     private boolean team1L2Climb;
     private boolean team2L2Climb;
+
+    // Ignore / Weak flags
+    private boolean team1Ignored;
+    private boolean team2Ignored;
+
+    // Broken Robot flags
+    private boolean team1Broken;
+    private boolean team2Broken;
+
     private int totalScore;
     private String submitter;
     private String submissionTime;
-
-    // 新增：存储点击坐标，格式 "x,y;x,y;..."
-    private String clickLocations;
+    private String clickLocations; // Format: "teamIdx:x,y,state;..."
 
     public ScoreEntry(Type scoreType, int matchNumber, String alliance, int team1, int team2, int autoArtifacts, int teleopArtifacts,
                       boolean team1CanSequence, boolean team2CanSequence, boolean team1L2Climb, boolean team2L2Climb,
-                      String clickLocations, // 新增参数
+                      boolean team1Ignored, boolean team2Ignored,
+                      boolean team1Broken, boolean team2Broken,
+                      String clickLocations,
                       String submitter) {
         this.scoreType = scoreType;
         this.matchNumber = matchNumber;
@@ -42,6 +51,10 @@ public class ScoreEntry implements Serializable {
         this.team2CanSequence = team2CanSequence;
         this.team1L2Climb = team1L2Climb;
         this.team2L2Climb = team2L2Climb;
+        this.team1Ignored = team1Ignored;
+        this.team2Ignored = team2Ignored;
+        this.team1Broken = team1Broken;
+        this.team2Broken = team2Broken;
         this.clickLocations = clickLocations;
         this.submitter = submitter;
         this.submissionTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
@@ -57,7 +70,6 @@ public class ScoreEntry implements Serializable {
         return score;
     }
 
-    // Getters
     public Type getScoreType() { return scoreType; }
     public int getMatchNumber() { return matchNumber; }
     public String getAlliance() { return alliance; }
@@ -76,5 +88,9 @@ public class ScoreEntry implements Serializable {
     public boolean isTeam2CanSequence() { return team2CanSequence; }
     public boolean isTeam1L2Climb() { return team1L2Climb; }
     public boolean isTeam2L2Climb() { return team2L2Climb; }
+    public boolean isTeam1Ignored() { return team1Ignored; }
+    public boolean isTeam2Ignored() { return team2Ignored; }
+    public boolean isTeam1Broken() { return team1Broken; }
+    public boolean isTeam2Broken() { return team2Broken; }
     public String getClickLocations() { return clickLocations; }
 }

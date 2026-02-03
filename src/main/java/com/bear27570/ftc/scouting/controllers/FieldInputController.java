@@ -6,9 +6,12 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Label;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 
 import java.util.ArrayList;
@@ -26,45 +29,39 @@ public class FieldInputController {
     private boolean confirmed = false;
     private boolean isAllianceMode = true;
 
-    // 带队伍标记的点
+    // 分割线 (y=400)
+    private static final double ZONE_DIVIDER_Y = 400.0;
+
     public static class TeamPoint {
         double x, y;
-        int teamIndex; // 1 or 2
-        public TeamPoint(double x, double y, int teamIndex) {
-            this.x = x; this.y = y; this.teamIndex = teamIndex;
+        int teamIndex;
+        boolean isMiss;
+        public TeamPoint(double x, double y, int teamIndex, boolean isMiss) {
+            this.x = x; this.y = y; this.teamIndex = teamIndex; this.isMiss = isMiss;
         }
     }
 
-    @FXML
-    public void initialize() {
+    @FXML public void initialize() {
         ToggleGroup teamGroup = new ToggleGroup();
-        team1Btn.setToggleGroup(teamGroup);
-        team2Btn.setToggleGroup(teamGroup);
-
+        team1Btn.setToggleGroup(teamGroup); team2Btn.setToggleGroup(teamGroup);
         ToggleGroup modeGroup = new ToggleGroup();
-        addModeBtn.setToggleGroup(modeGroup);
-        removeModeBtn.setToggleGroup(modeGroup);
-
+        addModeBtn.setToggleGroup(modeGroup); removeModeBtn.setToggleGroup(modeGroup);
         redraw();
     }
 
     public void setDialogStage(Stage dialogStage) { this.dialogStage = dialogStage; }
-
-    // 由 MainController 调用，设置是否显示双队切换
     public void setAllianceMode(boolean isAllianceMode) {
         this.isAllianceMode = isAllianceMode;
         teamSelectBox.setVisible(isAllianceMode);
         teamSelectBox.setManaged(isAllianceMode);
-        if (!isAllianceMode) {
-            team1Btn.setSelected(true); // 单队模式默认 Team 1
-        }
+        if (!isAllianceMode) { team1Btn.setSelected(true); }
     }
 
-    @FXML
-    private void handleCanvasClick(MouseEvent event) {
+    @FXML private void handleCanvasClick(MouseEvent event) {
         if (addModeBtn.isSelected()) {
             int currentTeam = team1Btn.isSelected() ? 1 : 2;
-            points.add(new TeamPoint(event.getX(), event.getY(), currentTeam));
+            boolean isMiss = (event.getButton() == MouseButton.SECONDARY);
+            points.add(new TeamPoint(event.getX(), event.getY(), currentTeam, isMiss));
         } else {
             removeClosestPoint(event.getX(), event.getY());
         }
@@ -75,31 +72,21 @@ public class FieldInputController {
         TeamPoint closest = null;
         double minDesc = Double.MAX_VALUE;
         double radius = 30.0;
-
-        // 只能删除当前选中队伍的点，防止误删队友
         int currentTeam = team1Btn.isSelected() ? 1 : 2;
-
         for (TeamPoint p : points) {
-            // 在联盟模式下，只删当前选中的队伍；单队模式下全删
             if (isAllianceMode && p.teamIndex != currentTeam) continue;
-
             double dist = Math.sqrt(Math.pow(p.x - x, 2) + Math.pow(p.y - y, 2));
-            if (dist < radius && dist < minDesc) {
-                minDesc = dist;
-                closest = p;
-            }
+            if (dist < radius && dist < minDesc) { minDesc = dist; closest = p; }
         }
         if (closest != null) points.remove(closest);
     }
 
     private void updateUI() {
-        long t1Count = points.stream().filter(p -> p.teamIndex == 1).count();
-        long t2Count = points.stream().filter(p -> p.teamIndex == 2).count();
-
+        long t1Count = points.stream().filter(p -> p.teamIndex == 1 && !p.isMiss).count();
+        long t2Count = points.stream().filter(p -> p.teamIndex == 2 && !p.isMiss).count();
         countT1Label.setText(String.valueOf(t1Count));
         countT2Label.setText(String.valueOf(t2Count));
-        countLabel.setText(String.valueOf(points.size()));
-
+        countLabel.setText(String.valueOf(t1Count + t2Count));
         redraw();
     }
 
@@ -107,41 +94,47 @@ public class FieldInputController {
         GraphicsContext gc = drawCanvas.getGraphicsContext2D();
         gc.clearRect(0, 0, drawCanvas.getWidth(), drawCanvas.getHeight());
 
-        gc.setLineWidth(2);
+        // --- 绘制区域辅助线 ---
+        gc.save();
+        gc.setStroke(Color.web("#FFFFFF", 0.3));
+        gc.setLineWidth(1);
+        gc.setLineDashes(10);
+        gc.strokeLine(0, ZONE_DIVIDER_Y, drawCanvas.getWidth(), ZONE_DIVIDER_Y);
 
+        gc.setFill(Color.web("#FFFFFF", 0.5));
+        gc.setFont(Font.font("System", FontWeight.BOLD, 14));
+        // 修改：上方为近点 (Near)，下方为远点 (Far)
+        gc.fillText("NEAR ZONE (Top / Large Area)", 10, ZONE_DIVIDER_Y - 10);
+        gc.fillText("FAR ZONE (Bottom / Small Area)", 10, ZONE_DIVIDER_Y + 20);
+        gc.restore();
+        // ---------------------
+
+        gc.setLineWidth(2);
         for (TeamPoint p : points) {
-            if (p.teamIndex == 1) {
-                gc.setFill(Color.web("#00BCD4")); // Cyan
-                gc.setStroke(Color.WHITE);
+            Color baseColor = (p.teamIndex == 1) ? Color.web("#00BCD4") : Color.web("#E91E63");
+            gc.setStroke(baseColor);
+            gc.setFill(baseColor);
+            if (p.isMiss) {
+                double s = 6; gc.setLineWidth(3);
+                gc.strokeLine(p.x - s, p.y - s, p.x + s, p.y + s);
+                gc.strokeLine(p.x + s, p.y - s, p.x - s, p.y + s);
             } else {
-                gc.setFill(Color.web("#E91E63")); // Pink
-                gc.setStroke(Color.WHITE);
+                gc.fillOval(p.x - 6, p.y - 6, 12, 12);
+                gc.setStroke(Color.WHITE); gc.setLineWidth(1);
+                gc.strokeOval(p.x - 6, p.y - 6, 12, 12);
             }
-            gc.fillOval(p.x - 6, p.y - 6, 12, 12);
-            gc.strokeOval(p.x - 6, p.y - 6, 12, 12);
         }
     }
 
-    @FXML private void handleClear() {
-        points.clear();
-        updateUI();
-    }
-
-    @FXML private void handleConfirm() {
-        confirmed = true;
-        dialogStage.close();
-    }
-
+    @FXML private void handleClear() { points.clear(); updateUI(); }
+    @FXML private void handleConfirm() { confirmed = true; dialogStage.close(); }
     public boolean isConfirmed() { return confirmed; }
-
-    // 返回所有点的总数
-    public int getTotalCount() { return points.size(); }
-
-    // 字符串格式： "1:123.0,456.0;2:200.0,300.0;..."
+    public int getTotalHitCount() { return (int) points.stream().filter(p -> !p.isMiss).count(); }
     public String getLocationsString() {
         StringBuilder sb = new StringBuilder();
         for (TeamPoint p : points) {
-            sb.append(p.teamIndex).append(":").append(String.format("%.1f,%.1f;", p.x, p.y));
+            int missInt = p.isMiss ? 1 : 0;
+            sb.append(p.teamIndex).append(":").append(String.format("%.1f,%.1f,%d;", p.x, p.y, missInt));
         }
         return sb.toString();
     }

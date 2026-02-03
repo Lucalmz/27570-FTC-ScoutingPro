@@ -1,195 +1,186 @@
 package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.models.ScoreEntry;
-import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Label;
-import javafx.scene.image.PixelWriter;
 import javafx.scene.paint.Color;
+import javafx.scene.layout.VBox;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class HeatmapController {
-    @FXML private Canvas heatCanvas;
     @FXML private Label teamTitleLabel;
+    @FXML private Canvas heatmapCanvas;
 
-    // --- 概率云参数配置 ---
-    // 为了让渐变更柔和，稍微增加一点扩散半径 (Sigma 30 -> 35)
-    // 这样边缘的下降坡度会更缓，有利于渐变渲染
-    private static final double SIGMA = 35.0;
-    private static final int KERNEL_RADIUS = (int) (SIGMA * 3);
+    // 右侧边栏控件
+    @FXML private Label playStyleLabel;
+    @FXML private Label efficiencyLabel;
 
-    private static class Point {
-        double x, y;
-        Point(double x, double y) { this.x = x; this.y = y; }
-    }
+    // 效率拆分
+    @FXML private Label farShotsLabel; // 显示远点场均进球
+    @FXML private Label farAccLabel;
+    @FXML private Label nearShotsLabel; // 显示近点场均进球
+    @FXML private Label nearAccLabel;
+
+    // 新增：右侧状态显示
+    @FXML private VBox statusBox;
+    @FXML private Label statusTextLabel;
+    @FXML private Label brokenTextLabel;
+
+    private static final double ZONE_DIVIDER_Y = 400.0;
+
+    // 修改：所有球统一为 3 分
+    private static final int POINTS_PER_HIT = 3;
 
     public void setData(int teamNumber, List<ScoreEntry> matches) {
-        teamTitleLabel.setText("Probability Cloud - Team " + teamNumber);
+        teamTitleLabel.setText("Team " + teamNumber + " Heatmap");
 
-        new Thread(() -> {
-            List<Point> validPoints = extractPoints(teamNumber, matches);
-            Platform.runLater(() -> {
-                if (validPoints.isEmpty()) return;
-                drawProbabilityCloud(validPoints);
-            });
-        }).start();
+        // --- 1. 状态检查 (Weak/Ignored) ---
+        boolean isIgnored = matches.stream().anyMatch(m ->
+                (m.getTeam1() == teamNumber && m.isTeam1Ignored()) ||
+                        (m.getTeam2() == teamNumber && m.isTeam2Ignored())
+        );
+        if (isIgnored) {
+            statusTextLabel.setText("IGNORED / WEAK");
+            statusTextLabel.setTextFill(Color.web("#FF5252"));
+        } else {
+            statusTextLabel.setText("ACTIVE");
+            statusTextLabel.setTextFill(Color.LIGHTGREEN);
+        }
+
+        // --- 2. 车坏了场次统计 ---
+        List<Integer> brokenMatches = matches.stream()
+                .filter(m -> (m.getTeam1() == teamNumber && m.isTeam1Broken()) ||
+                        (m.getTeam2() == teamNumber && m.isTeam2Broken()))
+                .map(ScoreEntry::getMatchNumber)
+                .sorted()
+                .collect(Collectors.toList());
+
+        if (brokenMatches.isEmpty()) {
+            brokenTextLabel.setText("None");
+        } else {
+            brokenTextLabel.setText("Matches: " + brokenMatches.toString());
+        }
+
+        calculateAndDraw(teamNumber, matches);
     }
 
-    private List<Point> extractPoints(int targetTeam, List<ScoreEntry> matches) {
-        List<Point> points = new ArrayList<>();
-        double width = heatCanvas.getWidth();
+    private void calculateAndDraw(int teamNumber, List<ScoreEntry> matches) {
+        GraphicsContext gc = heatmapCanvas.getGraphicsContext2D();
+        gc.clearRect(0, 0, heatmapCanvas.getWidth(), heatmapCanvas.getHeight());
 
-        for (ScoreEntry match : matches) {
-            String locs = match.getClickLocations();
+        gc.setStroke(Color.web("#FFFFFF", 0.3));
+        gc.setLineWidth(1);
+        gc.setLineDashes(10);
+        gc.strokeLine(0, ZONE_DIVIDER_Y, heatmapCanvas.getWidth(), ZONE_DIVIDER_Y);
+        gc.setLineDashes(null);
+
+        gc.setFill(Color.web("#FFFFFF", 0.5));
+        // 修改：Top = Near, Bottom = Far
+        gc.fillText("NEAR ZONE (Top)", 10, ZONE_DIVIDER_Y - 10);
+        gc.fillText("FAR ZONE (Bottom)", 10, ZONE_DIVIDER_Y + 20);
+
+        int farShots = 0, farHits = 0;
+        int nearShots = 0, nearHits = 0;
+
+        // 计算有效场次 (剔除Broken的场次可能更准，但此处按“出场数”算)
+        long validMatchCount = matches.stream().filter(m -> {
+            boolean p1 = (m.getTeam1() == teamNumber && !m.isTeam1Broken());
+            boolean p2 = (m.getTeam2() == teamNumber && !m.isTeam2Broken());
+            return p1 || p2;
+        }).count();
+        if (validMatchCount == 0) validMatchCount = 1; // 避免除0
+
+        for (ScoreEntry m : matches) {
+            String locs = m.getClickLocations();
             if (locs == null || locs.isEmpty()) continue;
-
-            boolean isRedAlliance = "RED".equalsIgnoreCase(match.getAlliance());
-            int targetIndexInMatch = 0;
-            if (match.getTeam1() == targetTeam) targetIndexInMatch = 1;
-            else if (match.getTeam2() == targetTeam) targetIndexInMatch = 2;
-
-            if (match.getScoreType() == ScoreEntry.Type.SINGLE) {
-                targetIndexInMatch = 1;
-            }
-
-            if (targetIndexInMatch == 0) continue;
-
-            String[] rawPoints = locs.split(";");
-            for (String pStr : rawPoints) {
-                if (pStr.isEmpty()) continue;
+            String[] points = locs.split(";");
+            for (String p : points) {
                 try {
-                    int teamIdx = 1;
-                    String coordsStr = pStr;
-                    if (pStr.contains(":")) {
-                        String[] parts = pStr.split(":");
-                        teamIdx = Integer.parseInt(parts[0]);
-                        coordsStr = parts[1];
-                    }
+                    String[] parts = p.split(":");
+                    if (parts.length < 2) continue;
+                    int pTeamIdx = Integer.parseInt(parts[0]);
+                    int actualTeamNum = (pTeamIdx == 1) ? m.getTeam1() : m.getTeam2();
 
-                    if (teamIdx == targetIndexInMatch) {
-                        String[] coords = coordsStr.split(",");
+                    if (actualTeamNum == teamNumber) {
+                        String[] coords = parts[1].split(",");
                         double x = Double.parseDouble(coords[0]);
                         double y = Double.parseDouble(coords[1]);
+                        int state = (coords.length >= 3) ? Integer.parseInt(coords[2]) : 0;
+                        boolean isHit = (state == 0);
 
-                        if (isRedAlliance) {
-                            x = width - x;
+                        // 修改判定：y < 400 是上方(Near)，y > 400 是下方(Far)
+                        if (y < ZONE_DIVIDER_Y) {
+                            nearShots++;
+                            if (isHit) nearHits++;
+                        } else {
+                            farShots++;
+                            if (isHit) farHits++;
                         }
-                        points.add(new Point(x, y));
+
+                        if (isHit) {
+                            gc.setFill(Color.rgb(0, 255, 0, 0.6));
+                            gc.fillOval(x - 5, y - 5, 10, 10);
+                        } else {
+                            gc.setStroke(Color.rgb(255, 0, 0, 0.6));
+                            gc.setLineWidth(2);
+                            gc.strokeLine(x - 5, y - 5, x + 5, y + 5);
+                            gc.strokeLine(x + 5, y - 5, x - 5, y + 5);
+                        }
                     }
-                } catch (Exception e) { /* ignore */ }
+                } catch (Exception ignored) {}
             }
         }
-        return points;
+        updateAnalysis(farShots, farHits, nearShots, nearHits, (int)validMatchCount);
     }
 
-    private void drawProbabilityCloud(List<Point> points) {
-        int w = (int) heatCanvas.getWidth();
-        int h = (int) heatCanvas.getHeight();
+    private void updateAnalysis(int farShots, int farHits, int nearShots, int nearHits, int matchCount) {
+        int totalShots = farShots + nearShots;
+        int totalHits = farHits + nearHits;
 
-        double[][] densityMap = new double[w][h];
+        double avgFarHits = (double) farHits / matchCount;
+        double avgNearHits = (double) nearHits / matchCount;
 
-        // 预计算高斯核
-        int kernelSize = KERNEL_RADIUS * 2 + 1;
-        double[][] gaussianKernel = new double[kernelSize][kernelSize];
-        double sigmaSq2 = 2 * SIGMA * SIGMA;
+        double farAcc = (farShots > 0) ? (double) farHits / farShots * 100.0 : 0;
+        double nearAcc = (nearShots > 0) ? (double) nearHits / nearShots * 100.0 : 0;
 
-        for (int Ky = 0; Ky < kernelSize; Ky++) {
-            for (int Kx = 0; Kx < kernelSize; Kx++) {
-                double dy = Ky - KERNEL_RADIUS;
-                double dx = Kx - KERNEL_RADIUS;
-                double distSq = dx*dx + dy*dy;
-                gaussianKernel[Kx][Ky] = Math.exp(-distSq / sigmaSq2);
-            }
+        farShotsLabel.setText(String.format("%.1f Hits/M", avgFarHits));
+        nearShotsLabel.setText(String.format("%.1f Hits/M", avgNearHits));
+
+        farAccLabel.setText(String.format("%.1f%%", farAcc));
+        nearAccLabel.setText(String.format("%.1f%%", nearAcc));
+
+        if (totalShots == 0) {
+            playStyleLabel.setText("No Data");
+            efficiencyLabel.setText("0.0 PPS");
+            return;
         }
 
-        // 累积密度
-        double maxDensity = 0;
-        for (Point p : points) {
-            int cx = (int) p.x;
-            int cy = (int) p.y;
-            int startX = Math.max(0, cx - KERNEL_RADIUS);
-            int endX = Math.min(w, cx + KERNEL_RADIUS);
-            int startY = Math.max(0, cy - KERNEL_RADIUS);
-            int endY = Math.min(h, cy + KERNEL_RADIUS);
-
-            for (int x = startX; x < endX; x++) {
-                for (int y = startY; y < endY; y++) {
-                    int kx = x - cx + KERNEL_RADIUS;
-                    int ky = y - cy + KERNEL_RADIUS;
-                    if (kx >= 0 && kx < kernelSize && ky >= 0 && ky < kernelSize) {
-                        double val = gaussianKernel[kx][ky];
-                        densityMap[x][y] += val;
-                        if (densityMap[x][y] > maxDensity) maxDensity = densityMap[x][y];
-                    }
-                }
-            }
-        }
-
-        PixelWriter pw = heatCanvas.getGraphicsContext2D().getPixelWriter();
-
-        // 使用动态归一化因子
-        // Math.max(maxDensity, 1.5) 确保即使只有一个点，也不会红得刺眼，而是保持柔和
-        double normalizationFactor = Math.max(maxDensity, 1.5);
-
-        for (int x = 0; x < w; x++) {
-            for (int y = 0; y < h; y++) {
-                double density = densityMap[x][y];
-
-                // 核心修改 1: 极低阈值 (0.0001)，几乎不做截断，保证边缘有数据
-                if (density > 0.0001) {
-                    double ratio = density / normalizationFactor;
-                    if (ratio > 1.0) ratio = 1.0;
-
-                    pw.setColor(x, y, getSmoothGradientColor(ratio));
-                } else {
-                    pw.setColor(x, y, Color.TRANSPARENT);
-                }
-            }
-        }
-    }
-
-    /**
-     * 丝滑渐变算法：
-     * 透明 -> 紫色 -> 蓝色 -> 青色 -> 绿色 -> 黄色 -> 红色
-     */
-    private Color getSmoothGradientColor(double ratio) {
-        // 核心修改 2: Opacity 不再有基数 (0.2)，而是从 0.0 开始
-        // 使用 pow(ratio, 0.4) 是为了让低密度区域也能稍微显色（提亮暗部），否则边缘太淡看不清
-        // 限制最大透明度为 0.9，保留一点背景纹理
-        double opacity = Math.min(0.9, Math.pow(ratio, 0.45));
-
-        double hue;
-        double saturation = 1.0;
-        // 亮度随密度稍微增加，边缘稍微暗一点，中心亮一点，增加体积感
-        double brightness = 0.8 + (ratio * 0.2);
-
-        // --- 调整后的色相映射 ---
-        // 我们利用 0.0 - 0.5 的广阔空间来做 紫色->蓝色 的过渡
-
-        if (ratio < 0.4) {
-            // [0.0 - 0.4] 极低密度边缘 -> 冷色
-            // Hue: 280 (Deep Purple) -> 200 (Light Blue)
-            // 这里覆盖了大部分边缘区域，紫色会慢慢融化在背景里
-            double localRatio = ratio / 0.4;
-            hue = 280 - (localRatio * 80);
-
-        } else if (ratio < 0.75) {
-            // [0.4 - 0.75] 中等密度 -> 过渡色
-            // Hue: 200 (Light Blue) -> 80 (Green/Lime)
-            double localRatio = (ratio - 0.4) / 0.35;
-            hue = 200 - (localRatio * 120);
-
+        // 修改风格判定：远点占比高 (Far > Near)
+        double farRatio = (double) farShots / totalShots;
+        if (farRatio > 0.65) {
+            playStyleLabel.setText("Far Zone Specialist");
+            playStyleLabel.setStyle("-fx-text-fill: #FF9800; -fx-font-size: 16px; -fx-font-weight: bold;");
+        } else if (farRatio < 0.35) {
+            playStyleLabel.setText("Near Zone Rusher");
+            playStyleLabel.setStyle("-fx-text-fill: #4CAF50; -fx-font-size: 16px; -fx-font-weight: bold;");
         } else {
-            // [0.75 - 1.0] 高密度核心 -> 暖色警告
-            // Hue: 80 (Lime) -> 0 (Red)
-            // 只有最后 25% 的高频区域会变暖
-            double localRatio = (ratio - 0.75) / 0.25;
-            hue = 80 - (localRatio * 80);
+            playStyleLabel.setText("Hybrid");
+            playStyleLabel.setStyle("-fx-text-fill: #00BCD4; -fx-font-size: 16px; -fx-font-weight: bold;");
         }
 
-        return Color.hsb(hue, saturation, brightness, opacity);
+        // 修改：效率计算 PPS = (TotalHits * 3) / TotalShots. 结果应 <= 3.0
+        double totalScore = totalHits * POINTS_PER_HIT;
+        double pps = totalScore / totalShots;
+
+        efficiencyLabel.setText(String.format("%.2f PPS", pps));
+
+        // 阈值调整：最高3.0
+        if (pps >= 2.5) efficiencyLabel.setStyle("-fx-text-fill: #FF5252; -fx-font-size: 24px; -fx-font-weight: bold;");
+        else if (pps >= 1.5) efficiencyLabel.setStyle("-fx-text-fill: #FFEB3B; -fx-font-size: 24px; -fx-font-weight: bold;");
+        else efficiencyLabel.setStyle("-fx-text-fill: #FFFFFF; -fx-font-size: 24px; -fx-font-weight: bold;");
     }
 }

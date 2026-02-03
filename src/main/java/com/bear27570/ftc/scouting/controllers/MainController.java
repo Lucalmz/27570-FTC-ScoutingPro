@@ -1,10 +1,7 @@
 package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.MainApplication;
-import com.bear27570.ftc.scouting.models.Competition;
-import com.bear27570.ftc.scouting.models.NetworkPacket;
-import com.bear27570.ftc.scouting.models.ScoreEntry;
-import com.bear27570.ftc.scouting.models.TeamRanking;
+import com.bear27570.ftc.scouting.models.*;
 import com.bear27570.ftc.scouting.services.DatabaseService;
 import com.bear27570.ftc.scouting.services.NetworkService;
 import javafx.application.Platform;
@@ -27,50 +24,52 @@ import java.util.List;
 
 public class MainController {
 
-    @FXML private Label competitionNameLabel;
-    @FXML private Label submitterLabel;
-    @FXML private Label errorLabel;
-    @FXML private Label statusLabel;
-    @FXML private VBox scoringFormVBox;
+    @FXML private Label competitionNameLabel, submitterLabel, errorLabel, statusLabel;
 
-    // --- Scoring Tab Inputs ---
+    // Scoring Tab
+    @FXML private VBox scoringFormVBox;
     @FXML private RadioButton allianceModeRadio, singleModeRadio;
     @FXML private TextField matchNumberField, team1Field, team2Field;
     @FXML private TextField autoArtifactsField, teleopArtifactsField;
     @FXML private ToggleButton redAllianceToggle, blueAllianceToggle;
     @FXML private CheckBox team1SequenceCheck, team1L2ClimbCheck;
-
-    // UI elements to hide in Single Team Mode
+    @FXML private CheckBox team1IgnoreCheck, team2IgnoreCheck;
+    @FXML private CheckBox team1BrokenCheck, team2BrokenCheck;
+    @FXML private Label team1WarningLabel, team2WarningLabel;
+    @FXML private VBox team2IgnoreBox;
     @FXML private Label lblTeam2;
     @FXML private VBox team2CapsBox;
     @FXML private CheckBox team2SequenceCheck, team2L2ClimbCheck;
 
-    private ToggleGroup allianceToggleGroup;
-    private ToggleGroup modeToggleGroup;
+    // --- 新增: Penalty Tab ---
+    @FXML private TextField penMatchField;
+    @FXML private TextField penRedMajor, penRedMinor;
+    @FXML private TextField penBlueMajor, penBlueMinor;
+    @FXML private Label penStatusLabel;
 
-    // 暂存当前录入的坐标数据 (格式: "1:x,y;2:x,y;...")
-    private String currentClickLocations = "";
-
-    // --- Rankings Tab Inputs ---
+    // Rankings Tab
     @FXML private Button editRatingButton;
-    @FXML private Label rankingLegendLabel; // Legend for explanation
+    @FXML private Label rankingLegendLabel;
     @FXML private TableView<TeamRanking> rankingsTableView;
     @FXML private TableColumn<TeamRanking, Integer> rankTeamCol, rankMatchesCol;
     @FXML private TableColumn<TeamRanking, Double> rankAutoCol, rankTeleopCol;
-    @FXML private TableColumn<TeamRanking, String> rankSequenceCol, rankL2Col, rankRatingCol;
-    @FXML private TableColumn<TeamRanking, Void> rankHeatmapCol; // Column for "View Map" buttons
+    @FXML private TableColumn<TeamRanking, String> rankSequenceCol, rankL2Col, rankRatingCol, rankAccuracyCol;
+    @FXML private TableColumn<TeamRanking, String> rankPenCommCol, rankPenOppCol; // 新增列
+    @FXML private TableColumn<TeamRanking, Void> rankHeatmapCol;
 
-    // --- History Tab Inputs ---
+    // History Tab
     @FXML private TextField searchField;
     @FXML private TableView<ScoreEntry> historyTableView;
     @FXML private TableColumn<ScoreEntry, Integer> histMatchCol, histTotalCol;
     @FXML private TableColumn<ScoreEntry, String> histAllianceCol, histTeamsCol, histSubmitterCol, histTimeCol;
 
+    private ToggleGroup allianceToggleGroup;
+    private ToggleGroup modeToggleGroup;
+    private String currentClickLocations = "";
     private MainApplication mainApp;
     private Competition currentCompetition;
     private String currentUsername;
     private boolean isHost;
-
     private ObservableList<ScoreEntry> scoreHistoryList = FXCollections.observableArrayList();
 
     public void setMainApp(MainApplication mainApp, Competition competition, String username, boolean isHost) {
@@ -95,22 +94,17 @@ public class MainController {
         }
     }
 
-    // --- Networking Setup ---
     private void startAsHost() {
         refreshAllDataFromDatabase();
         NetworkService.getInstance().startHost(currentCompetition, this::handleScoreReceivedFromClient);
     }
-
     private void startAsClient() {
         setUIEnabled(false);
         try {
             NetworkService.getInstance().connectToHost(currentCompetition.getHostAddress(), this::handleUpdateReceivedFromHost);
             statusLabel.setText("Connected to host. Waiting for data...");
-        } catch (IOException e) {
-            statusLabel.setText("Failed to connect: " + e.getMessage());
-        }
+        } catch (IOException e) { statusLabel.setText("Failed to connect: " + e.getMessage()); }
     }
-
     private void handleScoreReceivedFromClient(ScoreEntry scoreEntry) {
         DatabaseService.saveScoreEntry(currentCompetition.getName(), scoreEntry);
         refreshAllDataFromDatabase();
@@ -118,58 +112,43 @@ public class MainController {
         List<TeamRanking> newRankings = DatabaseService.calculateTeamRankings(currentCompetition.getName());
         NetworkService.getInstance().broadcastUpdateToClients(new NetworkPacket(fullHistory, newRankings));
     }
-
     private void handleUpdateReceivedFromHost(NetworkPacket packet) {
         if (packet.getType() == NetworkPacket.PacketType.UPDATE_DATA) {
             updateUIAfterDataChange(packet.getScoreHistory(), packet.getTeamRankings());
             setUIEnabled(true);
             statusLabel.setText("Data updated from host.");
+            Platform.runLater(() -> {
+                checkTeamHistory(team1Field.getText(), 1);
+                checkTeamHistory(team2Field.getText(), 2);
+            });
         }
     }
 
-    // --- UI Handlers ---
-
-    @FXML
-    private void handleOpenFieldInput() {
+    @FXML private void handleOpenFieldInput() {
         try {
             FXMLLoader loader = new FXMLLoader(mainApp.getClass().getResource("fxml/FieldInputView.fxml"));
             Stage stage = new Stage();
             stage.setTitle("Record Scoring Locations");
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.setScene(new Scene(loader.load()));
-
             FieldInputController controller = loader.getController();
             controller.setDialogStage(stage);
-
-            // --- 核心逻辑：设置单/双队模式 ---
             boolean isSingle = singleModeRadio.isSelected();
-            controller.setAllianceMode(!isSingle); // 这里的 !isSingle 即为 isAllianceMode
-            // -----------------------------
-
+            controller.setAllianceMode(!isSingle);
             stage.showAndWait();
-
             if (controller.isConfirmed()) {
-                // 1. 获取计数并填入 Teleop 框 (累加或者覆盖，这里选择覆盖当前输入框以简化逻辑，用户可以手动改)
-                int count = controller.getTotalCount();
+                int count = controller.getTotalHitCount();
                 teleopArtifactsField.setText(String.valueOf(count));
-
-                // 2. 追加坐标字符串
                 String newLocs = controller.getLocationsString();
                 if (!newLocs.isEmpty()) {
-                    if (currentClickLocations.length() > 0 && !currentClickLocations.endsWith(";")) {
-                        currentClickLocations += ";";
-                    }
+                    if (currentClickLocations.length() > 0 && !currentClickLocations.endsWith(";")) currentClickLocations += ";";
                     currentClickLocations += newLocs;
                 }
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-            errorLabel.setText("Error opening map input: " + e.getMessage());
-        }
+        } catch (IOException e) { e.printStackTrace(); }
     }
 
-    @FXML
-    private void handleSubmitButtonAction() {
+    @FXML private void handleSubmitButtonAction() {
         try {
             ToggleButton selectedToggle = (ToggleButton) allianceToggleGroup.getSelectedToggle();
             if (selectedToggle == null) throw new IllegalArgumentException("Please select an alliance.");
@@ -177,7 +156,6 @@ public class MainController {
             String alliance = selectedToggle.getText().startsWith("Red") ? "RED" : "BLUE";
             boolean isSingle = singleModeRadio.isSelected();
 
-            // 验证并解析队伍号
             if (team1Field.getText().isEmpty()) throw new IllegalArgumentException("Team 1 is required.");
             int t1 = Integer.parseInt(team1Field.getText());
             int t2 = 0;
@@ -186,59 +164,76 @@ public class MainController {
                 t2 = Integer.parseInt(team2Field.getText());
             }
 
-            // 创建 ScoreEntry
             ScoreEntry newEntry = new ScoreEntry(
                     isSingle ? ScoreEntry.Type.SINGLE : ScoreEntry.Type.ALLIANCE,
                     Integer.parseInt(matchNumberField.getText()),
-                    alliance,
-                    t1,
-                    t2,
+                    alliance, t1, t2,
                     Integer.parseInt(autoArtifactsField.getText()),
                     Integer.parseInt(teleopArtifactsField.getText()),
-                    team1SequenceCheck.isSelected(),
-                    !isSingle && team2SequenceCheck.isSelected(), // 单队模式强制 false
-                    team1L2ClimbCheck.isSelected(),
-                    !isSingle && team2L2ClimbCheck.isSelected(), // 单队模式强制 false
-                    currentClickLocations, // 传入坐标数据
-                    currentUsername);
+                    team1SequenceCheck.isSelected(), !isSingle && team2SequenceCheck.isSelected(),
+                    team1L2ClimbCheck.isSelected(), !isSingle && team2L2ClimbCheck.isSelected(),
+                    team1IgnoreCheck.isSelected(), !isSingle && team2IgnoreCheck.isSelected(),
+                    team1BrokenCheck.isSelected(), !isSingle && team2BrokenCheck.isSelected(),
+                    currentClickLocations, currentUsername);
 
-            // 发送/保存
-            if (isHost) {
-                handleScoreReceivedFromClient(newEntry);
-            } else {
-                NetworkService.getInstance().sendScoreToServer(newEntry);
-                statusLabel.setText("Score sent to host.");
-            }
+            if (isHost) { handleScoreReceivedFromClient(newEntry); }
+            else { NetworkService.getInstance().sendScoreToServer(newEntry); statusLabel.setText("Score sent to host."); }
 
-            // 提交成功后的清理工作
             errorLabel.setText("Score submitted successfully!");
-            currentClickLocations = ""; // 清空坐标缓存
-
-            // 重置输入框，为下一场做准备
-            autoArtifactsField.setText("0");
-            teleopArtifactsField.setText("0");
+            currentClickLocations = "";
+            autoArtifactsField.setText("0"); teleopArtifactsField.setText("0");
             team1SequenceCheck.setSelected(false); team1L2ClimbCheck.setSelected(false);
             team2SequenceCheck.setSelected(false); team2L2ClimbCheck.setSelected(false);
+            team1IgnoreCheck.setSelected(false); team2IgnoreCheck.setSelected(false);
+            team1BrokenCheck.setSelected(false); team2BrokenCheck.setSelected(false);
+            team1WarningLabel.setVisible(false); team2WarningLabel.setVisible(false);
 
-            // 增加场次号方便录入
             try {
                 int nextMatch = Integer.parseInt(matchNumberField.getText()) + 1;
                 matchNumberField.setText(String.valueOf(nextMatch));
+                penMatchField.setText(String.valueOf(nextMatch)); // 同步更新Penalty页面的场次
             } catch (NumberFormatException ignored) {}
 
-        } catch (NumberFormatException e) {
-            errorLabel.setText("Error: Please enter valid numbers.");
+        } catch (Exception e) { errorLabel.setText("Error: " + e.getMessage()); }
+    }
+
+    // --- 新增: Penalty Handling ---
+    @FXML
+    private void handleSubmitPenalty() {
+        try {
+            int matchNum = Integer.parseInt(penMatchField.getText());
+            int rMaj = penRedMajor.getText().isEmpty() ? 0 : Integer.parseInt(penRedMajor.getText());
+            int rMin = penRedMinor.getText().isEmpty() ? 0 : Integer.parseInt(penRedMinor.getText());
+            int bMaj = penBlueMajor.getText().isEmpty() ? 0 : Integer.parseInt(penBlueMajor.getText());
+            int bMin = penBlueMinor.getText().isEmpty() ? 0 : Integer.parseInt(penBlueMinor.getText());
+
+            PenaltyEntry entry = new PenaltyEntry(matchNum, rMaj, rMin, bMaj, bMin);
+            DatabaseService.savePenaltyEntry(currentCompetition.getName(), entry);
+
+            // 提交后刷新数据 (判罚会影响排名统计)
+            refreshAllDataFromDatabase();
+            if (isHost) {
+                // 如果是Host，还得广播一下 (这里简化逻辑，通常也发Update包)
+                List<ScoreEntry> fullHistory = DatabaseService.getScoresForCompetition(currentCompetition.getName());
+                List<TeamRanking> newRankings = DatabaseService.calculateTeamRankings(currentCompetition.getName());
+                NetworkService.getInstance().broadcastUpdateToClients(new NetworkPacket(fullHistory, newRankings));
+            }
+
+            penStatusLabel.setText("Penalty saved for Match " + matchNum);
+            penStatusLabel.setStyle("-fx-text-fill: lightgreen;");
+
+            // 清空
+            penRedMajor.clear(); penRedMinor.clear();
+            penBlueMajor.clear(); penBlueMinor.clear();
+            penMatchField.setText(String.valueOf(matchNum + 1));
+
         } catch (Exception e) {
-            errorLabel.setText("Error: " + e.getMessage());
+            penStatusLabel.setText("Error: " + e.getMessage());
+            penStatusLabel.setStyle("-fx-text-fill: red;");
         }
     }
 
-    @FXML
-    private void handleEditRating() throws IOException {
-        if (!isHost) return;
-        mainApp.showFormulaEditView(currentCompetition);
-        refreshAllDataFromDatabase();
-    }
+    @FXML private void handleEditRating() throws IOException { if (!isHost) return; mainApp.showFormulaEditView(currentCompetition); refreshAllDataFromDatabase(); }
 
     private void showHeatmap(int teamNumber) {
         try {
@@ -246,16 +241,11 @@ public class MainController {
             Stage stage = new Stage();
             stage.setTitle("Heatmap - Team " + teamNumber);
             stage.setScene(new Scene(loader.load()));
-
             HeatmapController controller = loader.getController();
             List<ScoreEntry> matches = DatabaseService.getScoresForTeam(currentCompetition.getName(), teamNumber);
             controller.setData(teamNumber, matches);
-
             stage.show();
-        } catch (IOException e) {
-            e.printStackTrace();
-            errorLabel.setText("Error opening heatmap.");
-        }
+        } catch (IOException e) { e.printStackTrace(); }
     }
 
     private void refreshAllDataFromDatabase() {
@@ -268,64 +258,75 @@ public class MainController {
         Platform.runLater(() -> {
             rankingsTableView.setItems(FXCollections.observableArrayList(rankings));
             scoreHistoryList.setAll(history);
-
             if (currentCompetition != null) {
-                // 如果是Host，重新获取对象以获得最新公式
                 if (isHost) currentCompetition = DatabaseService.getCompetition(currentCompetition.getName());
-
                 String formula = currentCompetition.getRatingFormula();
-                if (formula != null && !formula.equals("total")) {
-                    rankRatingCol.setText("Rating *");
-                } else {
-                    rankRatingCol.setText("Rating");
-                }
+                rankRatingCol.setText((formula != null && !formula.equals("total")) ? "Rating *" : "Rating");
             }
         });
     }
 
-    private void setUIEnabled(boolean enabled) {
-        scoringFormVBox.setDisable(!enabled);
-        if(!enabled) statusLabel.setText("Connecting to host...");
-    }
+    private void setUIEnabled(boolean enabled) { scoringFormVBox.setDisable(!enabled); if(!enabled) statusLabel.setText("Connecting to host..."); }
 
     private void setupScoringTab() {
-        // 联盟选择
         allianceToggleGroup = new ToggleGroup();
-        redAllianceToggle.setToggleGroup(allianceToggleGroup);
-        blueAllianceToggle.setToggleGroup(allianceToggleGroup);
+        redAllianceToggle.setToggleGroup(allianceToggleGroup); blueAllianceToggle.setToggleGroup(allianceToggleGroup);
         redAllianceToggle.setSelected(true);
-
-        // 模式选择
         modeToggleGroup = new ToggleGroup();
-        allianceModeRadio.setToggleGroup(modeToggleGroup);
-        singleModeRadio.setToggleGroup(modeToggleGroup);
-
-        // 监听模式切换
+        allianceModeRadio.setToggleGroup(modeToggleGroup); singleModeRadio.setToggleGroup(modeToggleGroup);
         modeToggleGroup.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
             boolean isSingle = singleModeRadio.isSelected();
-            // 切换 Team 2 相关控件的显示/隐藏
             lblTeam2.setVisible(!isSingle); lblTeam2.setManaged(!isSingle);
             team2Field.setVisible(!isSingle); team2Field.setManaged(!isSingle);
             team2CapsBox.setVisible(!isSingle); team2CapsBox.setManaged(!isSingle);
-
-            if (isSingle) {
-                team2Field.clear();
-                team2SequenceCheck.setSelected(false);
-                team2L2ClimbCheck.setSelected(false);
-            }
+            team2IgnoreBox.setVisible(!isSingle); team2IgnoreBox.setManaged(!isSingle);
+            if (isSingle) { team2Field.clear(); team2BrokenCheck.setSelected(false); }
         });
+        team1IgnoreCheck.setVisible(false); team2IgnoreCheck.setVisible(false);
+        team1Field.textProperty().addListener((observable, oldValue, newValue) -> checkTeamHistory(newValue, 1));
+        team2Field.textProperty().addListener((observable, oldValue, newValue) -> checkTeamHistory(newValue, 2));
+    }
+
+    private void checkTeamHistory(String teamStr, int teamSlot) {
+        if (teamStr == null || teamStr.isBlank()) {
+            if (teamSlot == 1) { team1WarningLabel.setVisible(false); team1IgnoreCheck.setVisible(false); }
+            else { team2WarningLabel.setVisible(false); team2IgnoreCheck.setVisible(false); }
+            return;
+        }
+        try {
+            int teamNum = Integer.parseInt(teamStr.trim());
+            long matchCount = scoreHistoryList.stream().filter(e -> e.getTeam1() == teamNum || e.getTeam2() == teamNum).count();
+            boolean showIgnoreOption = (matchCount >= 2);
+            boolean wasIgnored = scoreHistoryList.stream().anyMatch(entry ->
+                    (entry.getTeam1() == teamNum && entry.isTeam1Ignored()) || (entry.getTeam2() == teamNum && entry.isTeam2Ignored()));
+            if (teamSlot == 1) { team1IgnoreCheck.setVisible(showIgnoreOption); team1WarningLabel.setVisible(wasIgnored); }
+            else { team2IgnoreCheck.setVisible(showIgnoreOption); team2WarningLabel.setVisible(wasIgnored); }
+        } catch (NumberFormatException e) {}
     }
 
     private void setupRankingsTab() {
         rankTeamCol.setCellValueFactory(new PropertyValueFactory<>("teamNumber"));
         rankRatingCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getRatingFormatted()));
         rankMatchesCol.setCellValueFactory(new PropertyValueFactory<>("matchesPlayed"));
-        rankAutoCol.setCellValueFactory(new PropertyValueFactory<>("avgAutoArtifactsFormatted")); // 使用 Formatted getter
+        rankAutoCol.setCellValueFactory(new PropertyValueFactory<>("avgAutoArtifactsFormatted"));
         rankTeleopCol.setCellValueFactory(new PropertyValueFactory<>("avgTeleopArtifactsFormatted"));
         rankSequenceCol.setCellValueFactory(new PropertyValueFactory<>("canSequence"));
         rankL2Col.setCellValueFactory(new PropertyValueFactory<>("l2Capable"));
 
-        // 设置 "Shot Chart" 按钮列
+        TableColumn<TeamRanking, String> accCol = new TableColumn<>("Accuracy");
+        accCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getAccuracyFormatted()));
+        rankingsTableView.getColumns().add(5, accCol);
+
+        // --- 新增：判罚列 ---
+        TableColumn<TeamRanking, String> penComm = new TableColumn<>("Avg Pen Given");
+        penComm.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getAvgPenaltyCommittedFormatted()));
+
+        TableColumn<TeamRanking, String> penOpp = new TableColumn<>("Avg Pen Got");
+        penOpp.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getAvgOpponentPenaltyFormatted()));
+
+        rankingsTableView.getColumns().add(rankingsTableView.getColumns().size() - 1, penComm);
+        rankingsTableView.getColumns().add(rankingsTableView.getColumns().size() - 1, penOpp);
+
         rankHeatmapCol.setCellFactory(new Callback<>() {
             @Override
             public TableCell<TeamRanking, Void> call(TableColumn<TeamRanking, Void> param) {
@@ -338,20 +339,11 @@ public class MainController {
                             if(data != null) showHeatmap(data.getTeamNumber());
                         });
                     }
-                    @Override
-                    protected void updateItem(Void item, boolean empty) {
-                        super.updateItem(item, empty);
-                        if (empty) setGraphic(null);
-                        else setGraphic(btn);
-                    }
+                    @Override protected void updateItem(Void item, boolean empty) { super.updateItem(item, empty); if (empty) setGraphic(null); else setGraphic(btn); }
                 };
             }
         });
-
-        // 设置说明文字
-        if (rankingLegendLabel != null) {
-            rankingLegendLabel.setText("LEGEND: 'Avg Auto/Teleop' = Avg per match (In Alliance Mode, total is halved). 'Rating' = Calculated score based on formula. '*' indicates custom formula. View 'Shot Chart' for density heatmap.");
-        }
+        rankingLegendLabel.setText("Avg Pen Given = Points given to opponent (Lower better). Avg Pen Got = Points received from opponent.");
     }
 
     private void setupHistoryTab() {
@@ -361,7 +353,6 @@ public class MainController {
         histTotalCol.setCellValueFactory(new PropertyValueFactory<>("totalScore"));
         histSubmitterCol.setCellValueFactory(new PropertyValueFactory<>("submitter"));
         histTimeCol.setCellValueFactory(new PropertyValueFactory<>("submissionTime"));
-
         FilteredList<ScoreEntry> filteredData = new FilteredList<>(scoreHistoryList, p -> true);
         searchField.textProperty().addListener((observable, oldValue, newValue) -> {
             filteredData.setPredicate(scoreEntry -> {
@@ -376,13 +367,6 @@ public class MainController {
         historyTableView.setItems(filteredData);
     }
 
-    @FXML
-    private void handleBackButton() throws IOException {
-        mainApp.showHubView(currentUsername);
-    }
-
-    @FXML
-    private void handleLogout() throws IOException {
-        mainApp.showLoginView();
-    }
+    @FXML private void handleBackButton() throws IOException { mainApp.showHubView(currentUsername); }
+    @FXML private void handleLogout() throws IOException { mainApp.showLoginView(); }
 }
