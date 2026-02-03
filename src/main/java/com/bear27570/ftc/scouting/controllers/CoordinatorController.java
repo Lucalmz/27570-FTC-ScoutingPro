@@ -3,6 +3,7 @@ package com.bear27570.ftc.scouting.controllers;
 import com.bear27570.ftc.scouting.models.Competition;
 import com.bear27570.ftc.scouting.models.Membership;
 import com.bear27570.ftc.scouting.services.DatabaseService;
+import com.bear27570.ftc.scouting.services.NetworkService;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.ListView;
@@ -28,14 +29,6 @@ public class CoordinatorController {
                 DatabaseService.getMembersByStatus(competition.getName(), Membership.Status.APPROVED)));
     }
 
-    @FXML
-    private void handleApprove() {
-        String selected = pendingListView.getSelectionModel().getSelectedItem();
-        if (selected != null) {
-            DatabaseService.updateMembershipStatus(selected, competition.getName(), Membership.Status.APPROVED);
-            refreshLists();
-        }
-    }
 
     @FXML
     private void handleDeny() {
@@ -45,7 +38,17 @@ public class CoordinatorController {
             refreshLists();
         }
     }
-
+    @FXML
+    private void handleApprove() {
+        String selected = pendingListView.getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            // 1. 更新数据库
+            DatabaseService.updateMembershipStatus(selected, competition.getName(), Membership.Status.APPROVED);
+            // 2. 通过网络通知 Client
+            NetworkService.getInstance().approveClient(selected);
+            refreshLists();
+        }
+    }
     @FXML
     private void handleKick() {
         String selected = approvedListView.getSelectionModel().getSelectedItem();

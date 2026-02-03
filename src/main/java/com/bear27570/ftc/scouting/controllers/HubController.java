@@ -2,6 +2,7 @@ package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.MainApplication;
 import com.bear27570.ftc.scouting.models.Competition;
+import com.bear27570.ftc.scouting.models.NetworkPacket;
 import com.bear27570.ftc.scouting.services.DatabaseService;
 import com.bear27570.ftc.scouting.services.NetworkService;
 import javafx.collections.FXCollections;
@@ -131,13 +132,23 @@ public class HubController {
 
     @FXML private void handleJoinButton() throws IOException {
         Competition selected = discoveredCompetitionsListView.getSelectionModel().getSelectedItem();
-        if (selected == null) {
-            statusLabel.setText("Please select a competition from the list to join.");
-            return;
-        }
-        mainApp.showScoringView(selected, currentUsername, false);
-    }
+        if (selected == null) return;
 
+        statusLabel.setText("Requesting to join " + selected.getName() + "...");
+
+        NetworkService.getInstance().connectToHost(selected.getHostAddress(), currentUsername, (packet) -> {
+            if (packet.getType() == NetworkPacket.PacketType.JOIN_RESPONSE) {
+                if (packet.isApproved()) {
+                    try {
+                        mainApp.showScoringView(selected, currentUsername, false);
+                    } catch (IOException e) { e.printStackTrace(); }
+                } else {
+                    statusLabel.setText("Join request denied by Host.");
+                    NetworkService.getInstance().stop();
+                }
+            }
+        });
+    }
     @FXML private void handleLogout() throws IOException {
         NetworkService.getInstance().stop();
         mainApp.showLoginView();

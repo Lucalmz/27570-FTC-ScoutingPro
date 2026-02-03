@@ -100,7 +100,7 @@ public class MainController {
     private void startAsClient() {
         setUIEnabled(false);
         try {
-            NetworkService.getInstance().connectToHost(currentCompetition.getHostAddress(), this::handleUpdateReceivedFromHost);
+            NetworkService.getInstance().connectToHost(currentCompetition.getHostAddress(),currentUsername, this::handleUpdateReceivedFromHost);
             statusLabel.setText("Connected to host. Waiting for data...");
         } catch (IOException e) {
             statusLabel.setText("Failed to connect: " + e.getMessage());

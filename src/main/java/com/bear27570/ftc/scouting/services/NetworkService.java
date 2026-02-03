@@ -1,25 +1,20 @@
 package com.bear27570.ftc.scouting.services;
 
-import com.bear27570.ftc.scouting.models.Competition;
-import com.bear27570.ftc.scouting.models.NetworkPacket;
-import com.bear27570.ftc.scouting.models.ScoreEntry;
+import com.bear27570.ftc.scouting.models.*;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
 
 import java.io.*;
 import java.net.*;
-import java.util.Iterator;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class NetworkService {
 
     private static NetworkService instance;
-
     public static synchronized NetworkService getInstance() {
-        if (instance == null) {
-            instance = new NetworkService();
-        }
+        if (instance == null) instance = new NetworkService();
         return instance;
     }
 
@@ -29,169 +24,162 @@ public class NetworkService {
     private ServerSocket serverSocket;
     private Socket clientSocket;
     private DatagramSocket udpSocket;
-
     private ObjectOutputStream outToServer;
 
-    // 修复：使用线程安全的 List，避免广播时出现并发修改异常
-    private final CopyOnWriteArrayList<ObjectOutputStream> clientOutputStreams = new CopyOnWriteArrayList<>();
-
+    private final CopyOnWriteArrayList<ClientHandler> connectedClients = new CopyOnWriteArrayList<>();
     private volatile boolean running = false;
-    private Thread udpDiscoveryThread;
-    private Thread tcpServerThread;
-    private Thread hostBroadcastThread;
+    private String hostingCompetitionName; // 记录当前主持的比赛名
 
     private NetworkService() {}
 
-    private enum State {IDLE, HOSTING, DISCOVERING, CLIENT}
-    private State currentState = State.IDLE;
-
     public synchronized void startHost(Competition competition, Consumer<ScoreEntry> onScoreReceived) {
-        if (currentState != State.IDLE) return;
         stop();
         running = true;
-        currentState = State.HOSTING;
+        this.hostingCompetitionName = competition.getName();
 
-        tcpServerThread = new Thread(() -> {
+        new Thread(() -> {
             try {
                 serverSocket = new ServerSocket(TCP_PORT);
                 while (running) {
                     Socket client = serverSocket.accept();
-                    ObjectOutputStream out = new ObjectOutputStream(client.getOutputStream());
-                    clientOutputStreams.add(out);
-                    new ClientHandler(client, out, onScoreReceived).start();
+                    ClientHandler handler = new ClientHandler(client, onScoreReceived);
+                    connectedClients.add(handler);
+                    handler.start();
                 }
-            } catch (IOException e) {
-                // Socket closed normally or error
-            }
-        });
-        tcpServerThread.start();
+            } catch (IOException ignored) {}
+        }).start();
 
-        hostBroadcastThread = new Thread(() -> {
-            try (DatagramSocket broadcastSocket = new DatagramSocket()) {
-                broadcastSocket.setBroadcast(true);
-                String message = String.format("FTC_SCOUTER;%s;%s", competition.getName(), competition.getCreatorUsername());
-                byte[] buffer = message.getBytes();
-                // 使用广播地址
-                DatagramPacket packet = new DatagramPacket(buffer, buffer.length, InetAddress.getByName("255.255.255.255"), UDP_PORT);
+        // UDP 广播保持不变...
+        startUdpBeacon(competition);
+    }
+
+    private void startUdpBeacon(Competition comp) {
+        new Thread(() -> {
+            try (DatagramSocket beacon = new DatagramSocket()) {
+                beacon.setBroadcast(true);
+                String msg = "FTC_SCOUTER;" + comp.getName() + ";" + comp.getCreatorUsername();
+                byte[] buf = msg.getBytes();
+                DatagramPacket packet = new DatagramPacket(buf, buf.length, InetAddress.getByName("255.255.255.255"), UDP_PORT);
                 while (running) {
-                    broadcastSocket.send(packet);
+                    beacon.send(packet);
                     Thread.sleep(2000);
                 }
-            } catch (Exception e) {
-                // Ignore
-            }
-        });
-        hostBroadcastThread.start();
+            } catch (Exception ignored) {}
+        }).start();
     }
 
     private class ClientHandler extends Thread {
         private final Socket socket;
-        private final ObjectOutputStream out;
+        private ObjectOutputStream out;
         private final Consumer<ScoreEntry> onScoreReceived;
+        private String clientUsername;
 
-        ClientHandler(Socket socket, ObjectOutputStream out, Consumer<ScoreEntry> onScoreReceived) {
+        ClientHandler(Socket socket, Consumer<ScoreEntry> onScoreReceived) {
             this.socket = socket;
-            this.out = out;
             this.onScoreReceived = onScoreReceived;
+        }
+
+        public void sendPacket(NetworkPacket p) {
+            try {
+                out.writeObject(p);
+                out.flush();
+                out.reset();
+            } catch (IOException e) { stopClient(); }
+        }
+
+        private void stopClient() {
+            connectedClients.remove(this);
+            try { socket.close(); } catch (IOException ignored) {}
         }
 
         @Override
         public void run() {
-            try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+            try {
+                out = new ObjectOutputStream(socket.getOutputStream());
+                ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
                 while (running) {
                     NetworkPacket packet = (NetworkPacket) in.readObject();
-                    if (packet.getType() == NetworkPacket.PacketType.SUBMIT_SCORE) {
-                        // 确保回调在 JavaFX 线程执行
-                        Platform.runLater(() -> onScoreReceived.accept(packet.getScoreEntry()));
+                    switch (packet.getType()) {
+                        case JOIN_REQUEST:
+                            this.clientUsername = packet.getUsername();
+                            // 关键点：收到请求立即写入 Host 的数据库为 PENDING
+                            DatabaseService.addMembership(clientUsername, hostingCompetitionName, Membership.Status.PENDING);
+                            // 这里可以加一个通知给 Host UI 的机制，但目前 refreshLists 就能看到
+                            break;
+                        case SUBMIT_SCORE:
+                            Platform.runLater(() -> onScoreReceived.accept(packet.getScoreEntry()));
+                            break;
                     }
                 }
             } catch (Exception e) {
-                // Client disconnected
-            } finally {
-                clientOutputStreams.remove(out);
-                try { socket.close(); } catch (IOException ignored) {}
+                stopClient();
+            }
+        }
+    }
+
+    // 当 Host 在界面点击批准时调用此方法通知 Client
+    public void approveClient(String username) {
+        for (ClientHandler handler : connectedClients) {
+            if (username.equals(handler.clientUsername)) {
+                handler.sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
+                return;
             }
         }
     }
 
     public void broadcastUpdateToClients(NetworkPacket updatePacket) {
-        // CopyOnWriteArrayList 允许安全遍历
-        for (ObjectOutputStream out : clientOutputStreams) {
-            try {
-                out.writeObject(updatePacket);
-                out.flush();
-                out.reset(); // 防止对象缓存导致数据不更新
-            } catch (IOException e) {
-                clientOutputStreams.remove(out);
-            }
+        for (ClientHandler handler : connectedClients) {
+            handler.sendPacket(updatePacket);
         }
     }
 
     public synchronized void startDiscovery(ObservableList<Competition> discoveredCompetitions) {
-        if (currentState != State.IDLE) return;
         stop();
         running = true;
-        currentState = State.DISCOVERING;
-
-        udpDiscoveryThread = new Thread(() -> {
+        new Thread(() -> {
             try {
                 udpSocket = new DatagramSocket(UDP_PORT);
                 udpSocket.setSoTimeout(1000);
                 byte[] buffer = new byte[1024];
-
                 while (running) {
                     try {
                         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                         udpSocket.receive(packet);
-                        String message = new String(packet.getData(), 0, packet.getLength());
-                        if (message.startsWith("FTC_SCOUTER;")) {
-                            String[] parts = message.split(";");
-                            if (parts.length >= 3) {
-                                Competition discovered = new Competition(parts[1], parts[2]);
-                                discovered.setHostAddress(packet.getAddress().getHostAddress());
-                                Platform.runLater(() -> {
-                                    // 避免重复添加
-                                    boolean exists = discoveredCompetitions.stream()
-                                            .anyMatch(c -> c.getName().equals(discovered.getName()));
-                                    if (!exists) {
-                                        discoveredCompetitions.add(discovered);
-                                    }
-                                });
-                            }
+                        String msg = new String(packet.getData(), 0, packet.getLength());
+                        if (msg.startsWith("FTC_SCOUTER;")) {
+                            String[] parts = msg.split(";");
+                            Competition d = new Competition(parts[1], parts[2]);
+                            d.setHostAddress(packet.getAddress().getHostAddress());
+                            Platform.runLater(() -> {
+                                if (discoveredCompetitions.stream().noneMatch(c -> c.getName().equals(d.getName())))
+                                    discoveredCompetitions.add(d);
+                            });
                         }
-                    } catch (SocketTimeoutException e) {
-                        // Expected loop behavior
-                    }
+                    } catch (SocketTimeoutException ignored) {}
                 }
-            } catch (IOException e) {
-                // Ignore
-            } finally {
-                if (udpSocket != null && !udpSocket.isClosed()) udpSocket.close();
-            }
-        });
-        udpDiscoveryThread.start();
+            } catch (IOException ignored) {} finally { if (udpSocket != null) udpSocket.close(); }
+        }).start();
     }
 
-    public synchronized void connectToHost(String hostAddress, Consumer<NetworkPacket> onUpdateReceived) throws IOException {
+    public synchronized void connectToHost(String hostAddress, String myUsername, Consumer<NetworkPacket> onPacketReceived) throws IOException {
         stop();
         running = true;
-        currentState = State.CLIENT;
-
         clientSocket = new Socket(hostAddress, TCP_PORT);
         outToServer = new ObjectOutputStream(clientSocket.getOutputStream());
 
-        Thread clientListener = new Thread(() -> {
-            try (ObjectInputStream inFromServer = new ObjectInputStream(clientSocket.getInputStream())) {
+        // 1. 发送加入请求
+        outToServer.writeObject(new NetworkPacket(NetworkPacket.PacketType.JOIN_REQUEST, myUsername));
+        outToServer.flush();
+
+        // 2. 开启监听
+        new Thread(() -> {
+            try (ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream())) {
                 while (running) {
-                    NetworkPacket updatePacket = (NetworkPacket) inFromServer.readObject();
-                    Platform.runLater(() -> onUpdateReceived.accept(updatePacket));
+                    NetworkPacket p = (NetworkPacket) in.readObject();
+                    Platform.runLater(() -> onPacketReceived.accept(p));
                 }
-            } catch (Exception e) {
-                if (running) System.out.println("Disconnected from host.");
-            }
-        });
-        clientListener.setDaemon(true);
-        clientListener.start();
+            } catch (Exception ignored) {}
+        }).start();
     }
 
     public void sendScoreToServer(ScoreEntry scoreEntry) {
@@ -200,21 +188,15 @@ public class NetworkService {
                 outToServer.writeObject(new NetworkPacket(scoreEntry));
                 outToServer.flush();
                 outToServer.reset();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            } catch (IOException e) { e.printStackTrace(); }
         }
     }
 
     public synchronized void stop() {
-        if (currentState == State.IDLE) return;
         running = false;
-
-        try { if (serverSocket != null) serverSocket.close(); } catch (IOException e) {}
-        try { if (clientSocket != null) clientSocket.close(); } catch (IOException e) {}
+        try { if (serverSocket != null) serverSocket.close(); } catch (IOException ignored) {}
+        try { if (clientSocket != null) clientSocket.close(); } catch (IOException ignored) {}
         if (udpSocket != null) udpSocket.close();
-
-        clientOutputStreams.clear();
-        currentState = State.IDLE;
+        connectedClients.clear();
     }
 }
