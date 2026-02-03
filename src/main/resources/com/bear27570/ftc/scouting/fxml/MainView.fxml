@@ -4,7 +4,6 @@
 <?import javafx.scene.layout.*?>
 
 <BorderPane prefHeight="768.0" prefWidth="1280.0" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.MainController">
-    <!-- TOP HEADER -->
     <top>
         <HBox alignment="CENTER_LEFT" spacing="10" style="-fx-background-color: #2A3B4F;">
             <padding><Insets bottom="10" left="20" right="20" top="10" /></padding>
@@ -15,7 +14,6 @@
         </HBox>
     </top>
 
-    <!-- CENTER CONTENT -->
     <center>
         <TabPane tabClosingPolicy="UNAVAILABLE">
             <tabs>
@@ -45,14 +43,14 @@
                                     <Label text="Team 1 #" />
                                     <TextField fx:id="team1Field" GridPane.columnIndex="1" />
                                     <VBox spacing="2" GridPane.columnIndex="1" GridPane.rowIndex="1">
-                                        <CheckBox fx:id="team1IgnoreCheck" text="Mark as Weak/Ignore" style="-fx-text-fill: #ffaaaa; -fx-font-size: 10px;"/>
-                                        <Label fx:id="team1WarningLabel" text="⚠️ Flagged in prev matches!" textFill="ORANGE" visible="false" style="-fx-font-size: 10px; -fx-font-weight: bold;"/>
+                                        <CheckBox fx:id="team1IgnoreCheck" style="-fx-text-fill: #ffaaaa; -fx-font-size: 10px;" text="Mark as Weak/Ignore" />
+                                        <Label fx:id="team1WarningLabel" style="-fx-font-size: 10px; -fx-font-weight: bold;" text="⚠️ Flagged in prev matches!" textFill="ORANGE" visible="false" />
                                     </VBox>
                                     <Label fx:id="lblTeam2" text="Team 2 #" GridPane.rowIndex="2" />
                                     <TextField fx:id="team2Field" GridPane.columnIndex="1" GridPane.rowIndex="2" />
                                     <VBox fx:id="team2IgnoreBox" spacing="2" GridPane.columnIndex="1" GridPane.rowIndex="3">
-                                        <CheckBox fx:id="team2IgnoreCheck" text="Mark as Weak/Ignore" style="-fx-text-fill: #ffaaaa; -fx-font-size: 10px;"/>
-                                        <Label fx:id="team2WarningLabel" text="⚠️ Flagged in prev matches!" textFill="ORANGE" visible="false" style="-fx-font-size: 10px; -fx-font-weight: bold;"/>
+                                        <CheckBox fx:id="team2IgnoreCheck" style="-fx-text-fill: #ffaaaa; -fx-font-size: 10px;" text="Mark as Weak/Ignore" />
+                                        <Label fx:id="team2WarningLabel" style="-fx-font-size: 10px; -fx-font-weight: bold;" text="⚠️ Flagged in prev matches!" textFill="ORANGE" visible="false" />
                                     </VBox>
                                     <columnConstraints><ColumnConstraints prefWidth="80" /><ColumnConstraints hgrow="ALWAYS" /></columnConstraints>
                                     <rowConstraints><RowConstraints /><RowConstraints /><RowConstraints /><RowConstraints /></rowConstraints>
@@ -94,44 +92,45 @@
                     </content>
                 </Tab>
 
-                <!-- TAB: PENALTIES -->
-                <Tab text="Penalties (Judge)">
+                <!-- TAB: PENALTIES (JUDGE) -->
+                <Tab text="Penalties">
                     <content>
                         <VBox alignment="CENTER" spacing="20">
-                            <padding><Insets top="40" bottom="40"/></padding>
-                            <VBox maxWidth="500" spacing="15" styleClass="sidebar">
-                                <padding><Insets top="20" right="20" bottom="20" left="20"/></padding>
-                                <Label text="Match Penalty Record" styleClass="sub-header-label"/>
-                                <Separator/>
+                            <padding><Insets bottom="40" top="40" /></padding>
+                            <VBox maxWidth="450" spacing="15" styleClass="sidebar">
+                                <padding><Insets bottom="20" left="20" right="20" top="20" /></padding>
+                                <Label styleClass="sub-header-label" text="Record Offending Alliance" />
+                                <Separator />
 
-                                <HBox spacing="10" alignment="CENTER_LEFT">
-                                    <Label text="Match Number: "/>
-                                    <TextField fx:id="penMatchField" prefWidth="80"/>
+                                <HBox alignment="CENTER_LEFT" spacing="10">
+                                    <Label text="Match Number: " />
+                                    <TextField fx:id="penMatchField" prefWidth="80" />
+                                </HBox>
+
+                                <Label text="Select Alliance that Committed Foul:" />
+                                <HBox alignment="CENTER" spacing="10">
+                                    <ToggleButton fx:id="penRedToggle" maxWidth="Infinity" style="-fx-base: #FF5252;" text="RED Alliance" HBox.hgrow="ALWAYS" />
+                                    <ToggleButton fx:id="penBlueToggle" maxWidth="Infinity" style="-fx-base: #448AFF;" text="BLUE Alliance" HBox.hgrow="ALWAYS" />
                                 </HBox>
 
                                 <GridPane hgap="15" vgap="10">
-                                    <Label text="Alliance" style="-fx-font-weight: bold;" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-                                    <Label text="Major (15pts)" style="-fx-font-weight: bold;" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
-                                    <Label text="Minor (5pts)" style="-fx-font-weight: bold;" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
-
-                                    <Label text="RED Alliance" textFill="#FF5252" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-                                    <TextField fx:id="penRedMajor" promptText="0" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
-                                    <TextField fx:id="penRedMinor" promptText="0" GridPane.columnIndex="2" GridPane.rowIndex="1"/>
-
-                                    <Label text="BLUE Alliance" textFill="#448AFF" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
-                                    <TextField fx:id="penBlueMajor" promptText="0" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
-                                    <TextField fx:id="penBlueMinor" promptText="0" GridPane.columnIndex="2" GridPane.rowIndex="2"/>
-
+                                    <Label text="Major (15pts)" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                                    <TextField fx:id="penMajor" text="0" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                                    <Label text="Minor (5pts)" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                                    <TextField fx:id="penMinor" text="0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
                                     <columnConstraints>
-                                        <ColumnConstraints prefWidth="100"/>
-                                        <ColumnConstraints prefWidth="100"/>
-                                        <ColumnConstraints prefWidth="100"/>
+                                        <ColumnConstraints prefWidth="120.0" />
+                                        <ColumnConstraints hgrow="ALWAYS" />
                                     </columnConstraints>
+                                    <rowConstraints>
+                                        <RowConstraints />
+                                        <RowConstraints />
+                                    </rowConstraints>
                                 </GridPane>
 
-                                <Label text="* Note: Enter how many penalties the ALLIANCE committed." style="-fx-font-size: 10px; -fx-text-fill: gray;" wrapText="true"/>
-                                <Button text="Save Penalty Record" onAction="#handleSubmitPenalty" styleClass="submit-button" maxWidth="Infinity"/>
-                                <Label fx:id="penStatusLabel" text="" alignment="CENTER"/>
+                                <Separator />
+                                <Button maxWidth="Infinity" onAction="#handleSubmitPenalty" styleClass="submit-button" text="Save Penalty" />
+                                <Label fx:id="penStatusLabel" alignment="CENTER" text="" wrapText="true" />
                             </VBox>
                         </VBox>
                     </content>
@@ -145,6 +144,7 @@
                             <HBox alignment="CENTER_LEFT" spacing="10">
                                 <Label styleClass="table-header-label" text="Live Rankings" />
                                 <Region HBox.hgrow="ALWAYS" />
+                                <Button onAction="#handleAllianceAnalysis" style="-fx-base: #9C27B0;" text="Alliance Analysis" />
                                 <Button fx:id="editRatingButton" managed="false" onAction="#handleEditRating" text="Edit Rating Formula" visible="false" />
                             </HBox>
                             <Label fx:id="rankingLegendLabel" style="-fx-font-style: italic; -fx-font-size: 12px;" text="Legend..." textFill="#B0BEC5" wrapText="true" />
@@ -156,6 +156,9 @@
                                     <TableColumn fx:id="rankMatchesCol" prefWidth="60" text="Plays" />
                                     <TableColumn fx:id="rankAutoCol" text="Avg Auto" />
                                     <TableColumn fx:id="rankTeleopCol" text="Avg Tele" />
+                                    <TableColumn fx:id="rankAccuracyCol" text="Accuracy" />
+                                    <TableColumn fx:id="rankPenCommCol" text="Avg Pen Given" />
+                                    <TableColumn fx:id="rankPenOppCol" text="Avg Pen Got" />
                                     <TableColumn fx:id="rankSequenceCol" text="Seq %" />
                                     <TableColumn fx:id="rankL2Col" text="L2 %" />
                                 </columns>

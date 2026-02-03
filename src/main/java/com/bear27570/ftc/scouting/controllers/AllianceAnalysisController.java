@@ -29,9 +29,24 @@ public class AllianceAnalysisController {
     private Competition competition;
     private Stage dialogStage;
 
+    // 参考 HeatmapController 的常量
+    private static final double ZONE_DIVIDER_Y = 400.0;
+
     public void setDialogStage(Stage dialogStage, Competition competition) {
         this.dialogStage = dialogStage;
         this.competition = competition;
+    }
+
+    /**
+     * 内部画像类，完全同步 HeatmapController 的统计口径
+     */
+    private static class TeamHeatmapProfile {
+        int teamNum;
+        double avgNearHits; // 近点场均命中
+        double avgFarHits;  // 远点场均命中
+        String style;       // 风格标签
+        double accuracy;    // 整体准确率
+        double stability;   // 标准差
     }
 
     @FXML
@@ -43,46 +58,56 @@ public class AllianceAnalysisController {
             int mainTeamNum = Integer.parseInt(input);
             List<TeamRanking> allRankings = DatabaseService.calculateTeamRankings(competition.getName());
 
-            TeamRanking mainTeam = allRankings.stream()
-                    .filter(t -> t.getTeamNumber() == mainTeamNum)
-                    .findFirst().orElse(null);
-
-            if (mainTeam == null) {
-                mainTeamStatsLabel.setText("Team " + mainTeamNum + " has no data.");
+            // 1. 计算主队画像
+            TeamHeatmapProfile mainProfile = getTeamHeatmapProfile(competition.getName(), mainTeamNum, allRankings);
+            if (mainProfile == null) {
+                mainTeamStatsLabel.setText("Team " + mainTeamNum + " has no match data.");
                 analysisTable.getItems().clear();
                 return;
             }
 
-            List<Double> mainScores = DatabaseService.getValidMatchScores(competition.getName(), mainTeamNum);
-            double mainStability = DatabaseService.calculateStdDev(mainScores);
-            String mainStyle = getZoneStyle(competition.getName(), mainTeamNum);
-
-            mainTeamStatsLabel.setText(String.format("Main Team: %d | Rtg: %.1f | Acc: %s | StdDev: %.2f | Style: %s",
-                    mainTeamNum, mainTeam.getRating(), mainTeam.getAccuracyFormatted(), mainStability, mainStyle));
+            mainTeamStatsLabel.setText(String.format("Main: %d | Near Avg: %.1f | Far Avg: %.1f | Style: %s",
+                    mainTeamNum, mainProfile.avgNearHits, mainProfile.avgFarHits, mainProfile.style));
 
             List<AnalysisResult> results = new ArrayList<>();
 
-            for (TeamRanking partner : allRankings) {
-                if (partner.getTeamNumber() == mainTeamNum) continue;
+            // 2. 遍历其他队伍进行最优搭配计算
+            for (TeamRanking tr : allRankings) {
+                if (tr.getTeamNumber() == mainTeamNum) continue;
 
-                double combinedScore = mainTeam.getRating() + partner.getRating();
+                TeamHeatmapProfile partnerProfile = getTeamHeatmapProfile(competition.getName(), tr.getTeamNumber(), allRankings);
+                if (partnerProfile == null) continue;
 
-                double acc1 = parseAcc(mainTeam.getAccuracyFormatted());
-                double acc2 = parseAcc(partner.getAccuracyFormatted());
-                double combinedAcc = (acc1 + acc2) / 2.0;
+                // --- 核心逻辑：强制取异位置效率最优解 ---
+                // 方案 1: 主队打远点 + 队友打近点
+                double scorePlanA = mainProfile.avgFarHits + partnerProfile.avgNearHits;
+                // 方案 2: 主队打近点 + 队友打远点
+                double scorePlanB = mainProfile.avgNearHits + partnerProfile.avgFarHits;
 
-                List<Double> partnerScores = DatabaseService.getValidMatchScores(competition.getName(), partner.getTeamNumber());
-                double partnerStability = DatabaseService.calculateStdDev(partnerScores);
-                double combinedStability = Math.sqrt(Math.pow(mainStability, 2) + Math.pow(partnerStability, 2));
+                double bestCombinedHits;
+                String synergyNote;
 
-                String partnerStyle = getZoneStyle(competition.getName(), partner.getTeamNumber());
-                String synergyNote = analyzeSynergy(mainStyle, partnerStyle);
+                if (scorePlanA >= scorePlanB) {
+                    bestCombinedHits = scorePlanA;
+                    synergyNote = "Main-Far / Partner-Near";
+                } else {
+                    bestCombinedHits = scorePlanB;
+                    synergyNote = "Main-Near / Partner-Far";
+                }
 
-                results.add(new AnalysisResult(partner.getTeamNumber(), combinedScore, combinedAcc, combinedStability, synergyNote));
+                // 识别潜在冲突（如果两队在某个位置都是0或极低）
+                if (mainProfile.style.equals(partnerProfile.style) && !mainProfile.style.equals("Hybrid")) {
+                    synergyNote += " (Style Conflict!)";
+                }
+
+                double combinedAcc = (mainProfile.accuracy + partnerProfile.accuracy) / 2.0;
+                double combinedStability = Math.sqrt(Math.pow(mainProfile.stability, 2) + Math.pow(partnerProfile.stability, 2));
+
+                results.add(new AnalysisResult(partnerProfile.teamNum, bestCombinedHits, combinedAcc, combinedStability, synergyNote));
             }
 
+            // 按综合场均命中数排序
             results.sort(Comparator.comparingDouble(AnalysisResult::getTotalEfficiency).reversed());
-
             analysisTable.setItems(FXCollections.observableArrayList(results));
 
         } catch (NumberFormatException e) {
@@ -90,43 +115,77 @@ public class AllianceAnalysisController {
         }
     }
 
-    private String getZoneStyle(String compName, int teamNum) {
+    /**
+     * 实现与 HeatmapController 相同的统计逻辑
+     */
+    private TeamHeatmapProfile getTeamHeatmapProfile(String compName, int teamNum, List<TeamRanking> rankings) {
         List<ScoreEntry> matches = DatabaseService.getScoresForTeam(compName, teamNum);
-        int far = 0, near = 0;
-        for (ScoreEntry m : matches) {
+
+        // 过滤掉该队在该场次 Broken 的数据
+        List<ScoreEntry> validMatches = matches.stream().filter(m -> {
+            boolean isT1 = (m.getTeam1() == teamNum && !m.isTeam1Broken());
+            boolean isT2 = (m.getTeam2() == teamNum && !m.isTeam2Broken());
+            return isT1 || isT2;
+        }).toList();
+
+        if (validMatches.isEmpty()) return null;
+
+        int nearHits = 0, farHits = 0;
+        int nearShots = 0, farShots = 0;
+
+        for (ScoreEntry m : validMatches) {
             String locs = m.getClickLocations();
-            if (locs == null) continue;
+            if (locs == null || locs.isEmpty()) continue;
+
             for (String p : locs.split(";")) {
                 try {
                     String[] parts = p.split(":");
-                    if (parts.length < 2) continue;
-                    int teamIdx = Integer.parseInt(parts[0]);
-                    int actualTeam = (teamIdx == 1) ? m.getTeam1() : m.getTeam2();
-                    if (actualTeam == teamNum) {
+                    int pTeamIdx = Integer.parseInt(parts[0]);
+                    int actualTeamNum = (pTeamIdx == 1) ? m.getTeam1() : m.getTeam2();
+
+                    if (actualTeamNum == teamNum) {
                         String[] coords = parts[1].split(",");
-                        if (Double.parseDouble(coords[1]) < 400) near++; else far++;
+                        double y = Double.parseDouble(coords[1]);
+                        int state = (coords.length >= 3) ? Integer.parseInt(coords[2]) : 0;
+                        boolean isHit = (state == 0); // 0 为 Hit
+
+                        if (y < ZONE_DIVIDER_Y) {
+                            nearShots++; if (isHit) nearHits++;
+                        } else {
+                            farShots++; if (isHit) farHits++;
+                        }
                     }
                 } catch (Exception ignored) {}
             }
         }
-        int total = far + near;
-        if (total == 0) return "Unknown";
-        double ratio = (double) far / total;
-        if (ratio > 0.65) return "Far";
-        if (ratio < 0.35) return "Near";
-        return "Hybrid";
-    }
 
-    private String analyzeSynergy(String s1, String s2) {
-        if (s1.equals("Far") && s2.equals("Near")) return "Excellent (Zone Coverage)";
-        if (s1.equals("Near") && s2.equals("Far")) return "Excellent (Zone Coverage)";
-        if (s1.equals("Hybrid") || s2.equals("Hybrid")) return "Good (Flexible)";
-        if (s1.equals(s2) && !s1.equals("Unknown")) return "Conflict Risk (Same Zone)";
-        return "Standard";
+        TeamHeatmapProfile profile = new TeamHeatmapProfile();
+        profile.teamNum = teamNum;
+        int mCount = validMatches.size();
+        profile.avgNearHits = (double) nearHits / mCount;
+        profile.avgFarHits = (double) farHits / mCount;
+
+        // 风格判断逻辑 (同步 HeatmapController)
+        int totalShots = nearShots + farShots;
+        if (totalShots == 0) profile.style = "Unknown";
+        else {
+            double farRatio = (double) farShots / totalShots;
+            if (farRatio > 0.65) profile.style = "Far";
+            else if (farRatio < 0.35) profile.style = "Near";
+            else profile.style = "Hybrid";
+        }
+
+        // 获取基础排名中的准确率和稳定性
+        TeamRanking tr = rankings.stream().filter(r -> r.getTeamNumber() == teamNum).findFirst().orElse(null);
+        profile.accuracy = (tr != null) ? parseAcc(tr.getAccuracyFormatted()) : 0;
+        List<Double> scores = DatabaseService.getValidMatchScores(compName, teamNum);
+        profile.stability = DatabaseService.calculateStdDev(scores);
+
+        return profile;
     }
 
     private double parseAcc(String accStr) {
-        if (accStr.equals("N/A")) return 0.0;
+        if (accStr == null || accStr.equals("N/A")) return 0.0;
         return Double.parseDouble(accStr.replace("%", ""));
     }
 
@@ -154,7 +213,7 @@ public class AllianceAnalysisController {
         }
 
         public int getPartnerTeam() { return partnerTeam; }
-        public double getTotalEfficiency() { return totalEfficiency; }
+        public double getTotalEfficiency() { return totalEfficiency; } // 这里显示的是场均总命中
         public double getCombinedAccuracy() { return combinedAccuracy; }
         public double getStability() { return stability; }
         public String getStyleDesc() { return styleDesc; }

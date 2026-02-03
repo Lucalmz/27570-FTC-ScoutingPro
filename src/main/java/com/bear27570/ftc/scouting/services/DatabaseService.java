@@ -281,7 +281,6 @@ public class DatabaseService {
 
     public static List<TeamRanking> calculateTeamRankings(String competitionName) {
         List<ScoreEntry> allScores = getScoresForCompetition(competitionName);
-        // 使用新的 getFullPenalties 方法获取完整红蓝数据
         Map<Integer, FullPenaltyRow> penaltyMap = getFullPenalties(competitionName);
         Competition comp = getCompetition(competitionName);
         String formulaStr = (comp != null && comp.getRatingFormula() != null) ? comp.getRatingFormula() : "total";
@@ -300,18 +299,18 @@ public class DatabaseService {
             int t1Hits = shotStats[0], t1Shots = shotStats[1];
             int t2Hits = shotStats[2], t2Shots = shotStats[3];
 
-            int penCommitted = 0;
-            int penReceived = 0;
+            // 判罚分数逻辑
+            int penCommitted = 0; // 该队犯规导致送分
+            int penReceived = 0;  // 对手犯规导致得益分
             FullPenaltyRow pe = penaltyMap.get(score.getMatchNumber());
 
             if (pe != null) {
                 int redGaveAway = (pe.rMaj * PENALTY_MAJOR_PTS) + (pe.rMin * PENALTY_MINOR_PTS);
                 int blueGaveAway = (pe.bMaj * PENALTY_MAJOR_PTS) + (pe.bMin * PENALTY_MINOR_PTS);
 
-                boolean isRed = score.getAlliance().equalsIgnoreCase("RED");
-                if (isRed) {
-                    penCommitted = redGaveAway; // 红方犯规 = 送分
-                    penReceived = blueGaveAway; // 蓝方犯规 = 得分
+                if (score.getAlliance().equalsIgnoreCase("RED")) {
+                    penCommitted = redGaveAway;
+                    penReceived = blueGaveAway;
                 } else {
                     penCommitted = blueGaveAway;
                     penReceived = redGaveAway;
@@ -325,12 +324,16 @@ public class DatabaseService {
 
             double matchRating = evaluateFormula(formulaStr, score, divisor);
 
+            // 处理 Team 1
             processTeam(rankings, totalRatingPoints, score.getTeam1(), score, adjAuto, adjTeleop, matchRating, true, t1Hits, t1Shots, score.isTeam1Broken(), penCommitted, penReceived);
+
+            // 处理 Team 2 (仅限联盟模式)
             if (isAllianceMode) {
                 processTeam(rankings, totalRatingPoints, score.getTeam2(), score, adjAuto, adjTeleop, matchRating, false, t2Hits, t2Shots, score.isTeam2Broken(), penCommitted, penReceived);
             }
         }
 
+        // 计算最终平均 Rating
         for (TeamRanking rank : rankings.values()) {
             double sum = totalRatingPoints.getOrDefault(rank.getTeamNumber(), 0.0);
             if (rank.getMatchesPlayed() > 0) {
@@ -339,6 +342,7 @@ public class DatabaseService {
         }
         return new ArrayList<>(rankings.values());
     }
+
 
     // ... (rest of helper methods: getValidMatchScores, calculateStdDev, parseShotStats, processTeam, evaluateFormula) ...
     public static List<Double> getValidMatchScores(String competitionName, int teamNumber) {
