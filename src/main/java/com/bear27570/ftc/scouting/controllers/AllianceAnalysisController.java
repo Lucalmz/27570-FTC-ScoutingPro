@@ -29,7 +29,7 @@ public class AllianceAnalysisController {
     private Competition competition;
     private Stage dialogStage;
 
-    // 参考 HeatmapController 的常量
+    // 区域划分线 Y坐标
     private static final double ZONE_DIVIDER_Y = 400.0;
 
     public void setDialogStage(Stage dialogStage, Competition competition) {
@@ -38,15 +38,15 @@ public class AllianceAnalysisController {
     }
 
     /**
-     * 内部画像类，完全同步 HeatmapController 的统计口径
+     * 内部画像类：记录在特定位置主打时的场均命中数 (Hits/Match)
      */
     private static class TeamHeatmapProfile {
         int teamNum;
-        double avgNearHits; // 近点场均命中
-        double avgFarHits;  // 远点场均命中
-        String style;       // 风格标签
-        double accuracy;    // 整体准确率
-        double stability;   // 标准差
+        double nearRoleAvgHits; // 当作为近端主打时的场均总命中 (Hits/Match)
+        double farRoleAvgHits;  // 当作为远端主打时的场均总命中 (Hits/Match)
+        String style;           // 整体风格标签
+        double accuracy;        // 整体准确率
+        double stability;       // 标准差
     }
 
     @FXML
@@ -66,8 +66,8 @@ public class AllianceAnalysisController {
                 return;
             }
 
-            mainTeamStatsLabel.setText(String.format("Main: %d | Near Avg: %.1f | Far Avg: %.1f | Style: %s",
-                    mainTeamNum, mainProfile.avgNearHits, mainProfile.avgFarHits, mainProfile.style));
+            mainTeamStatsLabel.setText(String.format("Main: %d | Near: %.1f Hits/M | Far: %.1f Hits/M | Style: %s",
+                    mainTeamNum, mainProfile.nearRoleAvgHits, mainProfile.farRoleAvgHits, mainProfile.style));
 
             List<AnalysisResult> results = new ArrayList<>();
 
@@ -78,11 +78,13 @@ public class AllianceAnalysisController {
                 TeamHeatmapProfile partnerProfile = getTeamHeatmapProfile(competition.getName(), tr.getTeamNumber(), allRankings);
                 if (partnerProfile == null) continue;
 
-                // --- 核心逻辑：强制取异位置效率最优解 ---
-                // 方案 1: 主队打远点 + 队友打近点
-                double scorePlanA = mainProfile.avgFarHits + partnerProfile.avgNearHits;
-                // 方案 2: 主队打近点 + 队友打远点
-                double scorePlanB = mainProfile.avgNearHits + partnerProfile.avgFarHits;
+                // --- 核心逻辑：使用"在该位置时的场均命中"进行搭配 ---
+
+                // 方案 1: 主队负责远端 + 队友负责近端
+                double scorePlanA = mainProfile.farRoleAvgHits + partnerProfile.nearRoleAvgHits;
+
+                // 方案 2: 主队负责近端 + 队友负责远端
+                double scorePlanB = mainProfile.nearRoleAvgHits + partnerProfile.farRoleAvgHits;
 
                 double bestCombinedHits;
                 String synergyNote;
@@ -95,9 +97,14 @@ public class AllianceAnalysisController {
                     synergyNote = "Main-Near / Partner-Far";
                 }
 
-                // 识别潜在冲突（如果两队在某个位置都是0或极低）
+                // 风格冲突提示：如果两队整体风格完全一致且不是混合型
                 if (mainProfile.style.equals(partnerProfile.style) && !mainProfile.style.equals("Hybrid")) {
                     synergyNote += " (Style Conflict!)";
+                }
+
+                // 数据不足提示 (例如某队从未打过远端)
+                if (bestCombinedHits == 0) {
+                    synergyNote = "Insufficient Data";
                 }
 
                 double combinedAcc = (mainProfile.accuracy + partnerProfile.accuracy) / 2.0;
@@ -116,7 +123,12 @@ public class AllianceAnalysisController {
     }
 
     /**
-     * 实现与 HeatmapController 相同的统计逻辑
+     * 计算逻辑：
+     * 1. 遍历每一场比赛。
+     * 2. 计算单场远射比例。
+     * 3. 根据比例判断该场角色 (Near/Far)。
+     * 4. 将该场比赛的 **总命中数** 计入对应角色的总和。
+     * 5. 最终除以该角色出现的场次，得出该位置的 Hits/Match。
      */
     private TeamHeatmapProfile getTeamHeatmapProfile(String compName, int teamNum, List<TeamRanking> rankings) {
         List<ScoreEntry> matches = DatabaseService.getScoresForTeam(compName, teamNum);
@@ -130,12 +142,24 @@ public class AllianceAnalysisController {
 
         if (validMatches.isEmpty()) return null;
 
-        int nearHits = 0, farHits = 0;
-        int nearShots = 0, farShots = 0;
+        // 统计变量
+        double sumHitsWhenNear = 0;
+        int countNearGames = 0;
+
+        double sumHitsWhenFar = 0;
+        int countFarGames = 0;
+
+        // 用于计算整体风格的全局累计
+        int globalNearShots = 0;
+        int globalFarShots = 0;
 
         for (ScoreEntry m : validMatches) {
             String locs = m.getClickLocations();
             if (locs == null || locs.isEmpty()) continue;
+
+            // 单场统计
+            int matchNearHits = 0, matchFarHits = 0;
+            int matchNearShots = 0, matchFarShots = 0;
 
             for (String p : locs.split(";")) {
                 try {
@@ -150,32 +174,58 @@ public class AllianceAnalysisController {
                         boolean isHit = (state == 0); // 0 为 Hit
 
                         if (y < ZONE_DIVIDER_Y) {
-                            nearShots++; if (isHit) nearHits++;
+                            matchNearShots++;
+                            if (isHit) matchNearHits++;
                         } else {
-                            farShots++; if (isHit) farHits++;
+                            matchFarShots++;
+                            if (isHit) matchFarHits++;
                         }
                     }
                 } catch (Exception ignored) {}
+            }
+
+            // 更新全局统计
+            globalNearShots += matchNearShots;
+            globalFarShots += matchFarShots;
+
+            // --- 判断本场角色并记录总命中 ---
+            int matchTotalShots = matchNearShots + matchFarShots;
+            int matchTotalHits = matchNearHits + matchFarHits;
+
+            if (matchTotalShots > 0) {
+                double farRatio = (double) matchFarShots / matchTotalShots;
+
+                if (farRatio > 0.65) {
+                    // 本场判定为：主远 (Far Role)
+                    sumHitsWhenFar += matchTotalHits; // 记录当场总命中
+                    countFarGames++;
+                } else if (farRatio < 0.35) {
+                    // 本场判定为：主近 (Near Role)
+                    sumHitsWhenNear += matchTotalHits; // 记录当场总命中
+                    countNearGames++;
+                }
+                // Hybrid 场次不计入极限强度计算
             }
         }
 
         TeamHeatmapProfile profile = new TeamHeatmapProfile();
         profile.teamNum = teamNum;
-        int mCount = validMatches.size();
-        profile.avgNearHits = (double) nearHits / mCount;
-        profile.avgFarHits = (double) farHits / mCount;
 
-        // 风格判断逻辑 (同步 HeatmapController)
-        int totalShots = nearShots + farShots;
-        if (totalShots == 0) profile.style = "Unknown";
+        // 计算 Hits/Match (根据角色采样)
+        profile.nearRoleAvgHits = (countNearGames > 0) ? (sumHitsWhenNear / countNearGames) : 0.0;
+        profile.farRoleAvgHits = (countFarGames > 0) ? (sumHitsWhenFar / countFarGames) : 0.0;
+
+        // 整体风格标签
+        int totalGlobalShots = globalNearShots + globalFarShots;
+        if (totalGlobalShots == 0) profile.style = "Unknown";
         else {
-            double farRatio = (double) farShots / totalShots;
-            if (farRatio > 0.65) profile.style = "Far";
-            else if (farRatio < 0.35) profile.style = "Near";
+            double globalFarRatio = (double) globalFarShots / totalGlobalShots;
+            if (globalFarRatio > 0.65) profile.style = "Far";
+            else if (globalFarRatio < 0.35) profile.style = "Near";
             else profile.style = "Hybrid";
         }
 
-        // 获取基础排名中的准确率和稳定性
+        // 获取准确率和稳定性
         TeamRanking tr = rankings.stream().filter(r -> r.getTeamNumber() == teamNum).findFirst().orElse(null);
         profile.accuracy = (tr != null) ? parseAcc(tr.getAccuracyFormatted()) : 0;
         List<Double> scores = DatabaseService.getValidMatchScores(compName, teamNum);
@@ -186,7 +236,9 @@ public class AllianceAnalysisController {
 
     private double parseAcc(String accStr) {
         if (accStr == null || accStr.equals("N/A")) return 0.0;
-        return Double.parseDouble(accStr.replace("%", ""));
+        try {
+            return Double.parseDouble(accStr.replace("%", ""));
+        } catch (Exception e) { return 0.0; }
     }
 
     @FXML public void initialize() {
@@ -213,7 +265,7 @@ public class AllianceAnalysisController {
         }
 
         public int getPartnerTeam() { return partnerTeam; }
-        public double getTotalEfficiency() { return totalEfficiency; } // 这里显示的是场均总命中
+        public double getTotalEfficiency() { return totalEfficiency; }
         public double getCombinedAccuracy() { return combinedAccuracy; }
         public double getStability() { return stability; }
         public String getStyleDesc() { return styleDesc; }
