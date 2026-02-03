@@ -16,7 +16,6 @@
             <padding><Insets top="20" right="20" bottom="20" left="20" /></padding>
             <HBox alignment="CENTER" spacing="10">
                 <children>
-                    <!-- 改为普通按钮 -->
                     <Button fx:id="hostModeButton" onAction="#selectHostMode" text="Host a Competition" />
                     <Button fx:id="joinModeButton" onAction="#selectJoinMode" text="Join a Competition" />
                 </children>
@@ -31,10 +30,14 @@
                 <TextField fx:id="newCompetitionField" promptText="New Competition Name" maxWidth="300"/>
                 <Button onAction="#handleCreateButton" text="Create Competition"/>
             </VBox>
+
+            <!-- 增加分析按钮 -->
             <HBox spacing="10" alignment="CENTER">
-                <Button onAction="#handleHostButton" text="Start Hosting" prefWidth="200" style="-fx-base: #007BFF;"/>
-                <Button onAction="#handleManageMembers" text="Manage Members" prefWidth="150" style="-fx-base: #FF9800;"/>
+                <Button onAction="#handleHostButton" text="Start Hosting" prefWidth="160" style="-fx-base: #007BFF;"/>
+                <Button onAction="#handleManageMembers" text="Members" prefWidth="120" style="-fx-base: #FF9800;"/>
+                <Button onAction="#handleAllianceAnalysis" text="Alliance Analysis" prefWidth="160" style="-fx-base: #9C27B0;"/>
             </HBox>
+
             <VBox fx:id="joinPane" spacing="10" alignment="TOP_CENTER" managed="false" visible="false">
                 <Label styleClass="table-header-label" text="Select a Competition on the Network to Join"/>
                 <ListView fx:id="discoveredCompetitionsListView" />

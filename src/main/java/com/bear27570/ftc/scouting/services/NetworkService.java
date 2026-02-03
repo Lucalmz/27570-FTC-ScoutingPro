@@ -8,10 +8,8 @@ import javafx.collections.ObservableList;
 
 import java.io.*;
 import java.net.*;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Iterator;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 public class NetworkService {
@@ -33,8 +31,9 @@ public class NetworkService {
     private DatagramSocket udpSocket;
 
     private ObjectOutputStream outToServer;
-    // 使用同步列表
-    private final List<ObjectOutputStream> clientOutputStreams = Collections.synchronizedList(new ArrayList<>());
+
+    // 修复：使用线程安全的 List，避免广播时出现并发修改异常
+    private final CopyOnWriteArrayList<ObjectOutputStream> clientOutputStreams = new CopyOnWriteArrayList<>();
 
     private volatile boolean running = false;
     private Thread udpDiscoveryThread;
@@ -62,7 +61,7 @@ public class NetworkService {
                     new ClientHandler(client, out, onScoreReceived).start();
                 }
             } catch (IOException e) {
-                // Ignore close exception
+                // Socket closed normally or error
             }
         });
         tcpServerThread.start();
@@ -102,6 +101,7 @@ public class NetworkService {
                 while (running) {
                     NetworkPacket packet = (NetworkPacket) in.readObject();
                     if (packet.getType() == NetworkPacket.PacketType.SUBMIT_SCORE) {
+                        // 确保回调在 JavaFX 线程执行
                         Platform.runLater(() -> onScoreReceived.accept(packet.getScoreEntry()));
                     }
                 }
@@ -109,22 +109,20 @@ public class NetworkService {
                 // Client disconnected
             } finally {
                 clientOutputStreams.remove(out);
+                try { socket.close(); } catch (IOException ignored) {}
             }
         }
     }
 
     public void broadcastUpdateToClients(NetworkPacket updatePacket) {
-        synchronized (clientOutputStreams) {
-            Iterator<ObjectOutputStream> iterator = clientOutputStreams.iterator();
-            while (iterator.hasNext()) {
-                ObjectOutputStream out = iterator.next();
-                try {
-                    out.writeObject(updatePacket);
-                    out.flush(); // 重要：刷新缓冲区
-                    out.reset(); // 重要：防止对象缓存导致数据不更新
-                } catch (IOException e) {
-                    iterator.remove();
-                }
+        // CopyOnWriteArrayList 允许安全遍历
+        for (ObjectOutputStream out : clientOutputStreams) {
+            try {
+                out.writeObject(updatePacket);
+                out.flush();
+                out.reset(); // 防止对象缓存导致数据不更新
+            } catch (IOException e) {
+                clientOutputStreams.remove(out);
             }
         }
     }
@@ -152,14 +150,17 @@ public class NetworkService {
                                 Competition discovered = new Competition(parts[1], parts[2]);
                                 discovered.setHostAddress(packet.getAddress().getHostAddress());
                                 Platform.runLater(() -> {
-                                    if (discoveredCompetitions.stream().noneMatch(c -> c.getName().equals(discovered.getName()))) {
+                                    // 避免重复添加
+                                    boolean exists = discoveredCompetitions.stream()
+                                            .anyMatch(c -> c.getName().equals(discovered.getName()));
+                                    if (!exists) {
                                         discoveredCompetitions.add(discovered);
                                     }
                                 });
                             }
                         }
                     } catch (SocketTimeoutException e) {
-                        // Expected
+                        // Expected loop behavior
                     }
                 }
             } catch (IOException e) {
@@ -213,6 +214,7 @@ public class NetworkService {
         try { if (clientSocket != null) clientSocket.close(); } catch (IOException e) {}
         if (udpSocket != null) udpSocket.close();
 
+        clientOutputStreams.clear();
         currentState = State.IDLE;
     }
 }

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox spacing="15" style="-fx-background-color: #1C2533;" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.AllianceAnalysisController">
+    <padding><Insets top="20" right="20" bottom="20" left="20"/></padding>
+
+    <Label text="Alliance Partner Analysis" styleClass="header-label"/>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label text="Main Team:" textFill="WHITE"/>
+        <TextField fx:id="mainTeamField" promptText="Enter Team #" prefWidth="100"/>
+        <Button text="Analyze Potential Partners" onAction="#handleAnalyze" styleClass="submit-button"/>
+    </HBox>
+
+    <Label fx:id="mainTeamStatsLabel" text="Waiting for input..." textFill="#B0BEC5"/>
+
+    <TableView fx:id="analysisTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="partnerCol" text="Partner Team" prefWidth="100"/>
+            <TableColumn fx:id="totalEffCol" text="Proj. Total Score" prefWidth="120"/>
+            <TableColumn fx:id="combinedAccCol" text="Comb. Accuracy" prefWidth="120"/>
+            <TableColumn fx:id="stabilityCol" text="Stability (StdDev)" prefWidth="120"/>
+            <TableColumn fx:id="styleCol" text="Analysis Note" prefWidth="200"/>
+        </columns>
+        <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
+    </TableView>
+</VBox>

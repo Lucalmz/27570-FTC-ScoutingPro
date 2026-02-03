@@ -34,12 +34,28 @@ public class ScoreEntry implements Serializable {
     private String submissionTime;
     private String clickLocations; // Format: "teamIdx:x,y,state;..."
 
+    // --- 构造函数 1：用于新建提交 (自动生成当前时间戳) ---
     public ScoreEntry(Type scoreType, int matchNumber, String alliance, int team1, int team2, int autoArtifacts, int teleopArtifacts,
                       boolean team1CanSequence, boolean team2CanSequence, boolean team1L2Climb, boolean team2L2Climb,
                       boolean team1Ignored, boolean team2Ignored,
                       boolean team1Broken, boolean team2Broken,
                       String clickLocations,
                       String submitter) {
+        this(scoreType, matchNumber, alliance, team1, team2, autoArtifacts, teleopArtifacts,
+                team1CanSequence, team2CanSequence, team1L2Climb, team2L2Climb,
+                team1Ignored, team2Ignored, team1Broken, team2Broken,
+                clickLocations, submitter,
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+    }
+
+    // --- 构造函数 2：用于从数据库读取 (保留原有时间戳) ---
+    public ScoreEntry(Type scoreType, int matchNumber, String alliance, int team1, int team2, int autoArtifacts, int teleopArtifacts,
+                      boolean team1CanSequence, boolean team2CanSequence, boolean team1L2Climb, boolean team2L2Climb,
+                      boolean team1Ignored, boolean team2Ignored,
+                      boolean team1Broken, boolean team2Broken,
+                      String clickLocations,
+                      String submitter,
+                      String existingTimestamp) {
         this.scoreType = scoreType;
         this.matchNumber = matchNumber;
         this.alliance = alliance;
@@ -57,7 +73,7 @@ public class ScoreEntry implements Serializable {
         this.team2Broken = team2Broken;
         this.clickLocations = clickLocations;
         this.submitter = submitter;
-        this.submissionTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        this.submissionTime = existingTimestamp; // 使用传入的时间
         this.totalScore = calculateTotalScore();
     }
 

@@ -7,8 +7,11 @@ import com.bear27570.ftc.scouting.services.NetworkService;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.util.stream.Collectors;
@@ -29,13 +32,11 @@ public class HubController {
     public void setMainApp(MainApplication mainApp, String username) {
         this.mainApp = mainApp;
         this.currentUsername = username;
-
         welcomeLabel.setText("Welcome, " + username + "!");
         refreshMyCompetitionsList();
     }
 
-    @FXML
-    private void selectHostMode() {
+    @FXML private void selectHostMode() {
         NetworkService.getInstance().stop();
         hostPane.setVisible(true); hostPane.setManaged(true);
         joinPane.setVisible(false); joinPane.setManaged(false);
@@ -44,8 +45,7 @@ public class HubController {
         joinModeButton.setStyle("");
     }
 
-    @FXML
-    private void selectJoinMode() {
+    @FXML private void selectJoinMode() {
         hostPane.setVisible(false); hostPane.setManaged(false);
         joinPane.setVisible(true); joinPane.setManaged(true);
         statusLabel.setText("Searching for competitions on the network...");
@@ -68,8 +68,7 @@ public class HubController {
         ));
     }
 
-    @FXML
-    private void handleCreateButton() {
+    @FXML private void handleCreateButton() {
         String newName = newCompetitionField.getText();
         if (newName.isBlank()) {
             statusLabel.setText("Competition name cannot be empty.");
@@ -84,8 +83,7 @@ public class HubController {
         }
     }
 
-    @FXML
-    private void handleHostButton() throws IOException {
+    @FXML private void handleHostButton() throws IOException {
         Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
         if (selected == null) {
             statusLabel.setText("Please select one of your competitions to host.");
@@ -94,26 +92,44 @@ public class HubController {
         mainApp.showScoringView(selected, currentUsername, true);
     }
 
-    // --- 新增：处理管理成员按钮点击 ---
-    @FXML
-    private void handleManageMembers() {
+    @FXML private void handleManageMembers() {
         Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
         if (selected == null) {
             statusLabel.setText("Please select a competition to manage.");
             return;
         }
         try {
-            // 调用 MainApplication 中的方法打开弹窗
             mainApp.showCoordinatorView(selected);
         } catch (IOException e) {
             e.printStackTrace();
             statusLabel.setText("Error opening manager: " + e.getMessage());
         }
     }
-    // -------------------------------
 
-    @FXML
-    private void handleJoinButton() throws IOException {
+    @FXML private void handleAllianceAnalysis() {
+        Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
+        // 如果 Host 没选，尝试从 Join 列表获取 (允许 Client 分析)
+        if (selected == null) selected = discoveredCompetitionsListView.getSelectionModel().getSelectedItem();
+
+        if (selected == null) {
+            statusLabel.setText("Please select a competition (Host or Join list) first.");
+            return;
+        }
+        try {
+            FXMLLoader loader = new FXMLLoader(mainApp.getClass().getResource("fxml/AllianceAnalysisView.fxml"));
+            Stage stage = new Stage();
+            stage.setTitle("Alliance Analysis - " + selected.getName());
+            stage.setScene(new Scene(loader.load()));
+            AllianceAnalysisController controller = loader.getController();
+            controller.setDialogStage(stage, selected);
+            stage.show();
+        } catch (IOException e) {
+            e.printStackTrace();
+            statusLabel.setText("Error opening analysis: " + e.getMessage());
+        }
+    }
+
+    @FXML private void handleJoinButton() throws IOException {
         Competition selected = discoveredCompetitionsListView.getSelectionModel().getSelectedItem();
         if (selected == null) {
             statusLabel.setText("Please select a competition from the list to join.");
@@ -122,8 +138,7 @@ public class HubController {
         mainApp.showScoringView(selected, currentUsername, false);
     }
 
-    @FXML
-    private void handleLogout() throws IOException {
+    @FXML private void handleLogout() throws IOException {
         NetworkService.getInstance().stop();
         mainApp.showLoginView();
     }

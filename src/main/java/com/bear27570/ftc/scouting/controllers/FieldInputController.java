@@ -29,7 +29,6 @@ public class FieldInputController {
     private boolean confirmed = false;
     private boolean isAllianceMode = true;
 
-    // 分割线 (y=400)
     private static final double ZONE_DIVIDER_Y = 400.0;
 
     public static class TeamPoint {
@@ -47,6 +46,31 @@ public class FieldInputController {
         ToggleGroup modeGroup = new ToggleGroup();
         addModeBtn.setToggleGroup(modeGroup); removeModeBtn.setToggleGroup(modeGroup);
         redraw();
+    }
+
+    // 新增：加载现有数据
+    public void loadExistingPoints(String locationStr) {
+        points.clear();
+        if (locationStr == null || locationStr.isEmpty()) return;
+
+        String[] entries = locationStr.split(";");
+        for (String entry : entries) {
+            try {
+                String[] parts = entry.split(":");
+                if (parts.length < 2) continue;
+
+                int teamIdx = Integer.parseInt(parts[0]);
+                String[] coords = parts[1].split(",");
+                double x = Double.parseDouble(coords[0]);
+                double y = Double.parseDouble(coords[1]);
+                int state = Integer.parseInt(coords[2]);
+
+                points.add(new TeamPoint(x, y, teamIdx, state == 1));
+            } catch (Exception e) {
+                // Ignore parsing errors
+            }
+        }
+        updateUI();
     }
 
     public void setDialogStage(Stage dialogStage) { this.dialogStage = dialogStage; }
@@ -73,6 +97,7 @@ public class FieldInputController {
         double minDesc = Double.MAX_VALUE;
         double radius = 30.0;
         int currentTeam = team1Btn.isSelected() ? 1 : 2;
+
         for (TeamPoint p : points) {
             if (isAllianceMode && p.teamIndex != currentTeam) continue;
             double dist = Math.sqrt(Math.pow(p.x - x, 2) + Math.pow(p.y - y, 2));
@@ -94,7 +119,6 @@ public class FieldInputController {
         GraphicsContext gc = drawCanvas.getGraphicsContext2D();
         gc.clearRect(0, 0, drawCanvas.getWidth(), drawCanvas.getHeight());
 
-        // --- 绘制区域辅助线 ---
         gc.save();
         gc.setStroke(Color.web("#FFFFFF", 0.3));
         gc.setLineWidth(1);
@@ -103,17 +127,16 @@ public class FieldInputController {
 
         gc.setFill(Color.web("#FFFFFF", 0.5));
         gc.setFont(Font.font("System", FontWeight.BOLD, 14));
-        // 修改：上方为近点 (Near)，下方为远点 (Far)
-        gc.fillText("NEAR ZONE (Top / Large Area)", 10, ZONE_DIVIDER_Y - 10);
-        gc.fillText("FAR ZONE (Bottom / Small Area)", 10, ZONE_DIVIDER_Y + 20);
+        gc.fillText("NEAR ZONE (Top)", 10, ZONE_DIVIDER_Y - 10);
+        gc.fillText("FAR ZONE (Bottom)", 10, ZONE_DIVIDER_Y + 20);
         gc.restore();
-        // ---------------------
 
         gc.setLineWidth(2);
         for (TeamPoint p : points) {
             Color baseColor = (p.teamIndex == 1) ? Color.web("#00BCD4") : Color.web("#E91E63");
             gc.setStroke(baseColor);
             gc.setFill(baseColor);
+
             if (p.isMiss) {
                 double s = 6; gc.setLineWidth(3);
                 gc.strokeLine(p.x - s, p.y - s, p.x + s, p.y + s);

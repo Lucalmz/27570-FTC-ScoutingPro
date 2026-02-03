@@ -32,19 +32,22 @@ public class MainController {
     @FXML private TextField matchNumberField, team1Field, team2Field;
     @FXML private TextField autoArtifactsField, teleopArtifactsField;
     @FXML private ToggleButton redAllianceToggle, blueAllianceToggle;
+
+    // Checkboxes
     @FXML private CheckBox team1SequenceCheck, team1L2ClimbCheck;
     @FXML private CheckBox team1IgnoreCheck, team2IgnoreCheck;
     @FXML private CheckBox team1BrokenCheck, team2BrokenCheck;
-    @FXML private Label team1WarningLabel, team2WarningLabel;
+
     @FXML private VBox team2IgnoreBox;
     @FXML private Label lblTeam2;
     @FXML private VBox team2CapsBox;
     @FXML private CheckBox team2SequenceCheck, team2L2ClimbCheck;
+    @FXML private Label team1WarningLabel, team2WarningLabel;
 
-    // --- 新增: Penalty Tab ---
+    // --- Penalty Tab (UI Modified) ---
     @FXML private TextField penMatchField;
-    @FXML private TextField penRedMajor, penRedMinor;
-    @FXML private TextField penBlueMajor, penBlueMinor;
+    @FXML private ToggleButton penRedToggle, penBlueToggle; // NEW: 选择哪一方犯规
+    @FXML private TextField penMajor, penMinor;             // NEW: 通用输入框
     @FXML private Label penStatusLabel;
 
     // Rankings Tab
@@ -54,7 +57,7 @@ public class MainController {
     @FXML private TableColumn<TeamRanking, Integer> rankTeamCol, rankMatchesCol;
     @FXML private TableColumn<TeamRanking, Double> rankAutoCol, rankTeleopCol;
     @FXML private TableColumn<TeamRanking, String> rankSequenceCol, rankL2Col, rankRatingCol, rankAccuracyCol;
-    @FXML private TableColumn<TeamRanking, String> rankPenCommCol, rankPenOppCol; // 新增列
+    @FXML private TableColumn<TeamRanking, String> rankPenCommCol, rankPenOppCol;
     @FXML private TableColumn<TeamRanking, Void> rankHeatmapCol;
 
     // History Tab
@@ -64,7 +67,9 @@ public class MainController {
     @FXML private TableColumn<ScoreEntry, String> histAllianceCol, histTeamsCol, histSubmitterCol, histTimeCol;
 
     private ToggleGroup allianceToggleGroup;
+    private ToggleGroup penaltyAllianceGroup; // NEW
     private ToggleGroup modeToggleGroup;
+
     private String currentClickLocations = "";
     private MainApplication mainApp;
     private Competition currentCompetition;
@@ -84,6 +89,7 @@ public class MainController {
         setupScoringTab();
         setupRankingsTab();
         setupHistoryTab();
+        setupPenaltyTab(); // NEW init method
 
         if (isHost) {
             editRatingButton.setVisible(true);
@@ -98,29 +104,50 @@ public class MainController {
         refreshAllDataFromDatabase();
         NetworkService.getInstance().startHost(currentCompetition, this::handleScoreReceivedFromClient);
     }
+
     private void startAsClient() {
         setUIEnabled(false);
         try {
             NetworkService.getInstance().connectToHost(currentCompetition.getHostAddress(), this::handleUpdateReceivedFromHost);
             statusLabel.setText("Connected to host. Waiting for data...");
-        } catch (IOException e) { statusLabel.setText("Failed to connect: " + e.getMessage()); }
+        } catch (IOException e) {
+            statusLabel.setText("Failed to connect: " + e.getMessage());
+        }
     }
+
     private void handleScoreReceivedFromClient(ScoreEntry scoreEntry) {
         DatabaseService.saveScoreEntry(currentCompetition.getName(), scoreEntry);
-        refreshAllDataFromDatabase();
         List<ScoreEntry> fullHistory = DatabaseService.getScoresForCompetition(currentCompetition.getName());
         List<TeamRanking> newRankings = DatabaseService.calculateTeamRankings(currentCompetition.getName());
+        Platform.runLater(() -> updateUIAfterDataChange(fullHistory, newRankings));
         NetworkService.getInstance().broadcastUpdateToClients(new NetworkPacket(fullHistory, newRankings));
     }
+
     private void handleUpdateReceivedFromHost(NetworkPacket packet) {
         if (packet.getType() == NetworkPacket.PacketType.UPDATE_DATA) {
-            updateUIAfterDataChange(packet.getScoreHistory(), packet.getTeamRankings());
-            setUIEnabled(true);
-            statusLabel.setText("Data updated from host.");
             Platform.runLater(() -> {
+                updateUIAfterDataChange(packet.getScoreHistory(), packet.getTeamRankings());
+                setUIEnabled(true);
+                statusLabel.setText("Data updated from host.");
                 checkTeamHistory(team1Field.getText(), 1);
                 checkTeamHistory(team2Field.getText(), 2);
             });
+        }
+    }
+
+    // --- 新增：打开联盟分析页面的入口 ---
+    @FXML private void handleAllianceAnalysis() {
+        try {
+            FXMLLoader loader = new FXMLLoader(mainApp.getClass().getResource("fxml/AllianceAnalysisView.fxml"));
+            Stage stage = new Stage();
+            stage.setTitle("Alliance Analysis - " + currentCompetition.getName());
+            stage.setScene(new Scene(loader.load()));
+            AllianceAnalysisController controller = loader.getController();
+            controller.setDialogStage(stage, currentCompetition);
+            stage.show();
+        } catch (IOException e) {
+            e.printStackTrace();
+            statusLabel.setText("Error opening analysis: " + e.getMessage());
         }
     }
 
@@ -131,19 +158,23 @@ public class MainController {
             stage.setTitle("Record Scoring Locations");
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.setScene(new Scene(loader.load()));
+
             FieldInputController controller = loader.getController();
             controller.setDialogStage(stage);
+
             boolean isSingle = singleModeRadio.isSelected();
             controller.setAllianceMode(!isSingle);
+
+            if (currentClickLocations != null && !currentClickLocations.isEmpty()) {
+                controller.loadExistingPoints(currentClickLocations);
+            }
+
             stage.showAndWait();
+
             if (controller.isConfirmed()) {
                 int count = controller.getTotalHitCount();
                 teleopArtifactsField.setText(String.valueOf(count));
-                String newLocs = controller.getLocationsString();
-                if (!newLocs.isEmpty()) {
-                    if (currentClickLocations.length() > 0 && !currentClickLocations.endsWith(";")) currentClickLocations += ";";
-                    currentClickLocations += newLocs;
-                }
+                currentClickLocations = controller.getLocationsString();
             }
         } catch (IOException e) { e.printStackTrace(); }
     }
@@ -164,68 +195,97 @@ public class MainController {
                 t2 = Integer.parseInt(team2Field.getText());
             }
 
+            // Checkbox Null Check
+            boolean t1Seq = team1SequenceCheck != null && team1SequenceCheck.isSelected();
+            boolean t1Climb = team1L2ClimbCheck != null && team1L2ClimbCheck.isSelected();
+            boolean t1Ign = team1IgnoreCheck != null && team1IgnoreCheck.isSelected();
+            boolean t1Brk = team1BrokenCheck != null && team1BrokenCheck.isSelected();
+
+            boolean t2Seq = !isSingle && (team2SequenceCheck != null && team2SequenceCheck.isSelected());
+            boolean t2Climb = !isSingle && (team2L2ClimbCheck != null && team2L2ClimbCheck.isSelected());
+            boolean t2Ign = !isSingle && (team2IgnoreCheck != null && team2IgnoreCheck.isSelected());
+            boolean t2Brk = !isSingle && (team2BrokenCheck != null && team2BrokenCheck.isSelected());
+
             ScoreEntry newEntry = new ScoreEntry(
                     isSingle ? ScoreEntry.Type.SINGLE : ScoreEntry.Type.ALLIANCE,
                     Integer.parseInt(matchNumberField.getText()),
                     alliance, t1, t2,
                     Integer.parseInt(autoArtifactsField.getText()),
                     Integer.parseInt(teleopArtifactsField.getText()),
-                    team1SequenceCheck.isSelected(), !isSingle && team2SequenceCheck.isSelected(),
-                    team1L2ClimbCheck.isSelected(), !isSingle && team2L2ClimbCheck.isSelected(),
-                    team1IgnoreCheck.isSelected(), !isSingle && team2IgnoreCheck.isSelected(),
-                    team1BrokenCheck.isSelected(), !isSingle && team2BrokenCheck.isSelected(),
-                    currentClickLocations, currentUsername);
+                    t1Seq, t2Seq, t1Climb, t2Climb,
+                    t1Ign, t2Ign, t1Brk, t2Brk,
+                    currentClickLocations, currentUsername); // Uses Constructor 1 (auto timestamp)
 
-            if (isHost) { handleScoreReceivedFromClient(newEntry); }
-            else { NetworkService.getInstance().sendScoreToServer(newEntry); statusLabel.setText("Score sent to host."); }
+            if (isHost) {
+                handleScoreReceivedFromClient(newEntry);
+            } else {
+                NetworkService.getInstance().sendScoreToServer(newEntry);
+                statusLabel.setText("Score sent to host.");
+            }
 
             errorLabel.setText("Score submitted successfully!");
             currentClickLocations = "";
-            autoArtifactsField.setText("0"); teleopArtifactsField.setText("0");
-            team1SequenceCheck.setSelected(false); team1L2ClimbCheck.setSelected(false);
-            team2SequenceCheck.setSelected(false); team2L2ClimbCheck.setSelected(false);
-            team1IgnoreCheck.setSelected(false); team2IgnoreCheck.setSelected(false);
-            team1BrokenCheck.setSelected(false); team2BrokenCheck.setSelected(false);
-            team1WarningLabel.setVisible(false); team2WarningLabel.setVisible(false);
+            autoArtifactsField.setText("0");
+            teleopArtifactsField.setText("0");
+
+            // Reset fields
+            if(team1SequenceCheck != null) team1SequenceCheck.setSelected(false);
+            if(team1L2ClimbCheck != null) team1L2ClimbCheck.setSelected(false);
+            if(team2SequenceCheck != null) team2SequenceCheck.setSelected(false);
+            if(team2L2ClimbCheck != null) team2L2ClimbCheck.setSelected(false);
+            if(team1IgnoreCheck != null) team1IgnoreCheck.setSelected(false);
+            if(team2IgnoreCheck != null) team2IgnoreCheck.setSelected(false);
+            if(team1BrokenCheck != null) team1BrokenCheck.setSelected(false);
+            if(team2BrokenCheck != null) team2BrokenCheck.setSelected(false);
 
             try {
                 int nextMatch = Integer.parseInt(matchNumberField.getText()) + 1;
                 matchNumberField.setText(String.valueOf(nextMatch));
-                penMatchField.setText(String.valueOf(nextMatch)); // 同步更新Penalty页面的场次
+                penMatchField.setText(String.valueOf(nextMatch));
             } catch (NumberFormatException ignored) {}
 
-        } catch (Exception e) { errorLabel.setText("Error: " + e.getMessage()); }
+        } catch (Exception e) {
+            e.printStackTrace();
+            errorLabel.setText("Error: " + e.getMessage());
+        }
     }
 
-    // --- 新增: Penalty Handling ---
-    @FXML
-    private void handleSubmitPenalty() {
+    // --- 修复后的 Penalty 提交逻辑 ---
+    @FXML private void handleSubmitPenalty() {
         try {
             int matchNum = Integer.parseInt(penMatchField.getText());
-            int rMaj = penRedMajor.getText().isEmpty() ? 0 : Integer.parseInt(penRedMajor.getText());
-            int rMin = penRedMinor.getText().isEmpty() ? 0 : Integer.parseInt(penRedMinor.getText());
-            int bMaj = penBlueMajor.getText().isEmpty() ? 0 : Integer.parseInt(penBlueMajor.getText());
-            int bMin = penBlueMinor.getText().isEmpty() ? 0 : Integer.parseInt(penBlueMinor.getText());
 
-            PenaltyEntry entry = new PenaltyEntry(matchNum, rMaj, rMin, bMaj, bMin);
+            ToggleButton selectedPenAlliance = (ToggleButton) penaltyAllianceGroup.getSelectedToggle();
+            if (selectedPenAlliance == null) {
+                throw new IllegalArgumentException("Select Alliance (Red/Blue)");
+            }
+            // 根据按钮颜色/文字判断
+            String alliance = selectedPenAlliance.getText().contains("Red") ? "RED" : "BLUE";
+
+            int maj = penMajor.getText().isEmpty() ? 0 : Integer.parseInt(penMajor.getText());
+            int min = penMinor.getText().isEmpty() ? 0 : Integer.parseInt(penMinor.getText());
+
+            // 创建新的单边判罚对象
+            PenaltyEntry entry = new PenaltyEntry(matchNum, alliance, maj, min);
+
+            // 存入数据库 (DB Service 会处理是 Update 还是 Insert)
             DatabaseService.savePenaltyEntry(currentCompetition.getName(), entry);
 
-            // 提交后刷新数据 (判罚会影响排名统计)
             refreshAllDataFromDatabase();
+
+            // Host 广播更新
             if (isHost) {
-                // 如果是Host，还得广播一下 (这里简化逻辑，通常也发Update包)
                 List<ScoreEntry> fullHistory = DatabaseService.getScoresForCompetition(currentCompetition.getName());
                 List<TeamRanking> newRankings = DatabaseService.calculateTeamRankings(currentCompetition.getName());
                 NetworkService.getInstance().broadcastUpdateToClients(new NetworkPacket(fullHistory, newRankings));
             }
 
-            penStatusLabel.setText("Penalty saved for Match " + matchNum);
+            penStatusLabel.setText("Saved: " + alliance + " M:" + matchNum);
             penStatusLabel.setStyle("-fx-text-fill: lightgreen;");
 
-            // 清空
-            penRedMajor.clear(); penRedMinor.clear();
-            penBlueMajor.clear(); penBlueMinor.clear();
-            penMatchField.setText(String.valueOf(matchNum + 1));
+            penMajor.clear();
+            penMinor.clear();
+            // 不自动跳下一场，因为可能要录另一边的判罚
 
         } catch (Exception e) {
             penStatusLabel.setText("Error: " + e.getMessage());
@@ -233,7 +293,11 @@ public class MainController {
         }
     }
 
-    @FXML private void handleEditRating() throws IOException { if (!isHost) return; mainApp.showFormulaEditView(currentCompetition); refreshAllDataFromDatabase(); }
+    @FXML private void handleEditRating() throws IOException {
+        if (!isHost) return;
+        mainApp.showFormulaEditView(currentCompetition);
+        refreshAllDataFromDatabase();
+    }
 
     private void showHeatmap(int teamNumber) {
         try {
@@ -266,31 +330,56 @@ public class MainController {
         });
     }
 
-    private void setUIEnabled(boolean enabled) { scoringFormVBox.setDisable(!enabled); if(!enabled) statusLabel.setText("Connecting to host..."); }
+    private void setUIEnabled(boolean enabled) {
+        scoringFormVBox.setDisable(!enabled);
+        if(!enabled) statusLabel.setText("Connecting to host...");
+    }
 
     private void setupScoringTab() {
         allianceToggleGroup = new ToggleGroup();
-        redAllianceToggle.setToggleGroup(allianceToggleGroup); blueAllianceToggle.setToggleGroup(allianceToggleGroup);
+        redAllianceToggle.setToggleGroup(allianceToggleGroup);
+        blueAllianceToggle.setToggleGroup(allianceToggleGroup);
         redAllianceToggle.setSelected(true);
+
         modeToggleGroup = new ToggleGroup();
-        allianceModeRadio.setToggleGroup(modeToggleGroup); singleModeRadio.setToggleGroup(modeToggleGroup);
+        allianceModeRadio.setToggleGroup(modeToggleGroup);
+        singleModeRadio.setToggleGroup(modeToggleGroup);
+
         modeToggleGroup.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
             boolean isSingle = singleModeRadio.isSelected();
-            lblTeam2.setVisible(!isSingle); lblTeam2.setManaged(!isSingle);
-            team2Field.setVisible(!isSingle); team2Field.setManaged(!isSingle);
-            team2CapsBox.setVisible(!isSingle); team2CapsBox.setManaged(!isSingle);
-            team2IgnoreBox.setVisible(!isSingle); team2IgnoreBox.setManaged(!isSingle);
-            if (isSingle) { team2Field.clear(); team2BrokenCheck.setSelected(false); }
+            if(lblTeam2 != null) { lblTeam2.setVisible(!isSingle); lblTeam2.setManaged(!isSingle); }
+            if(team2Field != null) { team2Field.setVisible(!isSingle); team2Field.setManaged(!isSingle); }
+            if(team2CapsBox != null) { team2CapsBox.setVisible(!isSingle); team2CapsBox.setManaged(!isSingle); }
+            if(team2IgnoreBox != null) { team2IgnoreBox.setVisible(!isSingle); team2IgnoreBox.setManaged(!isSingle); }
+
+            if (isSingle && team2Field != null) team2Field.clear();
         });
-        team1IgnoreCheck.setVisible(false); team2IgnoreCheck.setVisible(false);
+
+        if(team1IgnoreCheck != null) team1IgnoreCheck.setVisible(false);
+        if(team2IgnoreCheck != null) team2IgnoreCheck.setVisible(false);
+
         team1Field.textProperty().addListener((observable, oldValue, newValue) -> checkTeamHistory(newValue, 1));
         team2Field.textProperty().addListener((observable, oldValue, newValue) -> checkTeamHistory(newValue, 2));
     }
 
+    // NEW: 设置判罚 Tab 的 ToggleGroup
+    private void setupPenaltyTab() {
+        penaltyAllianceGroup = new ToggleGroup();
+        if (penRedToggle != null && penBlueToggle != null) {
+            penRedToggle.setToggleGroup(penaltyAllianceGroup);
+            penBlueToggle.setToggleGroup(penaltyAllianceGroup);
+        }
+    }
+
     private void checkTeamHistory(String teamStr, int teamSlot) {
         if (teamStr == null || teamStr.isBlank()) {
-            if (teamSlot == 1) { team1WarningLabel.setVisible(false); team1IgnoreCheck.setVisible(false); }
-            else { team2WarningLabel.setVisible(false); team2IgnoreCheck.setVisible(false); }
+            if (teamSlot == 1) {
+                if(team1WarningLabel!=null) team1WarningLabel.setVisible(false);
+                if(team1IgnoreCheck!=null) team1IgnoreCheck.setVisible(false);
+            } else {
+                if(team2WarningLabel!=null) team2WarningLabel.setVisible(false);
+                if(team2IgnoreCheck!=null) team2IgnoreCheck.setVisible(false);
+            }
             return;
         }
         try {
@@ -299,8 +388,14 @@ public class MainController {
             boolean showIgnoreOption = (matchCount >= 2);
             boolean wasIgnored = scoreHistoryList.stream().anyMatch(entry ->
                     (entry.getTeam1() == teamNum && entry.isTeam1Ignored()) || (entry.getTeam2() == teamNum && entry.isTeam2Ignored()));
-            if (teamSlot == 1) { team1IgnoreCheck.setVisible(showIgnoreOption); team1WarningLabel.setVisible(wasIgnored); }
-            else { team2IgnoreCheck.setVisible(showIgnoreOption); team2WarningLabel.setVisible(wasIgnored); }
+
+            if (teamSlot == 1) {
+                if(team1IgnoreCheck!=null) team1IgnoreCheck.setVisible(showIgnoreOption);
+                if(team1WarningLabel!=null) team1WarningLabel.setVisible(wasIgnored);
+            } else {
+                if(team2IgnoreCheck!=null) team2IgnoreCheck.setVisible(showIgnoreOption);
+                if(team2WarningLabel!=null) team2WarningLabel.setVisible(wasIgnored);
+            }
         } catch (NumberFormatException e) {}
     }
 
@@ -317,10 +412,8 @@ public class MainController {
         accCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getAccuracyFormatted()));
         rankingsTableView.getColumns().add(5, accCol);
 
-        // --- 新增：判罚列 ---
         TableColumn<TeamRanking, String> penComm = new TableColumn<>("Avg Pen Given");
         penComm.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getAvgPenaltyCommittedFormatted()));
-
         TableColumn<TeamRanking, String> penOpp = new TableColumn<>("Avg Pen Got");
         penOpp.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getAvgOpponentPenaltyFormatted()));
 
@@ -343,7 +436,7 @@ public class MainController {
                 };
             }
         });
-        rankingLegendLabel.setText("Avg Pen Given = Points given to opponent (Lower better). Avg Pen Got = Points received from opponent.");
+        rankingLegendLabel.setText("Penalty: Major=15, Minor=5. 'Avg Pen Given' = Pts given to opp due to fouls.");
     }
 
     private void setupHistoryTab() {

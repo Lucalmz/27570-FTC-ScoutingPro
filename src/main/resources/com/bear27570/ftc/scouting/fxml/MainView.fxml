@@ -94,7 +94,7 @@
                     </content>
                 </Tab>
 
-                <!-- NEW TAB: PENALTIES -->
+                <!-- TAB: PENALTIES -->
                 <Tab text="Penalties (Judge)">
                     <content>
                         <VBox alignment="CENTER" spacing="20">
@@ -111,8 +111,8 @@
 
                                 <GridPane hgap="15" vgap="10">
                                     <Label text="Alliance" style="-fx-font-weight: bold;" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-                                    <Label text="Major (30pts)" style="-fx-font-weight: bold;" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
-                                    <Label text="Minor (10pts)" style="-fx-font-weight: bold;" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
+                                    <Label text="Major (15pts)" style="-fx-font-weight: bold;" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+                                    <Label text="Minor (5pts)" style="-fx-font-weight: bold;" GridPane.columnIndex="2" GridPane.rowIndex="0"/>
 
                                     <Label text="RED Alliance" textFill="#FF5252" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
                                     <TextField fx:id="penRedMajor" promptText="0" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
@@ -158,7 +158,6 @@
                                     <TableColumn fx:id="rankTeleopCol" text="Avg Tele" />
                                     <TableColumn fx:id="rankSequenceCol" text="Seq %" />
                                     <TableColumn fx:id="rankL2Col" text="L2 %" />
-                                    <!-- New Cols added in Code -->
                                 </columns>
                                 <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY" /></columnResizePolicy>
                             </TableView>
