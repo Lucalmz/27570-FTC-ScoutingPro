@@ -137,11 +137,20 @@ public class HubController {
         statusLabel.setText("Requesting to join " + selected.getName() + "...");
 
         NetworkService.getInstance().connectToHost(selected.getHostAddress(), currentUsername, (packet) -> {
+            // --- 这里是 Callback ---
+            System.out.println("HubController 收到包: " + packet.getType()); // Debug
+
             if (packet.getType() == NetworkPacket.PacketType.JOIN_RESPONSE) {
+                System.out.println("是否批准: " + packet.isApproved()); // Debug
+
                 if (packet.isApproved()) {
                     try {
+                        System.out.println("即将跳转到计分页面..."); // Debug
                         mainApp.showScoringView(selected, currentUsername, false);
-                    } catch (IOException e) { e.printStackTrace(); }
+                    } catch (IOException e) {
+                        e.printStackTrace(); // 如果跳转失败（如FXML加载错），这里会打印
+                        statusLabel.setText("跳转失败: " + e.getMessage());
+                    }
                 } else {
                     statusLabel.setText("Join request denied by Host.");
                     NetworkService.getInstance().stop();

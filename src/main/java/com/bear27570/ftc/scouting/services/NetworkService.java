@@ -31,7 +31,20 @@ public class NetworkService {
     private String hostingCompetitionName; // 记录当前主持的比赛名
 
     private NetworkService() {}
+    // 在 NetworkService 类中添加
+    private Runnable onMemberJoinCallback;
 
+    public void setOnMemberJoinCallback(Runnable callback) {
+        this.onMemberJoinCallback = callback;
+    }
+
+    // 在 ClientHandler 内部类中添加辅助方法
+    private void notifyMembershipUpdate() {
+        if (NetworkService.getInstance().onMemberJoinCallback != null) {
+            // 必须在 JavaFX 线程执行 UI 更新
+            Platform.runLater(NetworkService.getInstance().onMemberJoinCallback);
+        }
+    }
     public synchronized void startHost(Competition competition, Consumer<ScoreEntry> onScoreReceived) {
         stop();
         running = true;
@@ -101,6 +114,7 @@ public class NetworkService {
                     NetworkPacket packet = (NetworkPacket) in.readObject();
                     switch (packet.getType()) {
                         case JOIN_REQUEST:
+                            System.out.println("收到加入请求: " + packet.getUsername()); // <--- 添加日志
                             this.clientUsername = packet.getUsername();
                             // 关键点：收到请求立即写入 Host 的数据库为 PENDING
                             DatabaseService.addMembership(clientUsername, hostingCompetitionName, Membership.Status.PENDING);
@@ -112,6 +126,8 @@ public class NetworkService {
                     }
                 }
             } catch (Exception e) {
+                System.err.println("ClientHandler 异常: " + e.getMessage()); // <--- 关键：打印错误信息
+                e.printStackTrace();
                 stopClient();
             }
         }
@@ -119,14 +135,26 @@ public class NetworkService {
 
     // 当 Host 在界面点击批准时调用此方法通知 Client
     public void approveClient(String username) {
+        boolean found = false;
+        System.out.println("Host尝试批准用户: [" + username + "]"); // Debug日志
+
         for (ClientHandler handler : connectedClients) {
+            // 打印当前连接的客户端，检查是否匹配
+            System.out.println(" - 检查连接: [" + handler.clientUsername + "]");
+
             if (username.equals(handler.clientUsername)) {
                 handler.sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
+                System.out.println("Host已发送批准指令给: " + username); // Debug日志
+                found = true;
                 return;
             }
         }
-    }
 
+        if (!found) {
+            System.err.println("错误: 找不到用户 [" + username + "] 的在线连接。");
+            System.err.println("当前在线列表: " + connectedClients.size() + " 人");
+        }
+    }
     public void broadcastUpdateToClients(NetworkPacket updatePacket) {
         for (ClientHandler handler : connectedClients) {
             handler.sendPacket(updatePacket);
@@ -176,9 +204,23 @@ public class NetworkService {
             try (ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream())) {
                 while (running) {
                     NetworkPacket p = (NetworkPacket) in.readObject();
-                    Platform.runLater(() -> onPacketReceived.accept(p));
+                    System.out.println("Client收到包类型: " + p.getType()); // <--- Debug日志 1
+
+                    // 必须用 Platform.runLater 包裹，否则不能操作界面
+                    Platform.runLater(() -> {
+                        System.out.println("正在UI线程处理包: " + p.getType()); // <--- Debug日志 2
+                        try {
+                            onPacketReceived.accept(p);
+                        } catch (Exception e) {
+                            System.err.println("Callback处理逻辑出错:"); // <--- 捕获 Callback 内部的逻辑错误
+                            e.printStackTrace();
+                        }
+                    });
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                System.err.println("Client监听线程崩溃:"); // <--- 关键：不再忽略异常
+                e.printStackTrace();
+            }
         }).start();
     }
 

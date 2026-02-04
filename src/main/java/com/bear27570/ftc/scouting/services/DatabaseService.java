@@ -80,11 +80,49 @@ public class DatabaseService {
             pstmt.setString(1, newFormula); pstmt.setString(2, competitionName); pstmt.executeUpdate();
         } catch (SQLException e) { e.printStackTrace(); }
     }
+    // 在 DatabaseService.java 中找到 addMembership 方法并替换
+
     public static void addMembership(String username, String competitionName, Membership.Status status) {
+        // 1. 自动注册不存在的用户 (修复外键报错的核心)
+        ensureUserExists(username);
+
         String sql = "INSERT INTO memberships(username, competitionName, status) VALUES(?, ?, ?)";
-        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, username); pstmt.setString(2, competitionName); pstmt.setString(3, status.name()); pstmt.executeUpdate();
-        } catch (SQLException e) {}
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            pstmt.setString(2, competitionName);
+            pstmt.setString(3, status.name());
+            pstmt.executeUpdate();
+            System.out.println("数据库成功写入成员: " + username + " -> " + status); // Debug日志
+        } catch (SQLException e) {
+            // 2. 打印报错，不再无声失败
+            System.err.println("添加成员失败: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    // 新增一个辅助方法，用来解决跨机用户不存在的问题
+    private static void ensureUserExists(String username) {
+        String checkSql = "SELECT 1 FROM users WHERE username = ?";
+        String insertSql = "INSERT INTO users(username, password) VALUES(?, 'guest_account')"; // 密码随便填，因为是在主机存个档而已
+
+        try (Connection conn = DriverManager.getConnection(DB_URL)) {
+            // 检查用户是否存在
+            try (PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+                checkStmt.setString(1, username);
+                if (checkStmt.executeQuery().next()) {
+                    return; // 用户存在，直接返回
+                }
+            }
+            // 用户不存在，插入临时用户
+            try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+                insertStmt.setString(1, username);
+                insertStmt.executeUpdate();
+                System.out.println("主机数据库自动创建了访客用户: " + username);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
     public static Membership.Status getMembershipStatus(String username, String competitionName) {
         String sql = "SELECT status FROM memberships WHERE username = ? AND competitionName = ?";
