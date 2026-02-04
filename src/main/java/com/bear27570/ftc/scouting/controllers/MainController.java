@@ -36,7 +36,7 @@ public class MainController {
     @FXML private CheckBox team1IgnoreCheck, team2IgnoreCheck;
     @FXML private CheckBox team1BrokenCheck, team2BrokenCheck;
 
-    // 这些组件可能在FXML里没定义ID，导致为空，所以后面必须加判空处理
+    // These components might not be defined in FXML, so null checks are required
     @FXML private VBox team2IgnoreBox, team2CapsBox;
 
     @FXML private Label lblTeam2;
@@ -200,7 +200,7 @@ public class MainController {
             autoArtifactsField.setText("0");
             teleopArtifactsField.setText("0");
 
-            // 提交后重置状态
+            // Reset flags after submission
             if(team1IgnoreCheck != null) {
                 team1IgnoreCheck.setSelected(false);
                 team1IgnoreCheck.setDisable(true);
@@ -209,6 +209,10 @@ public class MainController {
                 team2IgnoreCheck.setSelected(false);
                 team2IgnoreCheck.setDisable(true);
             }
+            // Clear broken flags as well
+            if(team1BrokenCheck != null) team1BrokenCheck.setSelected(false);
+            if(team2BrokenCheck != null) team2BrokenCheck.setSelected(false);
+
 
         } catch (Exception e) { errorLabel.setText("Error: " + e.getMessage()); }
     }
@@ -263,22 +267,37 @@ public class MainController {
         allianceModeRadio.setToggleGroup(modeToggleGroup);
         singleModeRadio.setToggleGroup(modeToggleGroup);
 
-        // --- 修复点：这里加了非空判断，避免空指针异常 ---
         modeToggleGroup.selectedToggleProperty().addListener((obs, old, newVal) -> {
             boolean isS = singleModeRadio.isSelected();
 
             if (lblTeam2 != null) lblTeam2.setVisible(!isS);
             if (team2Field != null) team2Field.setVisible(!isS);
 
-            // 安全判断：如果FXML里没加这个VBox，就不会崩
+            // Hide capability container if it exists
             if (team2CapsBox != null) team2CapsBox.setVisible(!isS);
+
+            // Hide Ignore/Broken if wrapped in a box
             if (team2IgnoreBox != null) team2IgnoreBox.setVisible(!isS);
+
+            // Explicitly hide the specific checkboxes if they aren't in the hidden box
+            // (Based on your FXML, they are in the GridPane, so we must hide them manually)
+            if (team2IgnoreCheck != null) team2IgnoreCheck.setVisible(!isS);
+            if (team2BrokenCheck != null) team2BrokenCheck.setVisible(!isS);
+
+            // --- CHANGED: Clear checkboxes when switching to Single Mode ---
+            if (isS) {
+                if (team2IgnoreCheck != null) team2IgnoreCheck.setSelected(false);
+                if (team2BrokenCheck != null) team2BrokenCheck.setSelected(false);
+
+                // Good practice to clear capabilities as well
+                if (team2SequenceCheck != null) team2SequenceCheck.setSelected(false);
+                if (team2L2ClimbCheck != null) team2L2ClimbCheck.setSelected(false);
+            }
         });
 
         if (team1IgnoreCheck != null) team1IgnoreCheck.setDisable(true);
         if (team2IgnoreCheck != null) team2IgnoreCheck.setDisable(true);
 
-        // 绑定监听器时也判断组件是否存在
         team1Field.textProperty().addListener((obs, old, newVal) -> {
             if (team1IgnoreCheck != null) updateWeakCheckboxStatus(newVal, team1IgnoreCheck);
         });
@@ -288,7 +307,7 @@ public class MainController {
     }
 
     private void updateWeakCheckboxStatus(String teamNumberStr, CheckBox checkBox) {
-        if (checkBox == null) return; // 安全退出
+        if (checkBox == null) return;
 
         if (teamNumberStr == null || teamNumberStr.trim().isEmpty() || currentCompetition == null) {
             checkBox.setDisable(true);
@@ -298,7 +317,7 @@ public class MainController {
         try {
             int teamNum = Integer.parseInt(teamNumberStr.trim());
             int matchCount = DatabaseService.getScoresForTeam(currentCompetition.getName(), teamNum).size();
-            // 逻辑：只有当已经打了2场（当前是第3场）时，允许设置为 Weak (Ignored)
+            // Allow "Weak" flag only after 2 matches played
             if (matchCount >= 2) {
                 checkBox.setDisable(false);
             } else {
@@ -369,47 +388,32 @@ public class MainController {
         }));
         historyTableView.setItems(filtered);
     }
-// ================= EXPORT FUNCTIONALITY =================
 
     @FXML
     private void handleExport() {
-        // 1. 创建 Stage
         final Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
         dialog.initOwner(competitionNameLabel.getScene().getWindow());
         dialog.setTitle("Export Data");
 
-        // 2. 创建容器 VBox
-        VBox dialogVbox = new VBox(20); // 间距 20
+        VBox dialogVbox = new VBox(20);
         dialogVbox.setAlignment(javafx.geometry.Pos.CENTER);
         dialogVbox.setPadding(new javafx.geometry.Insets(30));
-
-        // --- 关键修改：直接应用 CSS 类 ---
-        // 使用 "sidebar" 类作为背景 (#2A3B4F)，这与你的主界面侧边栏一致
         dialogVbox.getStyleClass().add("sidebar");
-        // 加一点边框让它更像一个独立的窗口
         dialogVbox.setStyle("-fx-border-color: #4A5C70; -fx-border-width: 2;");
 
-        // 3. 标题
         Label headerLabel = new Label("Export Data");
-        // 使用 CSS 中的 "header-label" (Cyan色, 粗体, 24px)
         headerLabel.getStyleClass().add("header-label");
 
         Label subLabel = new Label("Select format (.csv):");
-        // 使用 CSS 中的普通 "label" (浅灰色)
         subLabel.getStyleClass().add("label");
 
-        // 4. 按钮样式
-        // 我们希望导出按钮是绿色的，所以引用基础 .button 类后，覆盖背景色
-        // 这样可以保留 CSS 定义的字体、圆角和鼠标悬停逻辑，只改变颜色
         String exportBtnStyle = "-fx-background-color: #2E7D32; -fx-pref-width: 220;";
         String exportHoverStyle = "-fx-background-color: #1B5E20; -fx-pref-width: 220;";
 
-        // 按钮 1: Match History
         Button btnHistory = new Button("Export Match History");
-        btnHistory.getStyleClass().add("button"); // 加载基础样式
-        btnHistory.setStyle(exportBtnStyle);      // 覆盖为绿色
-        // 手动处理 Hover 变色 (因为 override 了背景色，CSS 的 :hover 可能被覆盖)
+        btnHistory.getStyleClass().add("button");
+        btnHistory.setStyle(exportBtnStyle);
         btnHistory.setOnMouseEntered(e -> btnHistory.setStyle(exportHoverStyle));
         btnHistory.setOnMouseExited(e -> btnHistory.setStyle(exportBtnStyle));
         btnHistory.setOnAction(e -> {
@@ -417,7 +421,6 @@ public class MainController {
             exportData("Match History");
         });
 
-        // 按钮 2: Rankings
         Button btnRankings = new Button("Export Team Rankings");
         btnRankings.getStyleClass().add("button");
         btnRankings.setStyle(exportBtnStyle);
@@ -428,32 +431,24 @@ public class MainController {
             exportData("Team Rankings");
         });
 
-        // 按钮 3: Cancel
         Button btnCancel = new Button("Cancel");
-        // 直接使用 CSS 里定义的 .logout-button (红色)，非常适合做取消/关闭按钮
         btnCancel.getStyleClass().add("logout-button");
-        btnCancel.setStyle("-fx-pref-width: 220; -fx-font-size: 14px; -fx-padding: 8;"); // 调整宽度和内边距以匹配上方按钮
+        btnCancel.setStyle("-fx-pref-width: 220; -fx-font-size: 14px; -fx-padding: 8;");
         btnCancel.setOnAction(e -> dialog.close());
 
-        // 5. 分割线
         Separator sep1 = new Separator();
         Separator sep2 = new Separator();
-        sep1.setOpacity(0.3); // 让分割线暗一点
+        sep1.setOpacity(0.3);
         sep2.setOpacity(0.3);
 
-        // 6. 组装
         dialogVbox.getChildren().addAll(headerLabel, subLabel, sep1, btnHistory, btnRankings, sep2, btnCancel);
 
         Scene dialogScene = new Scene(dialogVbox, 400, 380);
 
-        // --- 关键步骤：加载你的 CSS 文件 ---
-        // 假设 style.css 在 resources/com/bear27570/ftc/scouting/styles/style.css
-        // 使用 mainApp.getClass() 确保路径解析正确
         try {
             dialogScene.getStylesheets().add(mainApp.getClass().getResource("styles/style.css").toExternalForm());
         } catch (Exception e) {
             System.err.println("Could not load CSS for dialog: " + e.getMessage());
-            // 如果找不到 CSS，保持默认样式，不崩溃
         }
 
         dialog.setScene(dialogScene);
@@ -462,18 +457,15 @@ public class MainController {
     }
 
     private void exportData(String type) {
-        // 2. 配置文件选择器
         javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
         fileChooser.setTitle("Save Export File");
         fileChooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("CSV Files (*.csv)", "*.csv"));
 
-        // 生成默认文件名: CompetitionName_Type_Timestamp.csv
         String timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmm").format(new java.util.Date());
         String cleanCompName = currentCompetition.getName().replaceAll("[^a-zA-Z0-9]", "");
         String defaultName = cleanCompName + "_" + type.replace(" ", "") + "_" + timestamp + ".csv";
         fileChooser.setInitialFileName(defaultName);
 
-        // 获取当前 Stage
         Stage stage = (Stage) competitionNameLabel.getScene().getWindow();
         java.io.File file = fileChooser.showSaveDialog(stage);
 
@@ -493,12 +485,9 @@ public class MainController {
     }
 
     private void writeMatchHistoryCSV(java.io.BufferedWriter writer) throws IOException {
-        // 写入表头
         writer.write("Match Number,Alliance,Team 1,Team 2,Auto Artifacts,Teleop Artifacts,Total Score,T1 Sequence,T1 Climb,T2 Sequence,T2 Climb,Submitter,Time,Ignored/Broken Flags");
         writer.newLine();
 
-        // 写入数据
-        // 直接使用 scoreHistoryList，因为它包含当前所有数据
         for (ScoreEntry s : scoreHistoryList) {
             String flags = "";
             if(s.isTeam1Ignored()) flags += "T1_Weak ";
@@ -528,11 +517,9 @@ public class MainController {
     }
 
     private void writeRankingsCSV(java.io.BufferedWriter writer) throws IOException {
-        // 写入表头
         writer.write("Rank,Team Number,Rating,Matches Played,Avg Auto,Avg Teleop,Accuracy,Avg Pen Committed,Avg Pen Received,Sequence %,L2 Climb %");
         writer.newLine();
 
-        // 获取当前表格中的排序数据
         List<TeamRanking> rankings = rankingsTableView.getItems();
 
         int rank = 1;
@@ -540,14 +527,14 @@ public class MainController {
             String line = String.format("%d,%d,%s,%d,%s,%s,%s,%s,%s,%s,%s",
                     rank++,
                     r.getTeamNumber(),
-                    r.getRatingFormatted(), // 假设 TeamRanking 有这个getter，如果没有就用 r.getRating()
+                    r.getRatingFormatted(),
                     r.getMatchesPlayed(),
                     r.getAvgAutoArtifactsFormatted(),
                     r.getAvgTeleopArtifactsFormatted(),
                     r.getAccuracyFormatted(),
                     r.getAvgPenaltyCommittedFormatted(),
                     r.getAvgOpponentPenaltyFormatted(),
-                    r.getCanSequence(), // 假设返回的是格式化后的百分比字符串
+                    r.getCanSequence(),
                     r.getL2Capable()
             );
             writer.write(line);
@@ -555,7 +542,6 @@ public class MainController {
         }
     }
 
-    // 简单的 CSV 转义工具，防止数据中包含逗号导致格式错乱
     private String escapeCsv(String data) {
         if (data == null) return "";
         if (data.contains(",") || data.contains("\"") || data.contains("\n")) {

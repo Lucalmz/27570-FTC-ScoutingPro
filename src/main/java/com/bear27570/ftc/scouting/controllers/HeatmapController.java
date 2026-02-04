@@ -7,10 +7,10 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Label;
 import javafx.scene.image.PixelWriter;
-import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -19,13 +19,14 @@ public class HeatmapController {
     @FXML private Canvas heatmapCanvas;
     @FXML private Label playStyleLabel;
     @FXML private Label efficiencyLabel;
-    @FXML private Label farShotsLabel; // 将显示 Far Role Avg
+    @FXML private Label farShotsLabel;
     @FXML private Label farAccLabel;
-    @FXML private Label nearShotsLabel; // 将显示 Near Role Avg
+    @FXML private Label nearShotsLabel;
     @FXML private Label nearAccLabel;
-    @FXML private VBox statusBox;
     @FXML private Label statusTextLabel;
     @FXML private Label brokenTextLabel;
+    // New label for cycles
+    @FXML private Label cyclesLabel;
 
     private static final double ZONE_DIVIDER_Y = 400.0;
     private static final int POINTS_PER_HIT = 3;
@@ -59,15 +60,18 @@ public class HeatmapController {
     private void calculateAndDraw(int teamNumber, List<ScoreEntry> matches) {
         List<Point> hitPoints = new ArrayList<>();
 
-        // 采样统计
         int nearRoleHits = 0, nearRoleMatches = 0;
         int farRoleHits = 0, farRoleMatches = 0;
 
-        // 全局准确率统计
         int globalFarShots = 0, globalFarHits = 0;
         int globalNearShots = 0, globalNearHits = 0;
 
+        // Variables for Cycle Calculation
+        int totalCycles = 0;
+        int matchesWithData = 0;
+
         for (ScoreEntry m : matches) {
+            // Skip broken matches for stats
             if ((m.getTeam1() == teamNumber && m.isTeam1Broken()) ||
                     (m.getTeam2() == teamNumber && m.isTeam2Broken())) continue;
 
@@ -75,6 +79,7 @@ public class HeatmapController {
             if (locs == null || locs.isEmpty()) continue;
 
             int mHits = 0, mNearShots = 0, mFarShots = 0;
+            List<Long> matchTimestamps = new ArrayList<>();
 
             for (String p : locs.split(";")) {
                 try {
@@ -87,7 +92,11 @@ public class HeatmapController {
                         double x = Double.parseDouble(coords[0]);
                         double y = Double.parseDouble(coords[1]);
                         int state = (coords.length >= 3) ? Integer.parseInt(coords[2]) : 0;
+                        // Parse timestamp (index 3)
+                        long ts = (coords.length > 3) ? Long.parseLong(coords[3]) : 0;
                         boolean isHit = (state == 0);
+
+                        if (ts > 0) matchTimestamps.add(ts);
 
                         if (isHit) {
                             hitPoints.add(new Point(x, y));
@@ -102,10 +111,25 @@ public class HeatmapController {
                 } catch (Exception ignored) {}
             }
 
+            // --- Cycle Calculation Logic ---
+            if (!matchTimestamps.isEmpty()) {
+                Collections.sort(matchTimestamps);
+                int cycles = 1; // Assume 1st cycle (preload or first pickup)
+                for (int i = 1; i < matchTimestamps.size(); i++) {
+                    long diff = matchTimestamps.get(i) - matchTimestamps.get(i - 1);
+                    // Threshold: 4 seconds (4000ms) gap implies a new intake cycle
+                    if (diff > 4000) {
+                        cycles++;
+                    }
+                }
+                totalCycles += cycles;
+                matchesWithData++;
+            }
+            // -------------------------------
+
             globalNearShots += mNearShots;
             globalFarShots += mFarShots;
 
-            // 角色判定逻辑
             int mTotalShots = mNearShots + mFarShots;
             if (mTotalShots > 0) {
                 double ratio = (double) mFarShots / mTotalShots;
@@ -119,25 +143,31 @@ public class HeatmapController {
 
         double finalNearAvg = nearRoleMatches == 0 ? 0 : (double) nearRoleHits / nearRoleMatches;
         double finalFarAvg = farRoleMatches == 0 ? 0 : (double) farRoleHits / farRoleMatches;
+        // Calculate average cycles
+        double avgCycles = matchesWithData == 0 ? 0 : (double) totalCycles / matchesWithData;
+
         int fFarShots = globalFarShots, fFarHits = globalFarHits;
         int fNearShots = globalNearShots, fNearHits = globalNearHits;
 
         Platform.runLater(() -> {
             drawProbabilityCloud(hitPoints);
-            updateAnalysis(fFarShots, fFarHits, fNearShots, fNearHits, finalNearAvg, finalFarAvg);
+            updateAnalysis(fFarShots, fFarHits, fNearShots, fNearHits, finalNearAvg, finalFarAvg, avgCycles);
         });
     }
 
-    private void updateAnalysis(int farShots, int farHits, int nearShots, int nearHits, double nearAvg, double farAvg) {
+    private void updateAnalysis(int farShots, int farHits, int nearShots, int nearHits,
+                                double nearAvg, double farAvg, double avgCycles) {
         int totalShots = farShots + nearShots;
         int totalHits = farHits + nearHits;
 
-        // 此处显示的是“作为该角色时的场均命中”
         farShotsLabel.setText(String.format("%.1f Hits/M", farAvg));
         nearShotsLabel.setText(String.format("%.1f Hits/M", nearAvg));
 
         farAccLabel.setText(String.format("%.1f%%", (farShots > 0 ? (double)farHits/farShots*100 : 0)));
         nearAccLabel.setText(String.format("%.1f%%", (nearShots > 0 ? (double)nearHits/nearShots*100 : 0)));
+
+        // Update Cycle Label
+        cyclesLabel.setText(String.format("%.1f", avgCycles));
 
         if (totalShots == 0) {
             playStyleLabel.setText("No Data");
@@ -154,7 +184,6 @@ public class HeatmapController {
         efficiencyLabel.setText(String.format("%.2f PPS", pps));
     }
 
-    // --- 绘图逻辑 (与之前一致，省略部分重复的PixelWriter代码以保持长度，但逻辑完全保留) ---
     private void drawProbabilityCloud(List<Point> points) {
         int w = (int) heatmapCanvas.getWidth();
         int h = (int) heatmapCanvas.getHeight();
@@ -194,7 +223,7 @@ public class HeatmapController {
 
     private Color getSmoothGradientColor(double ratio) {
         double opacity = Math.min(0.9, Math.pow(ratio, 0.45));
-        double hue = 240 - ratio * 240; // 蓝(240) -> 红(0)
+        double hue = 240 - ratio * 240;
         return Color.hsb(hue, 1.0, 1.0, opacity);
     }
 

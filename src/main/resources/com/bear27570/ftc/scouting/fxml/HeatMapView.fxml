@@ -6,14 +6,14 @@
 <?import javafx.scene.canvas.Canvas?>
 
 <BorderPane style="-fx-background-color: #1C2533;" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.HeatmapController">
-    <!-- 顶部标题 -->
+    <!-- Top Header -->
     <top>
         <VBox alignment="CENTER" spacing="5" style="-fx-background-color: #2A3B4F; -fx-padding: 10;">
             <Label fx:id="teamTitleLabel" styleClass="header-label" text="Team Heatmap"/>
         </VBox>
     </top>
 
-    <!-- 中间：地图 -->
+    <!-- Center: Map -->
     <center>
         <StackPane fx:id="mapPane" style="-fx-border-color: #4A5C70; -fx-border-width: 2;">
             <ImageView fx:id="fieldImageView" fitHeight="600" fitWidth="600" preserveRatio="true">
@@ -23,11 +23,10 @@
         </StackPane>
     </center>
 
-    <!-- 右侧：高级数据分析 -->
+    <!-- Right: Stats -->
     <right>
         <VBox spacing="15" prefWidth="220" style="-fx-background-color: #232F3E; -fx-padding: 15; -fx-border-color: #4A5C70; -fx-border-width: 0 0 0 2;">
 
-            <!-- 新增：状态显示区域 -->
             <VBox fx:id="statusBox" spacing="5" style="-fx-background-color: #37474F; -fx-padding: 8; -fx-background-radius: 5;">
                 <Label text="Team Status" style="-fx-text-fill: white; -fx-font-weight: bold;"/>
                 <Separator/>
@@ -39,13 +38,11 @@
             <Label text="Performance Analysis" styleClass="sub-header-label" style="-fx-text-fill: white; -fx-font-size: 16px;"/>
             <Separator/>
 
-            <!-- 风格定义 -->
             <VBox spacing="5">
                 <Label text="Play Style" style="-fx-text-fill: #B0BEC5; -fx-font-size: 12px;"/>
                 <Label fx:id="playStyleLabel" text="Analyzing..." style="-fx-text-fill: #00BCD4; -fx-font-size: 18px; -fx-font-weight: bold;"/>
             </VBox>
 
-            <!-- 效率数据 -->
             <VBox spacing="5">
                 <Label text="Scoring Efficiency" style="-fx-text-fill: #B0BEC5; -fx-font-size: 12px;"/>
                 <Label fx:id="efficiencyLabel" text="0.0 PPS" style="-fx-text-fill: #FFEB3B; -fx-font-size: 24px; -fx-font-weight: bold;"/>
@@ -54,14 +51,21 @@
 
             <Separator/>
 
-            <!-- 远射数据 (Lower Box - Far Zone) -->
+            <!-- NEW: Cycles Stats -->
+            <VBox fx:id="cyclesBox" spacing="5">
+                <Label text="Avg Intake Cycles" style="-fx-text-fill: #B0BEC5; -fx-font-size: 12px;"/>
+                <Label fx:id="cyclesLabel" text="0.0" style="-fx-text-fill: #E0E0E0; -fx-font-size: 20px; -fx-font-weight: bold;"/>
+                <Label text="(>4s gap = new cycle)" style="-fx-text-fill: gray; -fx-font-size: 9px;"/>
+            </VBox>
+
+            <Separator/>
+
             <VBox spacing="5" style="-fx-background-color: #2A3B4F; -fx-padding: 8; -fx-background-radius: 5;">
                 <Label text="Far Zone (Bottom)" style="-fx-text-fill: #FF9800; -fx-font-weight: bold;"/>
                 <HBox spacing="5"><Label text="Avg:" textFill="#cfcfcf"/><Label fx:id="farShotsLabel" text="0" textFill="white"/></HBox>
                 <HBox spacing="5"><Label text="Acc:" textFill="#cfcfcf"/><Label fx:id="farAccLabel" text="0%" textFill="white"/></HBox>
             </VBox>
 
-            <!-- 近射数据 (Upper Box - Near Zone) -->
             <VBox spacing="5" style="-fx-background-color: #2A3B4F; -fx-padding: 8; -fx-background-radius: 5;">
                 <Label text="Near Zone (Top)" style="-fx-text-fill: #4CAF50; -fx-font-weight: bold;"/>
                 <HBox spacing="5"><Label text="Avg:" textFill="#cfcfcf"/><Label fx:id="nearShotsLabel" text="0" textFill="white"/></HBox>
