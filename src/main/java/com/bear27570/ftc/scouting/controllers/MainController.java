@@ -299,7 +299,7 @@ public class MainController {
             int teamNum = Integer.parseInt(teamNumberStr.trim());
             int matchCount = DatabaseService.getScoresForTeam(currentCompetition.getName(), teamNum).size();
             // 逻辑：只有当已经打了2场（当前是第3场）时，允许设置为 Weak (Ignored)
-            if (matchCount == 2) {
+            if (matchCount >= 2) {
                 checkBox.setDisable(false);
             } else {
                 checkBox.setDisable(true);
