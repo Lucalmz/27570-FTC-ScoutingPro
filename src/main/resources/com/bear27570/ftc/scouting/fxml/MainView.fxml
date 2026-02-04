@@ -19,7 +19,7 @@
     <center>
         <TabPane tabClosingPolicy="UNAVAILABLE">
             <tabs>
-                <!-- TAB 1: SCORING (已加入 ScrollPane) -->
+                <!-- TAB 1: SCORING (带滚动条) -->
                 <Tab text="Scoring">
                     <content>
                         <ScrollPane fitToWidth="true" style="-fx-background: #1C2533; -fx-background-color: transparent;">
@@ -52,7 +52,6 @@
                                         <TextField fx:id="team2Field" GridPane.columnIndex="1" GridPane.rowIndex="3" />
                                         <CheckBox fx:id="team2IgnoreCheck" text="Mark as Weak" GridPane.columnIndex="1" GridPane.rowIndex="4" style="-fx-font-size: 11px;"/>
                                         <CheckBox fx:id="team2BrokenCheck" text="Robot Broken" GridPane.columnIndex="1" GridPane.rowIndex="5" style="-fx-font-size: 11px;"/>
-
                                         <columnConstraints><ColumnConstraints prefWidth="100"/><ColumnConstraints hgrow="ALWAYS"/></columnConstraints>
                                     </GridPane>
                                     <Separator />
@@ -91,7 +90,7 @@
                     </content>
                 </Tab>
 
-                <!-- TAB 2: PENALTIES (也加入了 ScrollPane) -->
+                <!-- TAB 2: PENALTIES (带滚动条) -->
                 <Tab text="Penalties">
                     <content>
                         <ScrollPane fitToWidth="true" style="-fx-background: #1C2533; -fx-background-color: transparent;">
@@ -125,7 +124,7 @@
                     </content>
                 </Tab>
 
-                <!-- TAB 3: RANKINGS -->
+                <!-- TAB 3: RANKINGS (已修复 rankingLegendLabel) -->
                 <Tab text="Team Rankings">
                     <content>
                         <VBox spacing="10">
@@ -135,6 +134,9 @@
                                 <Region HBox.hgrow="ALWAYS" />
                                 <Button fx:id="editRatingButton" managed="false" onAction="#handleEditRating" text="Edit Formula" visible="false" />
                             </HBox>
+                            <!-- 关键修复：加回这个 Label，否则 MainController 会报 NPE -->
+                            <Label fx:id="rankingLegendLabel" style="-fx-font-style: italic; -fx-font-size: 12px;" text="Legend..." textFill="#B0BEC5" wrapText="true" />
+
                             <TableView fx:id="rankingsTableView" VBox.vgrow="ALWAYS">
                                 <columns>
                                     <TableColumn fx:id="rankTeamCol" prefWidth="70" text="Team #" />
