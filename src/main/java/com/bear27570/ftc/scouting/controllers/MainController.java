@@ -25,7 +25,7 @@ import java.util.List;
 public class MainController {
 
     @FXML private Label competitionNameLabel, submitterLabel, errorLabel, statusLabel;
-
+    @FXML private Button manageMembersBtn;
     // Scoring Tab
     @FXML private VBox scoringFormVBox;
     @FXML private RadioButton allianceModeRadio, singleModeRadio;

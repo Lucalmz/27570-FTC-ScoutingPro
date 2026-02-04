@@ -38,7 +38,6 @@ public class HubController {
     }
 
     @FXML private void selectHostMode() {
-        // 去除 NetworkService.getInstance().stop();
         hostPane.setVisible(true); hostPane.setManaged(true);
         joinPane.setVisible(false); joinPane.setManaged(false);
         statusLabel.setText("Select a competition to host.");
@@ -69,9 +68,23 @@ public class HubController {
         ));
     }
 
+    @FXML private void handleCreateButton() {
+        String newName = newCompetitionField.getText();
+        if (newName != null && !newName.isBlank()) {
+            if (DatabaseService.createCompetition(newName, currentUsername)) {
+                newCompetitionField.clear();
+                refreshMyCompetitionsList();
+                statusLabel.setText("Competition created!");
+            }
+        }
+    }
+
     @FXML private void handleHostButton() throws IOException {
         Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
-        if (selected == null) return;
+        if (selected == null) {
+            statusLabel.setText("Please select a competition to host.");
+            return;
+        }
         mainApp.showScoringView(selected, currentUsername, true);
     }
 
@@ -79,15 +92,17 @@ public class HubController {
         Competition selected = discoveredCompetitionsListView.getSelectionModel().getSelectedItem();
         if (selected == null) return;
 
-        statusLabel.setText("Requesting to join...");
+        statusLabel.setText("Requesting to join " + selected.getName() + "...");
         NetworkService.getInstance().connectToHost(selected.getHostAddress(), currentUsername, (packet) -> {
             if (packet.getType() == NetworkPacket.PacketType.JOIN_RESPONSE) {
                 if (packet.isApproved()) {
                     try {
                         mainApp.showScoringView(selected, currentUsername, false);
-                    } catch (IOException e) { e.printStackTrace(); }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 } else {
-                    statusLabel.setText("Join request denied.");
+                    statusLabel.setText("Join request denied by Host.");
                 }
             }
         });
@@ -95,20 +110,41 @@ public class HubController {
 
     @FXML private void handleManageMembers() {
         Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
-        if (selected != null) {
-            try { mainApp.showCoordinatorView(selected); } catch (IOException e) { e.printStackTrace(); }
+        if (selected == null) {
+            statusLabel.setText("Select a competition first.");
+            return;
+        }
+        try {
+            mainApp.showCoordinatorView(selected);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // 这里是报错的关键：必须确保这个方法存在且标记了 @FXML
+    @FXML private void handleAllianceAnalysis() {
+        Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
+        if (selected == null) selected = discoveredCompetitionsListView.getSelectionModel().getSelectedItem();
+
+        if (selected == null) {
+            statusLabel.setText("Please select a competition first.");
+            return;
+        }
+        try {
+            FXMLLoader loader = new FXMLLoader(mainApp.getClass().getResource("fxml/AllianceAnalysisView.fxml"));
+            Stage stage = new Stage();
+            stage.setTitle("Alliance Analysis - " + selected.getName());
+            stage.setScene(new Scene(loader.load()));
+            AllianceAnalysisController controller = loader.getController();
+            controller.setDialogStage(stage, selected);
+            stage.show();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
     @FXML private void handleLogout() throws IOException {
         NetworkService.getInstance().stop();
         mainApp.showLoginView();
-    }
-
-    @FXML private void handleCreateButton() {
-        String newName = newCompetitionField.getText();
-        if (!newName.isBlank() && DatabaseService.createCompetition(newName, currentUsername)) {
-            newCompetitionField.clear(); refreshMyCompetitionsList();
-        }
     }
 }
