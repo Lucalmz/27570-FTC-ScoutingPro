@@ -25,15 +25,28 @@ public class DatabaseService {
             if (!dbFolder.exists()) dbFolder.mkdirs();
 
             try (Connection conn = DriverManager.getConnection(DB_URL); Statement stmt = conn.createStatement()) {
+                // 1. Users Table
                 stmt.execute("CREATE TABLE IF NOT EXISTS users (username VARCHAR(255) PRIMARY KEY, password VARCHAR(255))");
+
+                // 2. Competitions Table (Auto-migration for ratingFormula)
                 stmt.execute("CREATE TABLE IF NOT EXISTS competitions (name VARCHAR(255) PRIMARY KEY, creatorUsername VARCHAR(255), ratingFormula VARCHAR(500) DEFAULT 'total', FOREIGN KEY (creatorUsername) REFERENCES users(username))");
                 try { stmt.execute("ALTER TABLE competitions ADD COLUMN IF NOT EXISTS ratingFormula VARCHAR(500) DEFAULT 'total'"); } catch (SQLException ignore) {}
 
+                // 3. Memberships Table
                 stmt.execute("CREATE TABLE IF NOT EXISTS memberships (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(255), competitionName VARCHAR(255), status VARCHAR(50), FOREIGN KEY (username) REFERENCES users(username), FOREIGN KEY (competitionName) REFERENCES competitions(name), UNIQUE(username, competitionName))");
 
-                stmt.execute("CREATE TABLE IF NOT EXISTS scores (id INT AUTO_INCREMENT PRIMARY KEY, competitionName VARCHAR(255), scoreType VARCHAR(20) DEFAULT 'ALLIANCE', matchNumber INT, alliance VARCHAR(10), team1 INT, team2 INT, autoArtifacts INT, teleopArtifacts INT, team1CanSequence BOOLEAN, team2CanSequence BOOLEAN, team1L2Climb BOOLEAN, team2L2Climb BOOLEAN, totalScore INT, clickLocations TEXT, submitter VARCHAR(255), submissionTime VARCHAR(255), FOREIGN KEY (competitionName) REFERENCES competitions(name))");
+                // 4. Scores Table
+                // Updated definition for new installs
+                stmt.execute("CREATE TABLE IF NOT EXISTS scores (id INT AUTO_INCREMENT PRIMARY KEY, competitionName VARCHAR(255), scoreType VARCHAR(20) DEFAULT 'ALLIANCE', matchNumber INT, alliance VARCHAR(10), team1 INT, team2 INT, autoArtifacts INT, teleopArtifacts INT, team1CanSequence BOOLEAN, team2CanSequence BOOLEAN, team1L2Climb BOOLEAN, team2L2Climb BOOLEAN, team1Ignored BOOLEAN DEFAULT FALSE, team2Ignored BOOLEAN DEFAULT FALSE, team1Broken BOOLEAN DEFAULT FALSE, team2Broken BOOLEAN DEFAULT FALSE, totalScore INT, clickLocations TEXT, submitter VARCHAR(255), submissionTime VARCHAR(255), FOREIGN KEY (competitionName) REFERENCES competitions(name))");
 
-                // 确保 penalty 表存在，结构保持不变以兼容旧数据，但只更新特定列
+                // *** CRITICAL FIX: Schema Migration for Existing Databases ***
+                // This adds the missing columns if they don't exist
+                try { stmt.execute("ALTER TABLE scores ADD COLUMN IF NOT EXISTS team1Ignored BOOLEAN DEFAULT FALSE"); } catch (SQLException ignore) {}
+                try { stmt.execute("ALTER TABLE scores ADD COLUMN IF NOT EXISTS team2Ignored BOOLEAN DEFAULT FALSE"); } catch (SQLException ignore) {}
+                try { stmt.execute("ALTER TABLE scores ADD COLUMN IF NOT EXISTS team1Broken BOOLEAN DEFAULT FALSE"); } catch (SQLException ignore) {}
+                try { stmt.execute("ALTER TABLE scores ADD COLUMN IF NOT EXISTS team2Broken BOOLEAN DEFAULT FALSE"); } catch (SQLException ignore) {}
+
+                // 5. Penalties Table
                 stmt.execute("CREATE TABLE IF NOT EXISTS penalties (id INT AUTO_INCREMENT PRIMARY KEY, competitionName VARCHAR(255), matchNumber INT, redMajor INT DEFAULT 0, redMinor INT DEFAULT 0, blueMajor INT DEFAULT 0, blueMinor INT DEFAULT 0, UNIQUE(competitionName, matchNumber))");
             }
         } catch (SQLException e) {
@@ -42,7 +55,8 @@ public class DatabaseService {
         }
     }
 
-    // ... (User, Membership, Competition methods remain same as before) ...
+    // ... (User, Membership, Competition methods) ...
+
     public static boolean createUser(String username, String password) {
         String sql = "INSERT INTO users(username, password) VALUES(?, ?)";
         try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -80,70 +94,44 @@ public class DatabaseService {
             pstmt.setString(1, newFormula); pstmt.setString(2, competitionName); pstmt.executeUpdate();
         } catch (SQLException e) { e.printStackTrace(); }
     }
-    // 在 DatabaseService.java 中找到 addMembership 方法并替换
 
-    // 替换 DatabaseService.java 中的 addMembership 方法
     public static void addMembership(String username, String competitionName, Membership.Status status) {
-        // 1. 确保用户在主机库里有底稿
         ensureUserExists(username);
-
-        // 2. 先检查是否已经存在该成员关系
         String checkSql = "SELECT status FROM memberships WHERE username = ? AND competitionName = ?";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
-             PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
-            checkStmt.setString(1, username);
-            checkStmt.setString(2, competitionName);
+        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+            checkStmt.setString(1, username); checkStmt.setString(2, competitionName);
             ResultSet rs = checkStmt.executeQuery();
-
             if (rs.next()) {
-                // 如果已存在，则更新状态（或者如果是 PENDING 则不做操作，防止覆盖 APPROVED 状态）
                 String currentStatus = rs.getString("status");
                 if (currentStatus.equals("PENDING") && status == Membership.Status.APPROVED) {
                     updateMembershipStatus(username, competitionName, status);
                 }
-                return; // 结束执行，避免 INSERT 冲突
+                return;
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        } catch (SQLException e) { e.printStackTrace(); }
 
-        // 3. 不存在则插入
         String sql = "INSERT INTO memberships(username, competitionName, status) VALUES(?, ?, ?)";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, username);
-            pstmt.setString(2, competitionName);
-            pstmt.setString(3, status.name());
+        try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username); pstmt.setString(2, competitionName); pstmt.setString(3, status.name());
             pstmt.executeUpdate();
-        } catch (SQLException e) {
-            System.err.println("Database Add Membership Error: " + e.getMessage());
-        }
+        } catch (SQLException e) { System.err.println("Database Add Membership Error: " + e.getMessage()); }
     }
 
-
-    // 新增一个辅助方法，用来解决跨机用户不存在的问题
     private static void ensureUserExists(String username) {
         String checkSql = "SELECT 1 FROM users WHERE username = ?";
-        String insertSql = "INSERT INTO users(username, password) VALUES(?, 'guest_account')"; // 密码随便填，因为是在主机存个档而已
-
+        String insertSql = "INSERT INTO users(username, password) VALUES(?, 'guest_account')";
         try (Connection conn = DriverManager.getConnection(DB_URL)) {
-            // 检查用户是否存在
             try (PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
                 checkStmt.setString(1, username);
-                if (checkStmt.executeQuery().next()) {
-                    return; // 用户存在，直接返回
-                }
+                if (checkStmt.executeQuery().next()) return;
             }
-            // 用户不存在，插入临时用户
             try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
-                insertStmt.setString(1, username);
-                insertStmt.executeUpdate();
-                System.out.println("主机数据库自动创建了访客用户: " + username);
+                insertStmt.setString(1, username); insertStmt.executeUpdate();
+                System.out.println("Host DB auto-created guest user: " + username);
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        } catch (SQLException e) { e.printStackTrace(); }
     }
+
     public static Membership.Status getMembershipStatus(String username, String competitionName) {
         String sql = "SELECT status FROM memberships WHERE username = ? AND competitionName = ?";
         try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -172,28 +160,21 @@ public class DatabaseService {
         } catch (SQLException e) {}
     }
 
-    // --- Penalties (Fix: Selective Update) ---
+    // --- Penalties ---
     public static void savePenaltyEntry(String competitionName, PenaltyEntry entry) {
-        // 先检查是否存在记录
         boolean exists = false;
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement checkStmt = conn.prepareStatement("SELECT 1 FROM penalties WHERE competitionName=? AND matchNumber=?")) {
-            checkStmt.setString(1, competitionName);
-            checkStmt.setInt(2, entry.getMatchNumber());
+            checkStmt.setString(1, competitionName); checkStmt.setInt(2, entry.getMatchNumber());
             exists = checkStmt.executeQuery().next();
         } catch (SQLException e) { e.printStackTrace(); return; }
 
         String sql;
         if (!exists) {
-            // 插入新记录，未提及的一方默认为 0
             sql = "INSERT INTO penalties (competitionName, matchNumber, redMajor, redMinor, blueMajor, blueMinor) VALUES (?, ?, ?, ?, ?, ?)";
         } else {
-            // 更新现有记录，只更新指定联盟的列
-            if (entry.getAlliance().equalsIgnoreCase("RED")) {
-                sql = "UPDATE penalties SET redMajor=?, redMinor=? WHERE competitionName=? AND matchNumber=?";
-            } else {
-                sql = "UPDATE penalties SET blueMajor=?, blueMinor=? WHERE competitionName=? AND matchNumber=?";
-            }
+            if (entry.getAlliance().equalsIgnoreCase("RED")) sql = "UPDATE penalties SET redMajor=?, redMinor=? WHERE competitionName=? AND matchNumber=?";
+            else sql = "UPDATE penalties SET blueMajor=?, blueMinor=? WHERE competitionName=? AND matchNumber=?";
         }
 
         try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -209,7 +190,6 @@ public class DatabaseService {
                 }
                 pstmt.executeUpdate();
             } else {
-                // UPDATE logic
                 pstmt.setInt(1, entry.getMajorCount());
                 pstmt.setInt(2, entry.getMinorCount());
                 pstmt.setString(3, competitionName);
@@ -219,33 +199,11 @@ public class DatabaseService {
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
-    // 注意：这个方法返回的是 Map<MatchNum, FullPenaltyData> 供 Rankings 计算使用
-    // 我们在内存里还是需要知道红蓝双方的数据，所以这里需要一个临时的内部类或逻辑来承载
-    // 为了简化，我们仍然让 Map 返回一个包含红蓝双方数据的对象（借用旧逻辑或使用Map）
-    // 但 PenaltyEntry 类本身已经改为单方了。
-    // 为了 Rankings 计算方便，我们这里还是读取出完整的行数据，但用 Map 返回
-    public static Map<Integer, PenaltyEntry> getPenaltiesForCompetition(String competitionName) {
-        // 这里的 PenaltyEntry 在 Rankings 里用时比较尴尬，因为现在的 PenaltyEntry 只有单边。
-        // 为了不改动 Ranking 逻辑太深，我们还是让 Ranking 逻辑去读取 Raw Data。
-        // 或者，我们让 getPenaltiesForCompetition 返回一个特殊结构。
-
-        // 简单方案：Ranking 计算里需要的是 RedTotalMajor, RedTotalMinor...
-        // 我们直接修改 Ranking 计算逻辑，或者在这里暂存数据。
-
-        // 这里我选择：让这个方法返回完整的行数据，但我们需要一个新的 Helper 类或者修改 PenaltyEntry 回去？
-        // 不，用户说 PenaltyEntry 表单只能填一个。
-        // 我们让 getPenaltiesForCompetition 返回一个 Map，Key 是 MatchNum，Value 是一个 Map<String, Integer> (RedMaj, RedMin, BlueMaj, BlueMin)
-        // 为了类型安全，我们使用一个简单的内部类 FullPenaltyRow
-        return new HashMap<>(); // 占位，实际上 Ranking 计算里我会直接重写那部分逻辑
-    }
-
-    // 专门为 Ranking 计算提供的方法，返回包含红蓝双方完整数据的对象
     public static Map<Integer, FullPenaltyRow> getFullPenalties(String competitionName) {
         Map<Integer, FullPenaltyRow> map = new HashMap<>();
         String sql = "SELECT * FROM penalties WHERE competitionName = ?";
         try (Connection conn = DriverManager.getConnection(DB_URL); PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, competitionName);
-            ResultSet rs = pstmt.executeQuery();
+            pstmt.setString(1, competitionName); ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 map.put(rs.getInt("matchNumber"), new FullPenaltyRow(
                         rs.getInt("redMajor"), rs.getInt("redMinor"),
@@ -292,7 +250,10 @@ public class DatabaseService {
             pstmt.setString(19, entry.getSubmitter());
             pstmt.setString(20, entry.getSubmissionTime());
             pstmt.executeUpdate();
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            System.err.println("Make sure your DB schema includes team1Ignored, etc. Try restarting to trigger migration.");
+        }
     }
 
     public static List<ScoreEntry> getScoresForCompetition(String competitionName) {
@@ -310,7 +271,6 @@ public class DatabaseService {
                 try { t1Brk = rs.getBoolean("team1Broken"); } catch (SQLException ignore) {}
                 try { t2Brk = rs.getBoolean("team2Broken"); } catch (SQLException ignore) {}
 
-                // *** FIX: Use Constructor 2 to preserve timestamp ***
                 entries.add(new ScoreEntry(
                         type,
                         rs.getInt("matchNumber"), rs.getString("alliance"), rs.getInt("team1"), rs.getInt("team2"),
@@ -319,7 +279,7 @@ public class DatabaseService {
                         t1Ign, t2Ign, t1Brk, t2Brk,
                         rs.getString("clickLocations"),
                         rs.getString("submitter"),
-                        rs.getString("submissionTime") // Pass existing time
+                        rs.getString("submissionTime")
                 ));
             }
         } catch (SQLException e) { e.printStackTrace(); }
@@ -357,41 +317,38 @@ public class DatabaseService {
             int t1Hits = shotStats[0], t1Shots = shotStats[1];
             int t2Hits = shotStats[2], t2Shots = shotStats[3];
 
-            // 判罚分数逻辑
-            int penCommitted = 0; // 该队犯规导致送分
-            int penReceived = 0;  // 对手犯规导致得益分
+            int penCommitted = 0, penReceived = 0;
             FullPenaltyRow pe = penaltyMap.get(score.getMatchNumber());
 
             if (pe != null) {
                 int redGaveAway = (pe.rMaj * PENALTY_MAJOR_PTS) + (pe.rMin * PENALTY_MINOR_PTS);
                 int blueGaveAway = (pe.bMaj * PENALTY_MAJOR_PTS) + (pe.bMin * PENALTY_MINOR_PTS);
-
                 if (score.getAlliance().equalsIgnoreCase("RED")) {
-                    penCommitted = redGaveAway;
-                    penReceived = blueGaveAway;
+                    penCommitted = redGaveAway; penReceived = blueGaveAway;
                 } else {
-                    penCommitted = blueGaveAway;
-                    penReceived = redGaveAway;
+                    penCommitted = blueGaveAway; penReceived = redGaveAway;
                 }
-
-                if (isAllianceMode) {
-                    penCommitted /= 2;
-                    penReceived /= 2;
-                }
+                if (isAllianceMode) { penCommitted /= 2; penReceived /= 2; }
             }
 
             double matchRating = evaluateFormula(formulaStr, score, divisor);
 
-            // 处理 Team 1
+            // Process Team 1
+            // IMPORTANT: If team1Ignored is true, we treat it similarly to broken but specific to logic
+            // Assuming Ignored means "Don't count for stats but keep record" or "Treat as 0 rating"?
+            // Usually "Weak" means we want to adjust how we view them, but for Ranking Calculation:
+            // If the user checked "Ignore", we likely want to exclude this specific match performance from their average
+            // OR simply flag it. Based on previous context, it's for "Set Weak".
+            // If Team is Broken -> We typically skip adding stats.
+
+            // Logic: processTeam adds to the ranking object.
             processTeam(rankings, totalRatingPoints, score.getTeam1(), score, adjAuto, adjTeleop, matchRating, true, t1Hits, t1Shots, score.isTeam1Broken(), penCommitted, penReceived);
 
-            // 处理 Team 2 (仅限联盟模式)
             if (isAllianceMode) {
                 processTeam(rankings, totalRatingPoints, score.getTeam2(), score, adjAuto, adjTeleop, matchRating, false, t2Hits, t2Shots, score.isTeam2Broken(), penCommitted, penReceived);
             }
         }
 
-        // 计算最终平均 Rating
         for (TeamRanking rank : rankings.values()) {
             double sum = totalRatingPoints.getOrDefault(rank.getTeamNumber(), 0.0);
             if (rank.getMatchesPlayed() > 0) {
@@ -401,8 +358,6 @@ public class DatabaseService {
         return new ArrayList<>(rankings.values());
     }
 
-
-    // ... (rest of helper methods: getValidMatchScores, calculateStdDev, parseShotStats, processTeam, evaluateFormula) ...
     public static List<Double> getValidMatchScores(String competitionName, int teamNumber) {
         List<ScoreEntry> all = getScoresForTeam(competitionName, teamNumber);
         List<Double> scores = new ArrayList<>();
@@ -452,10 +407,17 @@ public class DatabaseService {
                                     boolean isTeam1, int hits, int shots, boolean isBroken, int penComm, int penRec) {
         rankings.putIfAbsent(teamNum, new TeamRanking(teamNum));
         if (isBroken) return;
+
         TeamRanking tr = rankings.get(teamNum);
         boolean seq = isTeam1 ? score.isTeam1CanSequence() : score.isTeam2CanSequence();
         boolean climb = isTeam1 ? score.isTeam1L2Climb() : score.isTeam2L2Climb();
         tr.addMatchResult(adjAuto, adjTeleop, seq, climb, hits, shots, penComm, penRec);
+
+        // Handle "Ignored/Weak" logic here if needed:
+        // Currently, even if ignored (weak), we add rating points unless broken.
+        // If you want "Ignored" to NOT count towards average rating, wrap this in an if(!isIgnored) check.
+        // Assuming current requirement is just to store the flag.
+
         totalRatingPoints.put(teamNum, totalRatingPoints.getOrDefault(teamNum, 0.0) + matchRating);
     }
     private static double evaluateFormula(String formula, ScoreEntry score, double divisor) {

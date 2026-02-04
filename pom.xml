@@ -88,7 +88,7 @@
                 <configuration>
                     <!-- 应用信息 -->
                     <name>FTCScoutingPro</name>
-                    <appVersion>1.3.0</appVersion>
+                    <appVersion>2.1.2</appVersion>
                     <vendor>Bear27570</vendor>
                     <destination>${project.build.directory}/dist</destination>
 
