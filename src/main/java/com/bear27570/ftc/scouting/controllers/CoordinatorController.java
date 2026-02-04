@@ -22,19 +22,22 @@ public class CoordinatorController {
     public void setDialogStage(Stage dialogStage, Competition competition) {
         this.dialogStage = dialogStage;
         this.competition = competition;
+
+        refreshLists();
         startAutoRefresh();
+
+        // 关键：当有新的网络请求进入时，立即刷新列表
         NetworkService.getInstance().setOnMemberJoinCallback(this::refreshLists);
 
-        // 窗口关闭时移除回调，防止内存泄漏
-        dialogStage.setOnHidden(e -> NetworkService.getInstance().setOnMemberJoinCallback(null));
-        // 当窗口关闭时停止刷新，防止资源浪费
-        dialogStage.setOnCloseRequest(e -> stopAutoRefresh());
+        dialogStage.setOnHidden(e -> {
+            stopAutoRefresh();
+            NetworkService.getInstance().setOnMemberJoinCallback(null);
+        });
     }
+
     private void startAutoRefresh() {
         if (autoRefreshTimeline != null) return;
-        autoRefreshTimeline = new Timeline(new KeyFrame(Duration.seconds(2), event -> {
-            refreshLists();
-        }));
+        autoRefreshTimeline = new Timeline(new KeyFrame(Duration.seconds(2), event -> refreshLists()));
         autoRefreshTimeline.setCycleCount(Timeline.INDEFINITE);
         autoRefreshTimeline.play();
     }
@@ -45,6 +48,7 @@ public class CoordinatorController {
             autoRefreshTimeline = null;
         }
     }
+
     private void refreshLists() {
         pendingListView.setItems(FXCollections.observableArrayList(
                 DatabaseService.getMembersByStatus(competition.getName(), Membership.Status.PENDING)));
@@ -52,6 +56,15 @@ public class CoordinatorController {
                 DatabaseService.getMembersByStatus(competition.getName(), Membership.Status.APPROVED)));
     }
 
+    @FXML
+    private void handleApprove() {
+        String selected = pendingListView.getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            DatabaseService.updateMembershipStatus(selected, competition.getName(), Membership.Status.APPROVED);
+            NetworkService.getInstance().approveClient(selected);
+            refreshLists();
+        }
+    }
 
     @FXML
     private void handleDeny() {
@@ -61,28 +74,19 @@ public class CoordinatorController {
             refreshLists();
         }
     }
-    @FXML
-    private void handleApprove() {
-        String selected = pendingListView.getSelectionModel().getSelectedItem();
-        if (selected != null) {
-            // 1. 更新数据库
-            DatabaseService.updateMembershipStatus(selected, competition.getName(), Membership.Status.APPROVED);
-            // 2. 通过网络通知 Client
-            NetworkService.getInstance().approveClient(selected);
-            refreshLists();
-        }
-    }
+
     @FXML
     private void handleKick() {
         String selected = approvedListView.getSelectionModel().getSelectedItem();
         if (selected != null) {
             DatabaseService.removeMembership(selected, competition.getName());
+            // 发送包通知客户端被踢出
             refreshLists();
         }
     }
 
     @FXML
     private void handleClose() {
-        stopAutoRefresh();dialogStage.close();
+        dialogStage.close();
     }
 }

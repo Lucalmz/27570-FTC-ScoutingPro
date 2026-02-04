@@ -7,7 +7,6 @@ import javafx.collections.ObservableList;
 import java.io.*;
 import java.net.*;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class NetworkService {
@@ -28,25 +27,25 @@ public class NetworkService {
 
     private final CopyOnWriteArrayList<ClientHandler> connectedClients = new CopyOnWriteArrayList<>();
     private volatile boolean running = false;
-    private String hostingCompetitionName; // 记录当前主持的比赛名
+    private String hostingCompetitionName;
+    private Runnable onMemberJoinCallback;
 
     private NetworkService() {}
-    // 在 NetworkService 类中添加
-    private Runnable onMemberJoinCallback;
 
     public void setOnMemberJoinCallback(Runnable callback) {
         this.onMemberJoinCallback = callback;
     }
 
-    // 在 ClientHandler 内部类中添加辅助方法
-    private void notifyMembershipUpdate() {
-        if (NetworkService.getInstance().onMemberJoinCallback != null) {
-            // 必须在 JavaFX 线程执行 UI 更新
-            Platform.runLater(NetworkService.getInstance().onMemberJoinCallback);
-        }
-    }
     public synchronized void startHost(Competition competition, Consumer<ScoreEntry> onScoreReceived) {
-        stop();
+        // 健壮性改进：如果已经在这个比赛的主持模式中，只更新回调，不重启服务器
+        if (running && competition.getName().equals(hostingCompetitionName) && serverSocket != null) {
+            for (ClientHandler handler : connectedClients) {
+                handler.setOnScoreReceived(onScoreReceived);
+            }
+            return;
+        }
+
+        stop(); // 只有当切换比赛或初次启动时才停止旧连接
         running = true;
         this.hostingCompetitionName = competition.getName();
 
@@ -54,15 +53,20 @@ public class NetworkService {
             try {
                 serverSocket = new ServerSocket(TCP_PORT);
                 while (running) {
-                    Socket client = serverSocket.accept();
-                    ClientHandler handler = new ClientHandler(client, onScoreReceived);
-                    connectedClients.add(handler);
-                    handler.start();
+                    try {
+                        Socket client = serverSocket.accept();
+                        ClientHandler handler = new ClientHandler(client, onScoreReceived);
+                        connectedClients.add(handler);
+                        handler.start();
+                    } catch (IOException e) {
+                        if (running) System.err.println("Accept error: " + e.getMessage());
+                    }
                 }
-            } catch (IOException ignored) {}
+            } catch (IOException e) {
+                if (running) e.printStackTrace();
+            }
         }).start();
 
-        // UDP 广播保持不变...
         startUdpBeacon(competition);
     }
 
@@ -84,11 +88,15 @@ public class NetworkService {
     private class ClientHandler extends Thread {
         private final Socket socket;
         private ObjectOutputStream out;
-        private final Consumer<ScoreEntry> onScoreReceived;
+        private Consumer<ScoreEntry> onScoreReceived;
         private String clientUsername;
 
         ClientHandler(Socket socket, Consumer<ScoreEntry> onScoreReceived) {
             this.socket = socket;
+            this.onScoreReceived = onScoreReceived;
+        }
+
+        public void setOnScoreReceived(Consumer<ScoreEntry> onScoreReceived) {
             this.onScoreReceived = onScoreReceived;
         }
 
@@ -111,50 +119,41 @@ public class NetworkService {
                 out = new ObjectOutputStream(socket.getOutputStream());
                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
                 while (running) {
-                    NetworkPacket packet = (NetworkPacket) in.readObject();
-                    switch (packet.getType()) {
-                        case JOIN_REQUEST:
-                            System.out.println("收到加入请求: " + packet.getUsername()); // <--- 添加日志
-                            this.clientUsername = packet.getUsername();
-                            // 关键点：收到请求立即写入 Host 的数据库为 PENDING
-                            DatabaseService.addMembership(clientUsername, hostingCompetitionName, Membership.Status.PENDING);
-                            // 这里可以加一个通知给 Host UI 的机制，但目前 refreshLists 就能看到
-                            break;
-                        case SUBMIT_SCORE:
-                            Platform.runLater(() -> onScoreReceived.accept(packet.getScoreEntry()));
-                            break;
+                    Object obj = in.readObject();
+                    if (obj instanceof NetworkPacket packet) {
+                        switch (packet.getType()) {
+                            case JOIN_REQUEST:
+                                this.clientUsername = packet.getUsername();
+                                // 自动存入数据库为 PENDING
+                                DatabaseService.addMembership(clientUsername, hostingCompetitionName, Membership.Status.PENDING);
+                                // 触发 UI 刷新（如果窗口开着）
+                                if (onMemberJoinCallback != null) {
+                                    Platform.runLater(onMemberJoinCallback);
+                                }
+                                break;
+                            case SUBMIT_SCORE:
+                                if (onScoreReceived != null) {
+                                    Platform.runLater(() -> onScoreReceived.accept(packet.getScoreEntry()));
+                                }
+                                break;
+                        }
                     }
                 }
             } catch (Exception e) {
-                System.err.println("ClientHandler 异常: " + e.getMessage()); // <--- 关键：打印错误信息
-                e.printStackTrace();
                 stopClient();
             }
         }
     }
 
-    // 当 Host 在界面点击批准时调用此方法通知 Client
     public void approveClient(String username) {
-        boolean found = false;
-        System.out.println("Host尝试批准用户: [" + username + "]"); // Debug日志
-
         for (ClientHandler handler : connectedClients) {
-            // 打印当前连接的客户端，检查是否匹配
-            System.out.println(" - 检查连接: [" + handler.clientUsername + "]");
-
             if (username.equals(handler.clientUsername)) {
                 handler.sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
-                System.out.println("Host已发送批准指令给: " + username); // Debug日志
-                found = true;
                 return;
             }
         }
-
-        if (!found) {
-            System.err.println("错误: 找不到用户 [" + username + "] 的在线连接。");
-            System.err.println("当前在线列表: " + connectedClients.size() + " 人");
-        }
     }
+
     public void broadcastUpdateToClients(NetworkPacket updatePacket) {
         for (ClientHandler handler : connectedClients) {
             handler.sendPacket(updatePacket);
@@ -162,8 +161,9 @@ public class NetworkService {
     }
 
     public synchronized void startDiscovery(ObservableList<Competition> discoveredCompetitions) {
-        stop();
-        running = true;
+        // Discovery 模式不强制停止正在主持的服务器，仅重置 UDP 接收器
+        if (udpSocket != null) udpSocket.close();
+
         new Thread(() -> {
             try {
                 udpSocket = new DatagramSocket(UDP_PORT);
@@ -184,42 +184,29 @@ public class NetworkService {
                             });
                         }
                     } catch (SocketTimeoutException ignored) {}
+                    catch (IOException e) { break; }
                 }
-            } catch (IOException ignored) {} finally { if (udpSocket != null) udpSocket.close(); }
+            } catch (IOException ignored) {}
         }).start();
     }
 
     public synchronized void connectToHost(String hostAddress, String myUsername, Consumer<NetworkPacket> onPacketReceived) throws IOException {
-        stop();
+        stop(); // Client 模式连接新主机前必须清理旧连接
         running = true;
         clientSocket = new Socket(hostAddress, TCP_PORT);
         outToServer = new ObjectOutputStream(clientSocket.getOutputStream());
 
-        // 1. 发送加入请求
         outToServer.writeObject(new NetworkPacket(NetworkPacket.PacketType.JOIN_REQUEST, myUsername));
         outToServer.flush();
 
-        // 2. 开启监听
         new Thread(() -> {
             try (ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream())) {
                 while (running) {
                     NetworkPacket p = (NetworkPacket) in.readObject();
-                    System.out.println("Client收到包类型: " + p.getType()); // <--- Debug日志 1
-
-                    // 必须用 Platform.runLater 包裹，否则不能操作界面
-                    Platform.runLater(() -> {
-                        System.out.println("正在UI线程处理包: " + p.getType()); // <--- Debug日志 2
-                        try {
-                            onPacketReceived.accept(p);
-                        } catch (Exception e) {
-                            System.err.println("Callback处理逻辑出错:"); // <--- 捕获 Callback 内部的逻辑错误
-                            e.printStackTrace();
-                        }
-                    });
+                    Platform.runLater(() -> onPacketReceived.accept(p));
                 }
             } catch (Exception e) {
-                System.err.println("Client监听线程崩溃:"); // <--- 关键：不再忽略异常
-                e.printStackTrace();
+                Platform.runLater(() -> System.err.println("Disconnected from Host."));
             }
         }).start();
     }
@@ -240,5 +227,8 @@ public class NetworkService {
         try { if (clientSocket != null) clientSocket.close(); } catch (IOException ignored) {}
         if (udpSocket != null) udpSocket.close();
         connectedClients.clear();
+        serverSocket = null;
+        clientSocket = null;
+        udpSocket = null;
     }
 }

@@ -74,36 +74,44 @@ public class MainController {
         this.currentCompetition = competition;
         this.currentUsername = username;
         this.isHost = isHost;
-
         competitionNameLabel.setText(competition.getName() + (isHost ? " (HOSTING)" : " (CLIENT)"));
         submitterLabel.setText("Submitter: " + username);
-
         setupScoringTab();
         setupRankingsTab();
         setupHistoryTab();
         setupPenaltyTab();
-
         if (isHost) {
             editRatingButton.setVisible(true);
             editRatingButton.setManaged(true);
+            manageMembersBtn.setVisible(true);
+            manageMembersBtn.setManaged(true);
             startAsHost();
         } else {
+            manageMembersBtn.setVisible(false);
+            manageMembersBtn.setManaged(false);
             startAsClient();
         }
     }
-
     private void startAsHost() {
         refreshAllDataFromDatabase();
+        // 健壮性：此处调用 startHost 不会导致已连接的客户端断开
         NetworkService.getInstance().startHost(currentCompetition, this::handleScoreReceivedFromClient);
     }
-
     private void startAsClient() {
         setUIEnabled(false);
         try {
-            NetworkService.getInstance().connectToHost(currentCompetition.getHostAddress(),currentUsername, this::handleUpdateReceivedFromHost);
+            NetworkService.getInstance().connectToHost(currentCompetition.getHostAddress(), currentUsername, this::handleUpdateReceivedFromHost);
             statusLabel.setText("Connected to host. Waiting for data...");
         } catch (IOException e) {
             statusLabel.setText("Failed to connect: " + e.getMessage());
+        }
+    }
+    @FXML
+    private void handleManageMembers() {
+        try {
+            mainApp.showCoordinatorView(currentCompetition);
+        } catch (IOException e) {
+            statusLabel.setText("Error: " + e.getMessage());
         }
     }
 
