@@ -98,12 +98,13 @@ public class MainController {
         NetworkService.getInstance().startHost(currentCompetition, this::handleScoreReceivedFromClient);
     }
     private void startAsClient() {
-        setUIEnabled(false);
+        setUIEnabled(false); // 初始禁用
         try {
+            // 注意：这里的 connectToHost 内部会发送 JOIN_REQUEST
             NetworkService.getInstance().connectToHost(currentCompetition.getHostAddress(), currentUsername, this::handleUpdateReceivedFromHost);
-            statusLabel.setText("Connected to host. Waiting for data...");
+            statusLabel.setText("Authenticating with Host...");
         } catch (IOException e) {
-            statusLabel.setText("Failed to connect: " + e.getMessage());
+            statusLabel.setText("Connection Failed.");
         }
     }
     @FXML
@@ -124,13 +125,20 @@ public class MainController {
     }
 
     private void handleUpdateReceivedFromHost(NetworkPacket packet) {
-        if (packet.getType() == NetworkPacket.PacketType.UPDATE_DATA) {
-            Platform.runLater(() -> {
+        Platform.runLater(() -> {
+            if (packet.getType() == NetworkPacket.PacketType.UPDATE_DATA) {
                 updateUIAfterDataChange(packet.getScoreHistory(), packet.getTeamRankings());
-                setUIEnabled(true);
-                statusLabel.setText("Data updated from host.");
-            });
-        }
+                setUIEnabled(true); // 收到数据包，解锁 UI
+                statusLabel.setText("Connected & Synced.");
+            } else if (packet.getType() == NetworkPacket.PacketType.JOIN_RESPONSE) {
+                if (packet.isApproved()) {
+                    statusLabel.setText("Access Granted. Waiting for data...");
+                    // 此时还不能解锁 UI，必须等 UPDATE_DATA 包
+                } else {
+                    statusLabel.setText("Access Denied.");
+                }
+            }
+        });
     }
 
     @FXML private void handleAllianceAnalysis() {

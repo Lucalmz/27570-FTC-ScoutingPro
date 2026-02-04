@@ -34,13 +34,16 @@ public class HubController {
         this.mainApp = mainApp;
         this.currentUsername = username;
         welcomeLabel.setText("Welcome, " + username + "!");
+
+        // 绑定列表
+        discoveredCompetitionsListView.setItems(discoveredCompetitions);
         refreshMyCompetitionsList();
     }
 
     @FXML private void selectHostMode() {
         hostPane.setVisible(true); hostPane.setManaged(true);
         joinPane.setVisible(false); joinPane.setManaged(false);
-        statusLabel.setText("Select a competition to host.");
+        statusLabel.setText("Host Mode: Select a competition to start.");
         hostModeButton.setStyle("-fx-background-color: #007BFF;");
         joinModeButton.setStyle("");
     }
@@ -48,15 +51,12 @@ public class HubController {
     @FXML private void selectJoinMode() {
         hostPane.setVisible(false); hostPane.setManaged(false);
         joinPane.setVisible(true); joinPane.setManaged(true);
-        statusLabel.setText("Searching for hosts...");
+        statusLabel.setText("Searching for local competitions...");
         joinModeButton.setStyle("-fx-background-color: #007BFF;");
         hostModeButton.setStyle("");
-        startDiscovery();
-    }
 
-    private void startDiscovery() {
+        // 启动搜索
         discoveredCompetitions.clear();
-        discoveredCompetitionsListView.setItems(discoveredCompetitions);
         NetworkService.getInstance().startDiscovery(discoveredCompetitions);
     }
 
@@ -74,7 +74,9 @@ public class HubController {
             if (DatabaseService.createCompetition(newName, currentUsername)) {
                 newCompetitionField.clear();
                 refreshMyCompetitionsList();
-                statusLabel.setText("Competition created!");
+                statusLabel.setText("Created: " + newName);
+            } else {
+                statusLabel.setText("Error: Name exists.");
             }
         }
     }
@@ -82,7 +84,7 @@ public class HubController {
     @FXML private void handleHostButton() throws IOException {
         Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
         if (selected == null) {
-            statusLabel.setText("Please select a competition to host.");
+            statusLabel.setText("Select a competition first!");
             return;
         }
         mainApp.showScoringView(selected, currentUsername, true);
@@ -90,57 +92,50 @@ public class HubController {
 
     @FXML private void handleJoinButton() throws IOException {
         Competition selected = discoveredCompetitionsListView.getSelectionModel().getSelectedItem();
-        if (selected == null) return;
+        if (selected == null) {
+            statusLabel.setText("Select a competition from the list.");
+            return;
+        }
 
-        statusLabel.setText("Requesting to join " + selected.getName() + "...");
+        statusLabel.setText("Connecting to " + selected.getName() + "...");
         NetworkService.getInstance().connectToHost(selected.getHostAddress(), currentUsername, (packet) -> {
             if (packet.getType() == NetworkPacket.PacketType.JOIN_RESPONSE) {
                 if (packet.isApproved()) {
                     try {
                         mainApp.showScoringView(selected, currentUsername, false);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                    } catch (IOException e) { e.printStackTrace(); }
                 } else {
-                    statusLabel.setText("Join request denied by Host.");
+                    statusLabel.setText("Join request denied.");
                 }
             }
         });
     }
 
-    @FXML private void handleManageMembers() {
-        Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
-        if (selected == null) {
-            statusLabel.setText("Select a competition first.");
-            return;
-        }
-        try {
-            mainApp.showCoordinatorView(selected);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    // 这里是报错的关键：必须确保这个方法存在且标记了 @FXML
     @FXML private void handleAllianceAnalysis() {
         Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
         if (selected == null) selected = discoveredCompetitionsListView.getSelectionModel().getSelectedItem();
 
         if (selected == null) {
-            statusLabel.setText("Please select a competition first.");
+            statusLabel.setText("Select a competition to analyze.");
             return;
         }
         try {
             FXMLLoader loader = new FXMLLoader(mainApp.getClass().getResource("fxml/AllianceAnalysisView.fxml"));
             Stage stage = new Stage();
-            stage.setTitle("Alliance Analysis - " + selected.getName());
+            stage.setTitle("Analysis - " + selected.getName());
             stage.setScene(new Scene(loader.load()));
             AllianceAnalysisController controller = loader.getController();
             controller.setDialogStage(stage, selected);
             stage.show();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        } catch (IOException e) { e.printStackTrace(); }
+    }
+
+    @FXML private void handleManageMembers() {
+        Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
+        if (selected == null) return;
+        try {
+            mainApp.showCoordinatorView(selected);
+        } catch (IOException e) { e.printStackTrace(); }
     }
 
     @FXML private void handleLogout() throws IOException {

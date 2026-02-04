@@ -82,10 +82,32 @@ public class DatabaseService {
     }
     // 在 DatabaseService.java 中找到 addMembership 方法并替换
 
+    // 替换 DatabaseService.java 中的 addMembership 方法
     public static void addMembership(String username, String competitionName, Membership.Status status) {
-        // 1. 自动注册不存在的用户 (修复外键报错的核心)
+        // 1. 确保用户在主机库里有底稿
         ensureUserExists(username);
 
+        // 2. 先检查是否已经存在该成员关系
+        String checkSql = "SELECT status FROM memberships WHERE username = ? AND competitionName = ?";
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+            checkStmt.setString(1, username);
+            checkStmt.setString(2, competitionName);
+            ResultSet rs = checkStmt.executeQuery();
+
+            if (rs.next()) {
+                // 如果已存在，则更新状态（或者如果是 PENDING 则不做操作，防止覆盖 APPROVED 状态）
+                String currentStatus = rs.getString("status");
+                if (currentStatus.equals("PENDING") && status == Membership.Status.APPROVED) {
+                    updateMembershipStatus(username, competitionName, status);
+                }
+                return; // 结束执行，避免 INSERT 冲突
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        // 3. 不存在则插入
         String sql = "INSERT INTO memberships(username, competitionName, status) VALUES(?, ?, ?)";
         try (Connection conn = DriverManager.getConnection(DB_URL);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -93,13 +115,11 @@ public class DatabaseService {
             pstmt.setString(2, competitionName);
             pstmt.setString(3, status.name());
             pstmt.executeUpdate();
-            System.out.println("数据库成功写入成员: " + username + " -> " + status); // Debug日志
         } catch (SQLException e) {
-            // 2. 打印报错，不再无声失败
-            System.err.println("添加成员失败: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Database Add Membership Error: " + e.getMessage());
         }
     }
+
 
     // 新增一个辅助方法，用来解决跨机用户不存在的问题
     private static void ensureUserExists(String username) {
