@@ -9,6 +9,7 @@
             <padding><Insets bottom="10" left="20" right="20" top="10" /></padding>
             <Label fx:id="competitionNameLabel" styleClass="header-label" text="Competition Name" />
             <Region HBox.hgrow="ALWAYS" />
+            <Button onAction="#handleExport" style="-fx-base: #2E7D32;" text="Export CSV" />
             <Button fx:id="manageMembersBtn" onAction="#handleManageMembers" style="-fx-base: #FF9800;" text="Manage Members" visible="false" />
             <Button onAction="#handleAllianceAnalysis" style="-fx-base: #9C27B0;" text="Alliance Analysis" />
             <Button onAction="#handleBackButton" text="Back to Hub" />
