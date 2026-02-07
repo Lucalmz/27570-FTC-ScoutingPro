@@ -49,17 +49,23 @@ public class TeamRanking implements Serializable {
         this.totalShots += shots;
     }
 
+    // --- Getters ---
+
     public int getTeamNumber() { return teamNumber; }
     public int getMatchesPlayed() { return matchesPlayed; }
+
+    // 原有的格式化 Getter (用于导出 CSV 或显示字符串)
     public String getAvgAutoArtifactsFormatted() { return String.format("%.1f", avgAutoArtifacts); }
     public String getAvgTeleopArtifactsFormatted() { return String.format("%.1f", avgTeleopArtifacts); }
-
-    // 新增 getter 用于 TableView
     public String getAvgPenaltyCommittedFormatted() { return String.format("%.1f", avgPenaltyCommitted); }
     public String getAvgOpponentPenaltyFormatted() { return String.format("%.1f", avgOpponentPenalty); }
 
+    // === 修复核心：必须添加原始数值的 Getter，PropertyValueFactory 才能读取 ===
     public double getAvgAutoArtifacts() { return avgAutoArtifacts; }
     public double getAvgTeleopArtifacts() { return avgTeleopArtifacts; }
+    public double getAvgPenaltyCommitted() { return avgPenaltyCommitted; } // 之前缺失
+    public double getAvgOpponentPenalty() { return avgOpponentPenalty; }   // 之前缺失
+    // ===================================================================
 
     public String getCanSequence() { return canSequence ? "Yes" : "No"; }
     public String getL2Capable() { return l2Capable ? "Yes" : "No"; }
