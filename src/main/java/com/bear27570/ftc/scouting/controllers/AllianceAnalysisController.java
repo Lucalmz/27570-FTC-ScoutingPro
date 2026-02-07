@@ -14,6 +14,7 @@ import javafx.stage.Stage;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class AllianceAnalysisController {
 
@@ -228,8 +229,12 @@ public class AllianceAnalysisController {
         // 获取准确率和稳定性
         TeamRanking tr = rankings.stream().filter(r -> r.getTeamNumber() == teamNum).findFirst().orElse(null);
         profile.accuracy = (tr != null) ? parseAcc(tr.getAccuracyFormatted()) : 0;
-        List<Double> scores = DatabaseService.getValidMatchScores(compName, teamNum);
-        profile.stability = DatabaseService.calculateStdDev(scores);
+
+        // --- 修复冲突：直接在本地计算分数标准差，不调用不存在的 DatabaseService 方法 ---
+        List<Double> scores = validMatches.stream()
+                .map(m -> (m.getScoreType() == ScoreEntry.Type.ALLIANCE) ? m.getTotalScore() / 2.0 : (double) m.getTotalScore())
+                .collect(Collectors.toList());
+        profile.stability = calculateStdDev(scores);
 
         return profile;
     }
@@ -239,6 +244,21 @@ public class AllianceAnalysisController {
         try {
             return Double.parseDouble(accStr.replace("%", ""));
         } catch (Exception e) { return 0.0; }
+    }
+
+    // --- 新增：本地标准差计算方法 ---
+    private double calculateStdDev(List<Double> data) {
+        if (data == null || data.size() < 2) return 0.0;
+
+        double sum = 0.0;
+        for (double d : data) sum += d;
+        double mean = sum / data.size();
+
+        double temp = 0;
+        for (double d : data) {
+            temp += Math.pow(mean - d, 2);
+        }
+        return Math.sqrt(temp / (data.size() - 1));
     }
 
     @FXML public void initialize() {
