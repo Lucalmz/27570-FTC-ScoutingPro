@@ -6,7 +6,6 @@ import javafx.collections.ObservableList;
 
 import java.io.*;
 import java.net.*;
-import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
@@ -43,7 +42,7 @@ public class NetworkService {
     public synchronized void startHost(Competition competition, Consumer<ScoreEntry> onScoreReceived) {
         this.hostingCompetitionName = competition.getName();
 
-        // 健壮性：如果已经在运行，不重启 ServerSocket，但必须更新所有已连接客户端的数据处理回调
+        // 健壮性：如果已经在运行，不重启 ServerSocket，但更新回调
         if (running && serverSocket != null) {
             for (ClientHandler handler : connectedClients) {
                 handler.setOnScoreReceived(onScoreReceived);
@@ -96,7 +95,7 @@ public class NetworkService {
     private class ClientHandler extends Thread {
         private final Socket socket;
         private ObjectOutputStream out;
-        private volatile Consumer<ScoreEntry> onScoreReceived; // 必须是 volatile，保证线程可见
+        private volatile Consumer<ScoreEntry> onScoreReceived;
         private String clientUsername;
 
         ClientHandler(Socket socket, Consumer<ScoreEntry> onScoreReceived) {
@@ -109,10 +108,11 @@ public class NetworkService {
         }
 
         public void sendPacket(NetworkPacket p) {
+            if (out == null) return;
             try {
                 out.writeObject(p);
                 out.flush();
-                out.reset();
+                out.reset(); // 重要：防止对象缓存
             } catch (IOException e) { stopClient(); }
         }
 
@@ -149,7 +149,6 @@ public class NetworkService {
 
                             case SUBMIT_SCORE:
                                 if (onScoreReceived != null) {
-                                    // 收到从机数据，传给 MainController 的 handleScoreReceivedFromClient
                                     Platform.runLater(() -> onScoreReceived.accept(packet.getScoreEntry()));
                                 }
                                 break;
@@ -213,6 +212,7 @@ public class NetworkService {
 
         outToServer.writeObject(new NetworkPacket(NetworkPacket.PacketType.JOIN_REQUEST, myUsername));
         outToServer.flush();
+        outToServer.reset();
 
         new Thread(() -> {
             try (ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream())) {
@@ -237,7 +237,7 @@ public class NetworkService {
             try {
                 outToServer.writeObject(new NetworkPacket(scoreEntry));
                 outToServer.flush();
-                outToServer.reset();
+                outToServer.reset(); // 重要
             } catch (IOException e) { e.printStackTrace(); }
         }
     }

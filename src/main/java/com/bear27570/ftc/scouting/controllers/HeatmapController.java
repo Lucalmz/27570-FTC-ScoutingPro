@@ -92,7 +92,7 @@ public class HeatmapController {
                         double x = Double.parseDouble(coords[0]);
                         double y = Double.parseDouble(coords[1]);
                         int state = (coords.length >= 3) ? Integer.parseInt(coords[2]) : 0;
-                        // Parse timestamp (index 3)
+                        // Parse timestamp (index 3), default to 0 if missing
                         long ts = (coords.length > 3) ? Long.parseLong(coords[3]) : 0;
                         boolean isHit = (state == 0);
 
@@ -166,8 +166,10 @@ public class HeatmapController {
         farAccLabel.setText(String.format("%.1f%%", (farShots > 0 ? (double)farHits/farShots*100 : 0)));
         nearAccLabel.setText(String.format("%.1f%%", (nearShots > 0 ? (double)nearHits/nearShots*100 : 0)));
 
-        // Update Cycle Label
-        cyclesLabel.setText(String.format("%.1f", avgCycles));
+        // Update Cycle Label (Check for null in case FXML is not updated)
+        if (cyclesLabel != null) {
+            cyclesLabel.setText(String.format("%.1f", avgCycles));
+        }
 
         if (totalShots == 0) {
             playStyleLabel.setText("No Data");
@@ -203,8 +205,7 @@ public class HeatmapController {
             for (int x = Math.max(0, cx - KERNEL_RADIUS); x < Math.min(w, cx + KERNEL_RADIUS); x++) {
                 for (int y = Math.max(0, cy - KERNEL_RADIUS); y < Math.min(h, cy + KERNEL_RADIUS); y++) {
                     double distSq = Math.pow(x - cx, 2) + Math.pow(y - cy, 2);
-                    double val = Math.exp(-distSq / sigmaSq2);
-                    densityMap[x][y] += val;
+                    densityMap[x][y] += Math.exp(-distSq / sigmaSq2);
                     if (densityMap[x][y] > maxDensity) maxDensity = densityMap[x][y];
                 }
             }

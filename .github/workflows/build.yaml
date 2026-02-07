@@ -30,6 +30,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+
       # 1. 打包 Fat Jar (Shade 插件会把 JavaFX 库打包进 jar)
       # 这一步会自动根据当前系统 (Windows/Mac) 下载对应的 JavaFX 本地库
       - name: Build with Maven

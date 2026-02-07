@@ -25,6 +25,8 @@ public class MainController {
 
     @FXML private Label competitionNameLabel, submitterLabel, errorLabel, statusLabel;
     @FXML private Button manageMembersBtn;
+    @FXML private Button submitButton; // 确保在 FXML 中给提交按钮加上 fx:id="submitButton"
+
     // Scoring Tab
     @FXML private VBox scoringFormVBox;
     @FXML private RadioButton allianceModeRadio, singleModeRadio;
@@ -70,6 +72,10 @@ public class MainController {
     private String currentUsername;
     private boolean isHost;
     private ObservableList<ScoreEntry> scoreHistoryList = FXCollections.observableArrayList();
+
+    // === 编辑功能状态变量 ===
+    private int editingScoreId = -1; // -1 表示新建模式，>0 表示编辑模式
+    private String editingOriginalTime = null; // 用于在编辑时保留原始提交时间
 
     public void setMainApp(MainApplication mainApp, Competition competition, String username, boolean isHost) {
         this.mainApp = mainApp;
@@ -117,10 +123,15 @@ public class MainController {
     }
 
     private void handleScoreReceivedFromClient(ScoreEntry scoreEntry) {
-        DatabaseService.saveScoreEntry(currentCompetition.getName(), scoreEntry);
+        // 使用支持更新的方法
+        DatabaseService.saveOrUpdateScoreEntry(currentCompetition.getName(), scoreEntry);
+        refreshAllDataFromDatabase();
+        broadcastUpdate();
+    }
+
+    private void broadcastUpdate() {
         List<ScoreEntry> fullHistory = DatabaseService.getScoresForCompetition(currentCompetition.getName());
         List<TeamRanking> newRankings = DatabaseService.calculateTeamRankings(currentCompetition.getName());
-        Platform.runLater(() -> updateUIAfterDataChange(fullHistory, newRankings));
         NetworkService.getInstance().broadcastUpdateToClients(new NetworkPacket(fullHistory, newRankings));
     }
 
@@ -179,42 +190,87 @@ public class MainController {
             String alliance = selectedToggle.getText().contains("Red") ? "RED" : "BLUE";
             boolean isSingle = singleModeRadio.isSelected();
 
-            ScoreEntry newEntry = new ScoreEntry(
-                    isSingle ? ScoreEntry.Type.SINGLE : ScoreEntry.Type.ALLIANCE,
-                    Integer.parseInt(matchNumberField.getText()), alliance,
-                    Integer.parseInt(team1Field.getText()),
-                    isSingle ? 0 : Integer.parseInt(team2Field.getText()),
-                    Integer.parseInt(autoArtifactsField.getText()),
-                    Integer.parseInt(teleopArtifactsField.getText()),
-                    team1SequenceCheck.isSelected(), isSingle ? false : team2SequenceCheck.isSelected(),
-                    team1L2ClimbCheck.isSelected(), isSingle ? false : team2L2ClimbCheck.isSelected(),
-                    team1IgnoreCheck.isSelected(), isSingle ? false : team2IgnoreCheck.isSelected(),
-                    team1BrokenCheck.isSelected(), isSingle ? false : team2BrokenCheck.isSelected(),
-                    currentClickLocations, currentUsername);
+            ScoreEntry entry;
 
-            if (isHost) handleScoreReceivedFromClient(newEntry);
-            else NetworkService.getInstance().sendScoreToServer(newEntry);
-
-            errorLabel.setText("Score submitted!");
-            currentClickLocations = "";
-            autoArtifactsField.setText("0");
-            teleopArtifactsField.setText("0");
-
-            // Reset flags after submission
-            if(team1IgnoreCheck != null) {
-                team1IgnoreCheck.setSelected(false);
-                team1IgnoreCheck.setDisable(true);
+            if (editingScoreId != -1) {
+                // === 更新模式：保留 ID 和 原始时间戳 ===
+                entry = new ScoreEntry(
+                        editingScoreId, // 传入 ID
+                        isSingle ? ScoreEntry.Type.SINGLE : ScoreEntry.Type.ALLIANCE,
+                        Integer.parseInt(matchNumberField.getText()), alliance,
+                        Integer.parseInt(team1Field.getText()),
+                        isSingle ? 0 : Integer.parseInt(team2Field.getText()),
+                        Integer.parseInt(autoArtifactsField.getText()),
+                        Integer.parseInt(teleopArtifactsField.getText()),
+                        team1SequenceCheck.isSelected(), isSingle ? false : team2SequenceCheck.isSelected(),
+                        team1L2ClimbCheck.isSelected(), isSingle ? false : team2L2ClimbCheck.isSelected(),
+                        team1IgnoreCheck.isSelected(), isSingle ? false : team2IgnoreCheck.isSelected(),
+                        team1BrokenCheck.isSelected(), isSingle ? false : team2BrokenCheck.isSelected(),
+                        currentClickLocations,
+                        currentUsername, // 这里可以选择保留原提交人，或更新为当前修改人
+                        editingOriginalTime // 保留原始时间
+                );
+            } else {
+                // === 新建模式：ID=0, 自动生成时间 ===
+                entry = new ScoreEntry(
+                        isSingle ? ScoreEntry.Type.SINGLE : ScoreEntry.Type.ALLIANCE,
+                        Integer.parseInt(matchNumberField.getText()), alliance,
+                        Integer.parseInt(team1Field.getText()),
+                        isSingle ? 0 : Integer.parseInt(team2Field.getText()),
+                        Integer.parseInt(autoArtifactsField.getText()),
+                        Integer.parseInt(teleopArtifactsField.getText()),
+                        team1SequenceCheck.isSelected(), isSingle ? false : team2SequenceCheck.isSelected(),
+                        team1L2ClimbCheck.isSelected(), isSingle ? false : team2L2ClimbCheck.isSelected(),
+                        team1IgnoreCheck.isSelected(), isSingle ? false : team2IgnoreCheck.isSelected(),
+                        team1BrokenCheck.isSelected(), isSingle ? false : team2BrokenCheck.isSelected(),
+                        currentClickLocations, currentUsername);
             }
-            if(team2IgnoreCheck != null) {
-                team2IgnoreCheck.setSelected(false);
-                team2IgnoreCheck.setDisable(true);
+
+            if (isHost) {
+                // Host 自动判断 Save 或 Update
+                DatabaseService.saveOrUpdateScoreEntry(currentCompetition.getName(), entry);
+                refreshAllDataFromDatabase();
+                broadcastUpdate();
+            } else {
+                // Client 发送给 Host，Host 端也需要用 saveOrUpdateScoreEntry 处理
+                NetworkService.getInstance().sendScoreToServer(entry);
             }
-            // Clear broken flags as well
-            if(team1BrokenCheck != null) team1BrokenCheck.setSelected(false);
-            if(team2BrokenCheck != null) team2BrokenCheck.setSelected(false);
 
+            errorLabel.setText("Score saved!");
+            resetFormState(); // 清空或重置表单
 
-        } catch (Exception e) { errorLabel.setText("Error: " + e.getMessage()); }
+        } catch (Exception e) {
+            errorLabel.setText("Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private void resetFormState() {
+        // 重置编辑状态
+        editingScoreId = -1;
+        editingOriginalTime = null;
+        if(submitButton != null) {
+            submitButton.setText("Submit Score");
+            submitButton.setStyle("");
+        }
+        submitterLabel.setText("Submitter: " + currentUsername);
+        submitterLabel.setStyle("");
+
+        // 清空字段
+        currentClickLocations = "";
+        autoArtifactsField.setText("0");
+        teleopArtifactsField.setText("0");
+        matchNumberField.clear(); // 可选：是否清空比赛号取决于你的使用习惯
+
+        // 重置勾选框
+        if(team1IgnoreCheck != null) { team1IgnoreCheck.setSelected(false); team1IgnoreCheck.setDisable(true); }
+        if(team2IgnoreCheck != null) { team2IgnoreCheck.setSelected(false); team2IgnoreCheck.setDisable(true); }
+        if(team1BrokenCheck != null) team1BrokenCheck.setSelected(false);
+        if(team2BrokenCheck != null) team2BrokenCheck.setSelected(false);
+        team1SequenceCheck.setSelected(false);
+        team1L2ClimbCheck.setSelected(false);
+        if(team2SequenceCheck != null) team2SequenceCheck.setSelected(false);
+        if(team2L2ClimbCheck != null) team2L2ClimbCheck.setSelected(false);
     }
 
     @FXML private void handleSubmitPenalty() {
@@ -229,11 +285,7 @@ public class MainController {
             DatabaseService.savePenaltyEntry(currentCompetition.getName(), entry);
 
             refreshAllDataFromDatabase();
-            if (isHost) {
-                NetworkService.getInstance().broadcastUpdateToClients(new NetworkPacket(
-                        DatabaseService.getScoresForCompetition(currentCompetition.getName()),
-                        DatabaseService.calculateTeamRankings(currentCompetition.getName())));
-            }
+            if (isHost) broadcastUpdate();
             penStatusLabel.setText("Saved: " + alliance + " Match " + matchNum);
         } catch (Exception e) { penStatusLabel.setText("Error: " + e.getMessage()); }
     }
@@ -280,16 +332,13 @@ public class MainController {
             if (team2IgnoreBox != null) team2IgnoreBox.setVisible(!isS);
 
             // Explicitly hide the specific checkboxes if they aren't in the hidden box
-            // (Based on your FXML, they are in the GridPane, so we must hide them manually)
             if (team2IgnoreCheck != null) team2IgnoreCheck.setVisible(!isS);
             if (team2BrokenCheck != null) team2BrokenCheck.setVisible(!isS);
 
-            // --- CHANGED: Clear checkboxes when switching to Single Mode ---
+            // Clear checkboxes when switching to Single Mode
             if (isS) {
                 if (team2IgnoreCheck != null) team2IgnoreCheck.setSelected(false);
                 if (team2BrokenCheck != null) team2BrokenCheck.setSelected(false);
-
-                // Good practice to clear capabilities as well
                 if (team2SequenceCheck != null) team2SequenceCheck.setSelected(false);
                 if (team2L2ClimbCheck != null) team2L2ClimbCheck.setSelected(false);
             }
@@ -308,7 +357,8 @@ public class MainController {
 
     private void updateWeakCheckboxStatus(String teamNumberStr, CheckBox checkBox) {
         if (checkBox == null) return;
-
+        // 如果正在编辑模式，允许保留原有状态，或者根据逻辑判断
+        // 这里保持原逻辑：只有场次够了才能设为 Weak
         if (teamNumberStr == null || teamNumberStr.trim().isEmpty() || currentCompetition == null) {
             checkBox.setDisable(true);
             checkBox.setSelected(false);
@@ -321,8 +371,19 @@ public class MainController {
             if (matchCount >= 2) {
                 checkBox.setDisable(false);
             } else {
-                checkBox.setDisable(true);
-                checkBox.setSelected(false);
+                // 如果是编辑回填，且原本就是 Weak，那么允许它保持 Weak 状态（即使计算出来小于2场）
+                // 或者是新建时，小于2场禁用
+                if (editingScoreId == -1) {
+                    checkBox.setDisable(true);
+                    checkBox.setSelected(false);
+                } else {
+                    // 编辑模式下，如果原本选了，就允许选
+                    if (!checkBox.isSelected()) {
+                        checkBox.setDisable(true);
+                    } else {
+                        checkBox.setDisable(false);
+                    }
+                }
             }
         } catch (NumberFormatException e) {
             checkBox.setDisable(true);
@@ -387,6 +448,102 @@ public class MainController {
             return String.valueOf(s.getMatchNumber()).contains(low) || s.getTeams().contains(low);
         }));
         historyTableView.setItems(filtered);
+
+        // === 右键菜单：编辑与删除 ===
+        ContextMenu contextMenu = new ContextMenu();
+
+        MenuItem editItem = new MenuItem("Edit This Entry");
+        editItem.setOnAction(e -> handleEditAction());
+
+        MenuItem deleteItem = new MenuItem("Delete Entry (Danger)");
+        deleteItem.setStyle("-fx-text-fill: red;");
+        deleteItem.setOnAction(e -> handleDeleteAction());
+
+        contextMenu.getItems().addAll(editItem, deleteItem);
+
+        historyTableView.setRowFactory(tv -> {
+            TableRow<ScoreEntry> row = new TableRow<>();
+            row.contextMenuProperty().bind(
+                    javafx.beans.binding.Bindings.when(row.emptyProperty())
+                            .then((ContextMenu) null)
+                            .otherwise(contextMenu)
+            );
+            return row;
+        });
+    }
+
+    // 处理编辑动作：数据回填
+    private void handleEditAction() {
+        ScoreEntry selected = historyTableView.getSelectionModel().getSelectedItem();
+        if (selected == null) return;
+
+        // 设置状态
+        editingScoreId = selected.getId();
+        editingOriginalTime = selected.getSubmissionTime();
+
+        // 提示用户
+        submitterLabel.setText("EDITING RECORD ID: " + editingScoreId);
+        submitterLabel.setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
+        if(submitButton != null) {
+            submitButton.setText("Update Record");
+            submitButton.setStyle("-fx-background-color: #f39c12; -fx-text-fill: white;");
+        }
+
+        // 回填表单
+        matchNumberField.setText(String.valueOf(selected.getMatchNumber()));
+        team1Field.setText(String.valueOf(selected.getTeam1()));
+        team2Field.setText(String.valueOf(selected.getTeam2()));
+
+        autoArtifactsField.setText(String.valueOf(selected.getAutoArtifacts()));
+        teleopArtifactsField.setText(String.valueOf(selected.getTeleopArtifacts()));
+
+        if ("RED".equalsIgnoreCase(selected.getAlliance())) {
+            redAllianceToggle.setSelected(true);
+        } else {
+            blueAllianceToggle.setSelected(true);
+        }
+
+        if (selected.getScoreType() == ScoreEntry.Type.SINGLE) {
+            singleModeRadio.setSelected(true);
+        } else {
+            allianceModeRadio.setSelected(true);
+        }
+
+        team1SequenceCheck.setSelected(selected.isTeam1CanSequence());
+        team2SequenceCheck.setSelected(selected.isTeam2CanSequence());
+        team1L2ClimbCheck.setSelected(selected.isTeam1L2Climb());
+        team2L2ClimbCheck.setSelected(selected.isTeam2L2Climb());
+
+        // 处理 Weak/Broken (先启用再勾选)
+        if(team1IgnoreCheck != null) { team1IgnoreCheck.setDisable(false); team1IgnoreCheck.setSelected(selected.isTeam1Ignored()); }
+        if(team2IgnoreCheck != null) { team2IgnoreCheck.setDisable(false); team2IgnoreCheck.setSelected(selected.isTeam2Ignored()); }
+        if(team1BrokenCheck != null) team1BrokenCheck.setSelected(selected.isTeam1Broken());
+        if(team2BrokenCheck != null) team2BrokenCheck.setSelected(selected.isTeam2Broken());
+
+        currentClickLocations = selected.getClickLocations();
+        errorLabel.setText("Editing record loaded.");
+    }
+
+    // 处理删除动作
+    private void handleDeleteAction() {
+        ScoreEntry selected = historyTableView.getSelectionModel().getSelectedItem();
+        if (selected == null) return;
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION, "Delete Match " + selected.getMatchNumber() + "?", ButtonType.YES, ButtonType.NO);
+        alert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.YES) {
+                // 如果是 Client，无法直接删库，这需要网络协议支持 DeletePacket。
+                // 暂时假设 Client 只能让 Host 删，或者如果是 Host 才能删。
+                if (isHost) {
+                    DatabaseService.deleteScoreEntry(selected.getId());
+                    refreshAllDataFromDatabase();
+                    broadcastUpdate();
+                } else {
+                    // Client Delete TODO: 需要在 NetworkService 增加 sendDeleteRequest
+                    errorLabel.setText("Only Host can delete records for safety.");
+                }
+            }
+        });
     }
 
     @FXML
