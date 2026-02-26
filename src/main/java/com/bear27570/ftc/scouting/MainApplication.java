@@ -6,7 +6,6 @@ import com.bear27570.ftc.scouting.controllers.HubController;
 import com.bear27570.ftc.scouting.controllers.LoginController;
 import com.bear27570.ftc.scouting.controllers.MainController;
 import com.bear27570.ftc.scouting.models.Competition;
-import com.bear27570.ftc.scouting.services.DatabaseService;
 import com.bear27570.ftc.scouting.services.NetworkService;
 import javafx.application.Application;
 import javafx.application.Platform;

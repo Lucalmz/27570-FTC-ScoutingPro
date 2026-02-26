@@ -1,6 +1,8 @@
 package com.bear27570.ftc.scouting.services;
 
 import com.bear27570.ftc.scouting.models.*;
+import com.bear27570.ftc.scouting.services.network.DefaultNetworkDataHandler;
+import com.bear27570.ftc.scouting.services.network.NetworkDataHandler;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
 
@@ -30,19 +32,25 @@ public class NetworkService {
     private String hostingCompetitionName;
     private Runnable onMemberJoinCallback;
 
+    // 核心解耦：依赖注入的数据处理器，默认使用真实的数据库处理器
+    private NetworkDataHandler dataHandler = new DefaultNetworkDataHandler();
+
     private NetworkService() {}
+
+    /**
+     * 允许在单元测试中注入 Mock (假的数据处理器)
+     */
+    public void setDataHandler(NetworkDataHandler dataHandler) {
+        this.dataHandler = dataHandler;
+    }
 
     public void setOnMemberJoinCallback(Runnable callback) {
         this.onMemberJoinCallback = callback;
     }
 
-    /**
-     * 主机：启动或更新 Server 状态
-     */
     public synchronized void startHost(Competition competition, Consumer<ScoreEntry> onScoreReceived) {
         this.hostingCompetitionName = competition.getName();
 
-        // 健壮性：如果已经在运行，不重启 ServerSocket，但更新回调
         if (running && serverSocket != null) {
             for (ClientHandler handler : connectedClients) {
                 handler.setOnScoreReceived(onScoreReceived);
@@ -50,7 +58,7 @@ public class NetworkService {
             return;
         }
 
-        stop(); // 只有彻底没运行才重头启动
+        stop();
         this.running = true;
 
         new Thread(() -> {
@@ -85,13 +93,10 @@ public class NetworkService {
                     beacon.send(packet);
                     Thread.sleep(2000);
                 }
-            } catch (Exception e) {}
+            } catch (Exception ignored) {}
         }).start();
     }
 
-    /**
-     * 内部类：处理每个从机连接
-     */
     private class ClientHandler extends Thread {
         private final Socket socket;
         private ObjectOutputStream out;
@@ -112,7 +117,7 @@ public class NetworkService {
             try {
                 out.writeObject(p);
                 out.flush();
-                out.reset(); // 重要：防止对象缓存
+                out.reset();
             } catch (IOException e) { stopClient(); }
         }
 
@@ -132,19 +137,20 @@ public class NetworkService {
                         switch (packet.getType()) {
                             case JOIN_REQUEST:
                                 this.clientUsername = packet.getUsername();
-                                DatabaseService.addMembership(clientUsername, hostingCompetitionName, Membership.Status.PENDING);
 
-                                // 如果该用户已经是批准状态，直接发通过响应
-                                Membership.Status stat = DatabaseService.getMembershipStatus(clientUsername, hostingCompetitionName);
-                                if (stat == Membership.Status.APPROVED || stat == Membership.Status.CREATOR) {
+                                // 解耦：使用接口而不是硬编码的 DatabaseService
+                                dataHandler.addPendingMembership(clientUsername, hostingCompetitionName);
+
+                                if (dataHandler.isUserApprovedOrCreator(clientUsername, hostingCompetitionName)) {
                                     sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
-                                    // 顺便补发一次全量数据
                                     sendPacket(new NetworkPacket(
-                                            DatabaseService.getScoresForCompetition(hostingCompetitionName),
-                                            DatabaseService.calculateTeamRankings(hostingCompetitionName)));
+                                            dataHandler.getScores(hostingCompetitionName),
+                                            dataHandler.getRankings(hostingCompetitionName)));
                                 }
 
-                                if (onMemberJoinCallback != null) Platform.runLater(onMemberJoinCallback);
+                                if (onMemberJoinCallback != null) {
+                                    Platform.runLater(onMemberJoinCallback);
+                                }
                                 break;
 
                             case SUBMIT_SCORE:
@@ -165,10 +171,11 @@ public class NetworkService {
         for (ClientHandler handler : connectedClients) {
             if (username.equals(handler.clientUsername)) {
                 handler.sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
-                // 批准后立即同步当前数据
+
+                // 解耦：通过接口获取当前全局数据
                 handler.sendPacket(new NetworkPacket(
-                        DatabaseService.getScoresForCompetition(hostingCompetitionName),
-                        DatabaseService.calculateTeamRankings(hostingCompetitionName)));
+                        dataHandler.getScores(hostingCompetitionName),
+                        dataHandler.getRankings(hostingCompetitionName)));
                 return;
             }
         }
@@ -237,7 +244,7 @@ public class NetworkService {
             try {
                 outToServer.writeObject(new NetworkPacket(scoreEntry));
                 outToServer.flush();
-                outToServer.reset(); // 重要
+                outToServer.reset();
             } catch (IOException e) { e.printStackTrace(); }
         }
     }
