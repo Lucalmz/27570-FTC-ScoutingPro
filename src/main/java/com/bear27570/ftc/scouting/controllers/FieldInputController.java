@@ -33,19 +33,18 @@ public class FieldInputController {
     @FXML private Label countLabel, countT1Label, countT2Label;
 
     private Stage dialogStage;
+    private MainController parentController;
     private final List<TeamPoint> points = new ArrayList<>();
-    private boolean confirmed = false;
     private boolean isAllianceMode = true;
     private Label warningLabel;
 
     private static final double ZONE_DIVIDER_Y = 400.0;
 
-    // Updated Data Class with Timestamp
     public static class TeamPoint {
         double x, y;
         int teamIndex;
         boolean isMiss;
-        long timestamp; // New field
+        long timestamp;
 
         public TeamPoint(double x, double y, int teamIndex, boolean isMiss, long timestamp) {
             this.x = x; this.y = y; this.teamIndex = teamIndex; this.isMiss = isMiss;
@@ -77,8 +76,19 @@ public class FieldInputController {
         redraw();
     }
 
-    public void setDialogStage(Stage dialogStage) {
+    public void setDependencies(Stage dialogStage, MainController parentController, boolean isAllianceMode, String existingLocations) {
         this.dialogStage = dialogStage;
+        this.parentController = parentController;
+        this.isAllianceMode = isAllianceMode;
+
+        teamSelectBox.setVisible(isAllianceMode);
+        teamSelectBox.setManaged(isAllianceMode);
+        if (!isAllianceMode) { team1Btn.setSelected(true); }
+
+        if (existingLocations != null && !existingLocations.isEmpty()) {
+            loadExistingPoints(existingLocations);
+        }
+
         dialogStage.getScene().setOnKeyPressed(this::handleKeyPressed);
         dialogStage.getScene().setOnKeyReleased(this::handleKeyReleased);
     }
@@ -116,7 +126,6 @@ public class FieldInputController {
         if (addModeBtn.isSelected()) {
             int currentTeam = team1Btn.isSelected() ? 1 : 2;
             boolean isMiss = (event.getButton() == MouseButton.SECONDARY);
-            // Record current time for cycle calculation
             points.add(new TeamPoint(x, y, currentTeam, isMiss, System.currentTimeMillis()));
         } else {
             removeClosestPoint(x, y);
@@ -195,52 +204,40 @@ public class FieldInputController {
         }
     }
 
-    public void loadExistingPoints(String locationStr) {
+    private void loadExistingPoints(String locationStr) {
         points.clear();
-        if (locationStr == null || locationStr.isEmpty()) return;
-
         String[] entries = locationStr.split(";");
         for (String entry : entries) {
             try {
-                // Format: TeamIdx:x,y,state,timestamp
                 String[] parts = entry.split(":");
                 if (parts.length < 2) continue;
-
                 int teamIdx = Integer.parseInt(parts[0]);
                 String[] coords = parts[1].split(",");
                 double x = Double.parseDouble(coords[0]);
                 double y = Double.parseDouble(coords[1]);
                 int state = Integer.parseInt(coords[2]);
-
-                // Backward compatibility: if timestamp missing, use 0
                 long ts = (coords.length > 3) ? Long.parseLong(coords[3]) : 0;
-
                 points.add(new TeamPoint(x, y, teamIdx, state == 1, ts));
             } catch (Exception e) { }
         }
         updateUI();
     }
 
-    public String getLocationsString() {
+    private String getLocationsString() {
         StringBuilder sb = new StringBuilder();
         for (TeamPoint p : points) {
             int missInt = p.isMiss ? 1 : 0;
-            // Format: TeamIdx:x,y,state,timestamp;
             sb.append(p.teamIndex).append(":")
                     .append(String.format("%.1f,%.1f,%d,%d;", p.x, p.y, missInt, p.timestamp));
         }
         return sb.toString();
     }
 
-    public void setAllianceMode(boolean isAllianceMode) {
-        this.isAllianceMode = isAllianceMode;
-        teamSelectBox.setVisible(isAllianceMode);
-        teamSelectBox.setManaged(isAllianceMode);
-        if (!isAllianceMode) { team1Btn.setSelected(true); }
-    }
-
     @FXML private void handleClear() { points.clear(); updateUI(); }
-    @FXML private void handleConfirm() { confirmed = true; dialogStage.close(); }
-    public boolean isConfirmed() { return confirmed; }
-    public int getTotalHitCount() { return (int) points.stream().filter(p -> !p.isMiss).count(); }
+
+    @FXML private void handleConfirm() {
+        int totalHits = (int) points.stream().filter(p -> !p.isMiss).count();
+        parentController.onFieldInputConfirmed(totalHits, getLocationsString());
+        dialogStage.close();
+    }
 }

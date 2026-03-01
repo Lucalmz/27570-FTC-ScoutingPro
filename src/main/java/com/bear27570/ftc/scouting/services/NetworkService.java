@@ -1,7 +1,7 @@
+// File: NetworkService.java
 package com.bear27570.ftc.scouting.services;
 
 import com.bear27570.ftc.scouting.models.*;
-import com.bear27570.ftc.scouting.services.network.DefaultNetworkDataHandler;
 import com.bear27570.ftc.scouting.services.network.NetworkDataHandler;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
@@ -32,14 +32,11 @@ public class NetworkService {
     private String hostingCompetitionName;
     private Runnable onMemberJoinCallback;
 
-    // 核心解耦：依赖注入的数据处理器，默认使用真实的数据库处理器
-    private NetworkDataHandler dataHandler = new DefaultNetworkDataHandler();
+    private NetworkDataHandler dataHandler;
 
-    private NetworkService() {}
+    // 修改为 public 以便单元测试可以独立实例化模拟 Client
+    public NetworkService() {}
 
-    /**
-     * 允许在单元测试中注入 Mock (假的数据处理器)
-     */
     public void setDataHandler(NetworkDataHandler dataHandler) {
         this.dataHandler = dataHandler;
     }
@@ -137,22 +134,19 @@ public class NetworkService {
                         switch (packet.getType()) {
                             case JOIN_REQUEST:
                                 this.clientUsername = packet.getUsername();
-
-                                // 解耦：使用接口而不是硬编码的 DatabaseService
-                                dataHandler.addPendingMembership(clientUsername, hostingCompetitionName);
-
-                                if (dataHandler.isUserApprovedOrCreator(clientUsername, hostingCompetitionName)) {
-                                    sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
-                                    sendPacket(new NetworkPacket(
-                                            dataHandler.getScores(hostingCompetitionName),
-                                            dataHandler.getRankings(hostingCompetitionName)));
+                                if(dataHandler != null) {
+                                    dataHandler.addPendingMembership(clientUsername, hostingCompetitionName);
+                                    if (dataHandler.isUserApprovedOrCreator(clientUsername, hostingCompetitionName)) {
+                                        sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
+                                        sendPacket(new NetworkPacket(
+                                                dataHandler.getScores(hostingCompetitionName),
+                                                dataHandler.getRankings(hostingCompetitionName)));
+                                    }
                                 }
-
                                 if (onMemberJoinCallback != null) {
                                     Platform.runLater(onMemberJoinCallback);
                                 }
                                 break;
-
                             case SUBMIT_SCORE:
                                 if (onScoreReceived != null) {
                                     Platform.runLater(() -> onScoreReceived.accept(packet.getScoreEntry()));
@@ -171,11 +165,11 @@ public class NetworkService {
         for (ClientHandler handler : connectedClients) {
             if (username.equals(handler.clientUsername)) {
                 handler.sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
-
-                // 解耦：通过接口获取当前全局数据
-                handler.sendPacket(new NetworkPacket(
-                        dataHandler.getScores(hostingCompetitionName),
-                        dataHandler.getRankings(hostingCompetitionName)));
+                if(dataHandler != null) {
+                    handler.sendPacket(new NetworkPacket(
+                            dataHandler.getScores(hostingCompetitionName),
+                            dataHandler.getRankings(hostingCompetitionName)));
+                }
                 return;
             }
         }
@@ -185,7 +179,7 @@ public class NetworkService {
         this.running = true;
         new Thread(() -> {
             try {
-                if (udpSocket != null) udpSocket.close();
+                if (udpSocket != null) { udpSocket.close(); }
                 udpSocket = new DatagramSocket(UDP_PORT);
                 udpSocket.setSoTimeout(2000);
                 byte[] buffer = new byte[1024];
@@ -230,7 +224,7 @@ public class NetworkService {
                     }
                 }
             } catch (Exception e) {
-                System.err.println("Connection to Host lost.");
+                if(running) System.err.println("Connection to Host lost.");
             }
         }, "Client-Listen-Thread").start();
     }
@@ -254,7 +248,12 @@ public class NetworkService {
         try { if (serverSocket != null) serverSocket.close(); } catch (IOException ignored) {}
         try { if (clientSocket != null) clientSocket.close(); } catch (IOException ignored) {}
         if (udpSocket != null) udpSocket.close();
+
+        for (ClientHandler client : connectedClients) {
+            try { client.socket.close(); } catch (Exception ignored) {}
+        }
         connectedClients.clear();
+
         serverSocket = null;
         clientSocket = null;
         udpSocket = null;

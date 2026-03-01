@@ -2,21 +2,34 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<VBox spacing="15" alignment="CENTER" style="-fx-background-color: #1C2533;" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.FormulaEditController">
-    <padding><Insets top="30" right="30" bottom="30" left="30"/></padding>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
-    <Label text="Edit Rating Formula" styleClass="header-label"/>
-    <Label text="Variables: auto, teleop, seq (0/1), climb (0/1), total" textFill="#B0BEC5"/>
-    <Label text="Math: +, -, *, /, ^, sqrt(), abs()" textFill="#B0BEC5"/>
-    <Label text="Example: (auto / 2) * 5 + (teleop / 2) * 3 + (seq ? 10 : 0)" textFill="#80CBC4" style="-fx-font-style: italic;"/>
+<VBox spacing="30" alignment="CENTER" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.FormulaEditController">
+    <padding><Insets top="40" right="45" bottom="40" left="45"/></padding>
 
-    <TextField fx:id="formulaField" promptText="e.g. total + (auto * 5)" prefWidth="400"/>
+    <Label text="Edit Rating Formula" styleClass="title-2"/>
 
-    <Label fx:id="errorLabel" styleClass="error-label"/>
+    <VBox spacing="15" styleClass="mac-card" style="-fx-padding: 30;">
+        <Label text="Available Variables: auto, teleop, seq (0/1), climb (0/1), total" styleClass="text-muted"/>
+        <Label text="Supported Math: +, -, *, /, ^, sqrt(), abs()" styleClass="text-muted"/>
+        <Label text="Example: (auto / 2) * 5 + (teleop / 2) * 3 + (seq ? 10 : 0)" styleClass="mono-text" style="-fx-text-fill: #0A84FF; -fx-font-style: italic;"/>
 
-    <HBox spacing="10" alignment="CENTER">
-        <Button onAction="#handleSave" text="Save &amp; Apply"/>
-        <Button onAction="#handleReset" text="Reset Default" styleClass="logout-button"/>
-        <Button onAction="#handleCancel" text="Cancel"/>
+        <Region prefHeight="15"/>
+        <!-- 核心输入框使用高亮蓝色发光边框 -->
+        <TextField fx:id="formulaField" promptText="total + (auto * 5)" prefWidth="550" prefHeight="50" styleClass="mono-text" style="-fx-font-size: 16px;"/>
+    </VBox>
+
+    <Label fx:id="errorLabel" styleClass="text-danger" style="-fx-font-weight: bold;"/>
+
+    <HBox spacing="20" alignment="CENTER">
+        <Button onAction="#handleCancel" text="Cancel" prefWidth="120" prefHeight="45">
+            <graphic><FontIcon iconLiteral="fth-x" iconSize="14"/></graphic>
+        </Button>
+        <Button onAction="#handleReset" text="Reset Default" styleClass="warning" prefWidth="140" prefHeight="45">
+            <graphic><FontIcon iconLiteral="fth-rotate-ccw" iconSize="14" iconColor="black"/></graphic>
+        </Button>
+        <Button onAction="#handleSave" text="Save &amp; Apply" styleClass="accent" prefWidth="140" prefHeight="45">
+            <graphic><FontIcon iconLiteral="fth-save" iconSize="16" iconColor="white"/></graphic>
+        </Button>
     </HBox>
 </VBox>

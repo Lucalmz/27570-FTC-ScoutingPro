@@ -4,45 +4,53 @@
 <?import javafx.scene.image.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.canvas.Canvas?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane style="-fx-background-color: #1C2533;" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.FieldInputController">
+<BorderPane stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.FieldInputController">
     <center>
-        <StackPane fx:id="inputPane" style="-fx-border-color: #4A5C70; -fx-border-width: 2;">
-            <ImageView fx:id="fieldImageView" fitHeight="600" fitWidth="600" preserveRatio="true">
-                <image>
-                    <Image url="@../images/field.png"/>
-                </image>
-            </ImageView>
-            <Canvas fx:id="drawCanvas" height="600" width="600" onMouseClicked="#handleCanvasClick"/>
+        <StackPane fx:id="inputPane" style="-fx-padding: 30;">
+            <StackPane styleClass="panel-inner" style="-fx-padding: 0; -fx-background-color: transparent;">
+                <ImageView fx:id="fieldImageView" fitHeight="600" fitWidth="600" preserveRatio="true">
+                    <image>
+                        <Image url="@../images/field.png"/>
+                    </image>
+                </ImageView>
+                <Canvas fx:id="drawCanvas" height="600" width="600" onMouseClicked="#handleCanvasClick"/>
+            </StackPane>
         </StackPane>
     </center>
     <right>
-        <VBox spacing="15" alignment="CENTER" prefWidth="160" style="-fx-background-color: #2A3B4F;">
-            <padding><Insets top="20" right="10" bottom="20" left="10"/></padding>
+        <VBox spacing="25" alignment="TOP_CENTER" prefWidth="240" style="-fx-background-color: -color-bg-overlay; -fx-border-color: rgba(255,255,255,0.05); -fx-border-width: 0 0 0 1px;">
+            <padding><Insets top="40" right="25" bottom="40" left="25"/></padding>
 
-            <!-- 新增：队伍选择 (仅在联盟模式显示) -->
-            <VBox fx:id="teamSelectBox" spacing="5" alignment="CENTER">
-                <Label text="Active Team" styleClass="sub-header-label"/>
-                <ToggleButton fx:id="team1Btn" text="Team 1" prefWidth="120" selected="true" style="-fx-base: #00BCD4;"/>
-                <ToggleButton fx:id="team2Btn" text="Team 2" prefWidth="120" style="-fx-base: #E91E63;"/>
-                <Separator/>
+            <VBox fx:id="teamSelectBox" spacing="12" alignment="CENTER" styleClass="panel-inner">
+                <Label text="Active Team" styleClass="title-4"/>
+                <ToggleButton fx:id="team1Btn" text="Team 1" prefWidth="160" prefHeight="38" selected="true" styleClass="accent"/>
+                <ToggleButton fx:id="team2Btn" text="Team 2" prefWidth="160" prefHeight="38" styleClass="danger"/>
             </VBox>
 
-            <Label text="Input Mode" styleClass="sub-header-label"/>
-            <ToggleButton fx:id="addModeBtn" text="Add (+)" prefWidth="120" selected="true"/>
-            <ToggleButton fx:id="removeModeBtn" text="Remove (-)" prefWidth="120"/>
+            <VBox spacing="12" alignment="CENTER" styleClass="panel-inner">
+                <Label text="Input Mode" styleClass="title-4"/>
+                <ToggleButton fx:id="addModeBtn" text="Add (+)" prefWidth="160" prefHeight="38" selected="true" styleClass="success"/>
+                <ToggleButton fx:id="removeModeBtn" text="Remove (-)" prefWidth="160" prefHeight="38"/>
+            </VBox>
 
-            <Separator/>
-            <Label text="Current Count:" style="-fx-text-fill: #E0E0E0;"/>
-            <Label fx:id="countLabel" text="0" style="-fx-font-size: 36px; -fx-text-fill: white; -fx-font-weight: bold;"/>
-            <HBox alignment="CENTER" spacing="5">
-                <Label text="T1:" textFill="#00BCD4"/><Label fx:id="countT1Label" text="0" textFill="#00BCD4"/>
-                <Label text="T2:" textFill="#E91E63"/><Label fx:id="countT2Label" text="0" textFill="#E91E63"/>
-            </HBox>
+            <VBox spacing="5" alignment="CENTER" styleClass="panel-inner">
+                <Label text="Total Count" styleClass="text-muted"/>
+                <Label fx:id="countLabel" text="0" styleClass="mono-text" style="-fx-font-size: 48px; -fx-font-weight: bold;"/>
+                <HBox alignment="CENTER" spacing="20">
+                    <HBox alignment="CENTER" spacing="5"><Label text="T1:" style="-fx-text-fill: #0A84FF;"/><Label fx:id="countT1Label" text="0" styleClass="mono-text" style="-fx-text-fill: #0A84FF; -fx-font-weight: bold;"/></HBox>
+                    <HBox alignment="CENTER" spacing="5"><Label text="T2:" style="-fx-text-fill: #FF453A;"/><Label fx:id="countT2Label" text="0" styleClass="mono-text" style="-fx-text-fill: #FF453A; -fx-font-weight: bold;"/></HBox>
+                </HBox>
+            </VBox>
 
             <Region VBox.vgrow="ALWAYS"/>
-            <Button onAction="#handleClear" text="Clear All" styleClass="logout-button"/>
-            <Button onAction="#handleConfirm" text="Confirm" prefWidth="120" styleClass="submit-button"/>
+            <Button onAction="#handleClear" text="Clear Canvas" styleClass="danger" prefWidth="160" prefHeight="40">
+                <graphic><FontIcon iconLiteral="fth-trash-2" iconSize="14" iconColor="white"/></graphic>
+            </Button>
+            <Button onAction="#handleConfirm" text="Confirm &amp; Save" prefWidth="160" styleClass="success" prefHeight="50">
+                <graphic><FontIcon iconLiteral="fth-check-circle" iconSize="16" iconColor="white"/></graphic>
+            </Button>
         </VBox>
     </right>
 </BorderPane>

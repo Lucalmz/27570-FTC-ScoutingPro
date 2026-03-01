@@ -2,7 +2,6 @@ package com.bear27570.ftc.scouting.repository.impl;
 
 import com.bear27570.ftc.scouting.models.ScoreEntry;
 import com.bear27570.ftc.scouting.repository.ScoreRepository;
-import org.intellij.lang.annotations.Language;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -46,6 +45,7 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
             pstmt.setString(20, entry.getSubmissionTime());
             pstmt.executeUpdate();
         } catch (SQLException e) {
+            System.err.println("Error saving score: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -76,6 +76,7 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
             pstmt.setInt(17, entry.getId());
             pstmt.executeUpdate();
         } catch (SQLException e) {
+            System.err.println("Error updating score (ID: " + entry.getId() + "): " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -87,6 +88,7 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
             pstmt.setInt(1, id);
             pstmt.executeUpdate();
         } catch (SQLException e) {
+            System.err.println("Error deleting score: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -97,12 +99,13 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
         String sql = "SELECT * FROM scores WHERE competitionName = ? ORDER BY matchNumber DESC, id DESC";
         try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, competitionName);
-            ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                entries.add(mapResultSetToScoreEntry(rs));
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    entries.add(mapResultSetToScoreEntry(rs));
+                }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("Error fetching scores by competition: " + e.getMessage());
         }
         return entries;
     }
@@ -115,19 +118,30 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
             pstmt.setString(1, competitionName);
             pstmt.setInt(2, teamNumber);
             pstmt.setInt(3, teamNumber);
-            ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                entries.add(mapResultSetToScoreEntry(rs));
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    entries.add(mapResultSetToScoreEntry(rs));
+                }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("Error fetching scores by team: " + e.getMessage());
         }
         return entries;
     }
 
     private ScoreEntry mapResultSetToScoreEntry(ResultSet rs) throws SQLException {
         String typeStr = rs.getString("scoreType");
-        ScoreEntry.Type type = (typeStr == null) ? ScoreEntry.Type.ALLIANCE : ScoreEntry.Type.valueOf(typeStr);
+        ScoreEntry.Type type = ScoreEntry.Type.ALLIANCE; // 默认防脏数据后备值
+
+        // 修复：防脏数据的 Enum 解析
+        if (typeStr != null && !typeStr.trim().isEmpty()) {
+            try {
+                type = ScoreEntry.Type.valueOf(typeStr.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                System.err.println("Warning: Unknown score type found in DB -> " + typeStr);
+            }
+        }
+
         boolean t1Ign = false, t2Ign = false, t1Brk = false, t2Brk = false;
         try { t1Ign = rs.getBoolean("team1Ignored"); } catch (SQLException ignore) {}
         try { t2Ign = rs.getBoolean("team2Ignored"); } catch (SQLException ignore) {}

@@ -2,21 +2,20 @@ package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.MainApplication;
 import com.bear27570.ftc.scouting.models.*;
-import com.bear27570.ftc.scouting.services.DatabaseService;
+import com.bear27570.ftc.scouting.repository.CompetitionRepository;
 import com.bear27570.ftc.scouting.services.NetworkService;
+import com.bear27570.ftc.scouting.services.domain.MatchDataService;
+import com.bear27570.ftc.scouting.services.domain.RankingService;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 
@@ -67,28 +66,40 @@ public class MainController {
 
     private ToggleGroup allianceToggleGroup, penaltyAllianceGroup, modeToggleGroup;
     private String currentClickLocations = "";
+
+    // --- 依赖注入的服务 ---
     private MainApplication mainApp;
+    private MatchDataService matchDataService;
+    private RankingService rankingService;
+    private CompetitionRepository competitionRepository;
+
     private Competition currentCompetition;
     private String currentUsername;
     private boolean isHost;
     private ObservableList<ScoreEntry> scoreHistoryList = FXCollections.observableArrayList();
 
-    // === 编辑功能状态变量 ===
     private int editingScoreId = -1;
     private String editingOriginalTime = null;
 
-    public void setMainApp(MainApplication mainApp, Competition competition, String username, boolean isHost) {
+    // --- 核心注入方法 ---
+    public void setDependencies(MainApplication mainApp, Competition competition, String username, boolean isHost,
+                                MatchDataService matchDataService, RankingService rankingService,
+                                CompetitionRepository competitionRepository) {
         this.mainApp = mainApp;
         this.currentCompetition = competition;
         this.currentUsername = username;
         this.isHost = isHost;
+        this.matchDataService = matchDataService;
+        this.rankingService = rankingService;
+        this.competitionRepository = competitionRepository;
+
         competitionNameLabel.setText(competition.getName() + (isHost ? " (HOSTING)" : " (CLIENT)"));
         submitterLabel.setText("Submitter: " + username);
 
         setupScoringTab();
         setupRankingsTab();
         setupHistoryTab();
-        setupPenaltyTab(); // 确保加载罚分选项卡初始化
+        setupPenaltyTab();
 
         if (isHost) {
             editRatingButton.setVisible(true);
@@ -118,7 +129,6 @@ public class MainController {
         }
     }
 
-    // --- 罚分选项卡初始化 ---
     private void setupPenaltyTab() {
         penaltyAllianceGroup = new ToggleGroup();
         penRedToggle.setToggleGroup(penaltyAllianceGroup);
@@ -160,7 +170,6 @@ public class MainController {
     }
 
     private void setupRankingsTab() {
-        // --- 核心修复：排行榜数值排序与居中对齐 ---
         rankTeamCol.setCellValueFactory(new PropertyValueFactory<>("teamNumber"));
         rankTeamCol.setStyle("-fx-alignment: CENTER;");
 
@@ -210,14 +219,17 @@ public class MainController {
             private final Button btn = new Button("View");
             {
                 btn.setStyle("-fx-font-size: 10px; -fx-background-color: #007BFF; -fx-text-fill: white;");
-                btn.setOnAction(e -> showHeatmap(getTableView().getItems().get(getIndex()).getTeamNumber()));
+                btn.setOnAction(e -> {
+                    try {
+                        mainApp.showHeatmapView(currentCompetition, getTableView().getItems().get(getIndex()).getTeamNumber());
+                    } catch (IOException ex) { ex.printStackTrace(); }
+                });
             }
             @Override protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty); setGraphic(empty ? null : btn);
             }
         });
 
-        // 规则更新：Into The Deep 赛季不执行自动翻倍
         rankingLegendLabel.setText("Penalty: Major=15, Minor=5. Auto scores are NOT doubled per Into The Deep rules.");
     }
 
@@ -240,7 +252,9 @@ public class MainController {
 
             PenaltyEntry entry = new PenaltyEntry(matchNum, alliance,
                     Integer.parseInt(penMajor.getText()), Integer.parseInt(penMinor.getText()));
-            DatabaseService.savePenaltyEntry(currentCompetition.getName(), entry);
+
+            // --- 调用 Service ---
+            matchDataService.submitPenalty(currentCompetition.getName(), entry);
 
             refreshAllDataFromDatabase();
             if (isHost) broadcastUpdate();
@@ -283,7 +297,8 @@ public class MainController {
             }
 
             if (isHost) {
-                DatabaseService.saveOrUpdateScoreEntry(currentCompetition.getName(), entry);
+                // --- 调用 Service ---
+                matchDataService.submitScore(currentCompetition.getName(), entry);
                 refreshAllDataFromDatabase();
                 broadcastUpdate();
             } else {
@@ -308,8 +323,9 @@ public class MainController {
     }
 
     private void refreshAllDataFromDatabase() {
-        List<ScoreEntry> fullHistory = DatabaseService.getScoresForCompetition(currentCompetition.getName());
-        List<TeamRanking> newRankings = DatabaseService.calculateTeamRankings(currentCompetition.getName());
+        // --- 调用 Service ---
+        List<ScoreEntry> fullHistory = matchDataService.getHistory(currentCompetition.getName());
+        List<TeamRanking> newRankings = rankingService.calculateRankings(currentCompetition.getName());
         updateUIAfterDataChange(fullHistory, newRankings);
     }
 
@@ -318,15 +334,16 @@ public class MainController {
             rankingsTableView.setItems(FXCollections.observableArrayList(rankings));
             scoreHistoryList.setAll(history);
             if (currentCompetition != null && isHost) {
-                currentCompetition = DatabaseService.getCompetition(currentCompetition.getName());
+                // --- 刷新 Competition 对象，获取最新公式 ---
+                currentCompetition = competitionRepository.findByName(currentCompetition.getName());
                 rankRatingCol.setText(currentCompetition.getRatingFormula().equals("total") ? "Rating" : "Rating *");
             }
         });
     }
 
     private void broadcastUpdate() {
-        List<ScoreEntry> fullHistory = DatabaseService.getScoresForCompetition(currentCompetition.getName());
-        List<TeamRanking> newRankings = DatabaseService.calculateTeamRankings(currentCompetition.getName());
+        List<ScoreEntry> fullHistory = matchDataService.getHistory(currentCompetition.getName());
+        List<TeamRanking> newRankings = rankingService.calculateRankings(currentCompetition.getName());
         NetworkService.getInstance().broadcastUpdateToClients(new NetworkPacket(fullHistory, newRankings));
     }
 
@@ -334,13 +351,15 @@ public class MainController {
         if (checkBox == null || teamNumberStr == null || teamNumberStr.trim().isEmpty() || currentCompetition == null) return;
         try {
             int teamNum = Integer.parseInt(teamNumberStr.trim());
-            int matchCount = DatabaseService.getScoresForTeam(currentCompetition.getName(), teamNum).size();
+            // --- 调用 Service ---
+            int matchCount = matchDataService.getTeamHistory(currentCompetition.getName(), teamNum).size();
             checkBox.setDisable(matchCount < 2 && editingScoreId == -1);
         } catch (Exception e) { checkBox.setDisable(true); }
     }
 
     private void handleScoreReceivedFromClient(ScoreEntry scoreEntry) {
-        DatabaseService.saveOrUpdateScoreEntry(currentCompetition.getName(), scoreEntry);
+        // --- 调用 Service ---
+        matchDataService.submitScore(currentCompetition.getName(), scoreEntry);
         refreshAllDataFromDatabase();
         broadcastUpdate();
     }
@@ -357,20 +376,14 @@ public class MainController {
 
     @FXML private void handleOpenFieldInput() {
         try {
-            FXMLLoader loader = new FXMLLoader(mainApp.getClass().getResource("fxml/FieldInputView.fxml"));
-            Stage stage = new Stage();
-            stage.initModality(Modality.APPLICATION_MODAL);
-            stage.setScene(new Scene(loader.load()));
-            FieldInputController controller = loader.getController();
-            controller.setDialogStage(stage);
-            controller.setAllianceMode(!singleModeRadio.isSelected());
-            if (currentClickLocations != null && !currentClickLocations.isEmpty()) controller.loadExistingPoints(currentClickLocations);
-            stage.showAndWait();
-            if (controller.isConfirmed()) {
-                teleopArtifactsField.setText(String.valueOf(controller.getTotalHitCount()));
-                currentClickLocations = controller.getLocationsString();
-            }
+            mainApp.showFieldInputView(this, !singleModeRadio.isSelected(), currentClickLocations);
         } catch (IOException e) { e.printStackTrace(); }
+    }
+
+    // 回调方法供 FieldInputController 使用
+    public void onFieldInputConfirmed(int totalHits, String clickLocations) {
+        teleopArtifactsField.setText(String.valueOf(totalHits));
+        currentClickLocations = clickLocations;
     }
 
     private void setupHistoryTab() {
@@ -427,7 +440,12 @@ public class MainController {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION, "Delete Match " + selected.getMatchNumber() + "?", ButtonType.YES, ButtonType.NO);
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.YES) {
-                if (isHost) { DatabaseService.deleteScoreEntry(selected.getId()); refreshAllDataFromDatabase(); broadcastUpdate(); }
+                if (isHost) {
+                    // --- 调用 Service ---
+                    matchDataService.deleteScore(selected.getId());
+                    refreshAllDataFromDatabase();
+                    broadcastUpdate();
+                }
                 else errorLabel.setText("Only Host can delete records for safety.");
             }
         });
@@ -436,7 +454,6 @@ public class MainController {
     @FXML
     private void handleExport() {
         final Stage dialog = new Stage();
-        dialog.initModality(Modality.APPLICATION_MODAL);
         dialog.initOwner(competitionNameLabel.getScene().getWindow());
         dialog.setTitle("Export Data");
         VBox dialogVbox = new VBox(20); dialogVbox.setAlignment(javafx.geometry.Pos.CENTER); dialogVbox.setPadding(new javafx.geometry.Insets(30));
@@ -482,21 +499,12 @@ public class MainController {
         }
     }
 
-    private void showHeatmap(int teamNum) {
-        try {
-            FXMLLoader loader = new FXMLLoader(mainApp.getClass().getResource("fxml/HeatmapView.fxml"));
-            Stage stage = new Stage();
-            stage.setTitle("Heatmap - Team " + teamNum);
-            stage.setScene(new Scene(loader.load()));
-            ((HeatmapController)loader.getController()).setData(teamNum, DatabaseService.getScoresForTeam(currentCompetition.getName(), teamNum));
-            stage.show();
-        } catch (IOException e) { e.printStackTrace(); }
-    }
-
     private void setUIEnabled(boolean e) { scoringFormVBox.setDisable(!e); }
+
+    // --- 页面跳转逻辑交由 MainApplication 统一处理 ---
     @FXML private void handleEditRating() throws IOException { if(isHost) mainApp.showFormulaEditView(currentCompetition); refreshAllDataFromDatabase(); }
     @FXML private void handleManageMembers() throws IOException { mainApp.showCoordinatorView(currentCompetition); }
-    @FXML private void handleAllianceAnalysis() { /* 逻辑已通过按钮跳转到 FXML */ }
+    @FXML private void handleAllianceAnalysis() throws IOException { mainApp.showAllianceAnalysisView(currentCompetition); }
     @FXML private void handleBackButton() throws IOException { mainApp.showHubView(currentUsername); }
     @FXML private void handleLogout() throws IOException { mainApp.showLoginView(); }
 }

@@ -2,30 +2,39 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<VBox spacing="10" alignment="CENTER" style="-fx-background-color: #1C2533;" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.CoordinatorController">
-    <padding><Insets top="20" right="20" bottom="20" left="20" /></padding>
-    <GridPane hgap="10" vgap="10" alignment="CENTER">
-        <VBox spacing="5" GridPane.columnIndex="0" GridPane.rowIndex="0">
-            <Label text="Pending Applications"/>
-            <ListView fx:id="pendingListView" prefHeight="200" prefWidth="200"/>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<VBox spacing="30" alignment="CENTER" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.CoordinatorController">
+    <padding><Insets top="40" right="40" bottom="40" left="40" /></padding>
+
+    <Label styleClass="title-2" text="Manage Competition Members"/>
+
+    <HBox spacing="30" alignment="CENTER">
+        <VBox spacing="15" styleClass="mac-card" style="-fx-padding: 25;" HBox.hgrow="ALWAYS">
+            <Label text="Pending Applications" styleClass="title-4"/>
+            <ListView fx:id="pendingListView" prefHeight="300" prefWidth="260" styleClass="edge-to-edge"/>
         </VBox>
-        <VBox spacing="10" alignment="CENTER" GridPane.columnIndex="1" GridPane.rowIndex="0">
-            <Button onAction="#handleApprove" text="--&gt; Approve --&gt;" prefWidth="120"/>
-            <Button onAction="#handleDeny" text="Deny Application" styleClass="logout-button" prefWidth="120"/>
-            <Button onAction="#handleKick" text="&lt;-- Kick Member &lt;--" prefWidth="120"/>
+
+        <VBox spacing="20" alignment="CENTER">
+            <Button onAction="#handleApprove" text="Approve" styleClass="success" prefWidth="160" prefHeight="45">
+                <graphic><FontIcon iconLiteral="fth-check" iconSize="16" iconColor="white"/></graphic>
+            </Button>
+            <Button onAction="#handleDeny" text="Deny" styleClass="danger" prefWidth="160" prefHeight="45">
+                <graphic><FontIcon iconLiteral="fth-x" iconSize="16" iconColor="white"/></graphic>
+            </Button>
+            <Region prefHeight="40"/>
+            <Button onAction="#handleKick" text="Kick Member" styleClass="warning" prefWidth="160" prefHeight="45">
+                <graphic><FontIcon iconLiteral="fth-user-minus" iconSize="16" iconColor="black"/></graphic>
+            </Button>
         </VBox>
-        <VBox spacing="5" GridPane.columnIndex="2" GridPane.rowIndex="0">
-            <Label text="Approved Members"/>
-            <ListView fx:id="approvedListView" prefHeight="200" prefWidth="200"/>
+
+        <VBox spacing="15" styleClass="mac-card" style="-fx-padding: 25;" HBox.hgrow="ALWAYS">
+            <Label text="Approved Members" styleClass="title-4"/>
+            <ListView fx:id="approvedListView" prefHeight="300" prefWidth="260" styleClass="edge-to-edge"/>
         </VBox>
-        <columnConstraints>
-            <ColumnConstraints/>
-            <ColumnConstraints/>
-            <ColumnConstraints/>
-        </columnConstraints>
-        <rowConstraints>
-            <RowConstraints/>
-        </rowConstraints>
-    </GridPane>
-    <Button onAction="#handleClose" text="Close"/>
+    </HBox>
+
+    <Button onAction="#handleClose" text="Done / Close" prefWidth="240" prefHeight="45">
+        <graphic><FontIcon iconLiteral="fth-chevron-left" iconSize="16"/></graphic>
+    </Button>
 </VBox>

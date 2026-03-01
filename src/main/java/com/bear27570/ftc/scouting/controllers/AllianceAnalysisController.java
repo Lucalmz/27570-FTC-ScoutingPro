@@ -3,8 +3,8 @@ package com.bear27570.ftc.scouting.controllers;
 import com.bear27570.ftc.scouting.models.Competition;
 import com.bear27570.ftc.scouting.models.ScoreEntry;
 import com.bear27570.ftc.scouting.models.TeamRanking;
-import com.bear27570.ftc.scouting.services.DatabaseService;
-import javafx.beans.property.SimpleObjectProperty;
+import com.bear27570.ftc.scouting.services.domain.MatchDataService;
+import com.bear27570.ftc.scouting.services.domain.RankingService;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
@@ -21,21 +21,24 @@ public class AllianceAnalysisController {
     @FXML private TextField mainTeamField;
     @FXML private Label mainTeamStatsLabel;
     @FXML private TableView<AnalysisResult> analysisTable;
-
-    // 修改：将列类型明确为数值类型，确保 TableView 自动执行数值排序
     @FXML private TableColumn<AnalysisResult, Integer> partnerCol;
     @FXML private TableColumn<AnalysisResult, Double> totalEffCol;
-    @FXML private TableColumn<AnalysisResult, Double> combinedAccCol; // 改为 Double
-    @FXML private TableColumn<AnalysisResult, Double> stabilityCol;   // 改为 Double
+    @FXML private TableColumn<AnalysisResult, Double> combinedAccCol;
+    @FXML private TableColumn<AnalysisResult, Double> stabilityCol;
     @FXML private TableColumn<AnalysisResult, String> styleCol;
 
     private Competition competition;
     private Stage dialogStage;
+    private RankingService rankingService;
+    private MatchDataService matchDataService;
     private static final double ZONE_DIVIDER_Y = 400.0;
 
-    public void setDialogStage(Stage dialogStage, Competition competition) {
+    // --- 核心注入方法 ---
+    public void setDependencies(Stage dialogStage, Competition competition, RankingService rankingService, MatchDataService matchDataService) {
         this.dialogStage = dialogStage;
         this.competition = competition;
+        this.rankingService = rankingService;
+        this.matchDataService = matchDataService;
     }
 
     private static class TeamHeatmapProfile {
@@ -54,7 +57,8 @@ public class AllianceAnalysisController {
 
         try {
             int mainTeamNum = Integer.parseInt(input);
-            List<TeamRanking> allRankings = DatabaseService.calculateTeamRankings(competition.getName());
+            // --- 使用注入的 Service ---
+            List<TeamRanking> allRankings = rankingService.calculateRankings(competition.getName());
 
             TeamHeatmapProfile mainProfile = getTeamHeatmapProfile(competition.getName(), mainTeamNum, allRankings);
             if (mainProfile == null) {
@@ -107,7 +111,8 @@ public class AllianceAnalysisController {
     }
 
     private TeamHeatmapProfile getTeamHeatmapProfile(String compName, int teamNum, List<TeamRanking> rankings) {
-        List<ScoreEntry> matches = DatabaseService.getScoresForTeam(compName, teamNum);
+        // --- 使用注入的 Service ---
+        List<ScoreEntry> matches = matchDataService.getTeamHistory(compName, teamNum);
         List<ScoreEntry> validMatches = matches.stream().filter(m -> {
             boolean isT1 = (m.getTeam1() == teamNum && !m.isTeam1Broken());
             boolean isT2 = (m.getTeam2() == teamNum && !m.isTeam2Broken());
@@ -179,11 +184,8 @@ public class AllianceAnalysisController {
     }
 
     @FXML public void initialize() {
-        // 1. Partner Team (Integer 排序正常)
         partnerCol.setCellValueFactory(new PropertyValueFactory<>("partnerTeam"));
         partnerCol.setStyle("-fx-alignment: CENTER;");
-
-        // 2. Efficiency (Double 排序正常)
         totalEffCol.setCellValueFactory(new PropertyValueFactory<>("totalEfficiency"));
         totalEffCol.setCellFactory(tc -> new TableCell<>() {
             @Override protected void updateItem(Double item, boolean empty) {
@@ -192,8 +194,6 @@ public class AllianceAnalysisController {
             }
         });
         totalEffCol.setStyle("-fx-alignment: CENTER;");
-
-        // 3. Accuracy (改为使用数值进行排序，仅在显示时加 %)
         combinedAccCol.setCellValueFactory(new PropertyValueFactory<>("combinedAccuracy"));
         combinedAccCol.setCellFactory(tc -> new TableCell<>() {
             @Override protected void updateItem(Double item, boolean empty) {
@@ -202,8 +202,6 @@ public class AllianceAnalysisController {
             }
         });
         combinedAccCol.setStyle("-fx-alignment: CENTER;");
-
-        // 4. Stability (改为使用数值进行排序，仅在显示时加 ±)
         stabilityCol.setCellValueFactory(new PropertyValueFactory<>("stability"));
         stabilityCol.setCellFactory(tc -> new TableCell<>() {
             @Override protected void updateItem(Double item, boolean empty) {
@@ -212,27 +210,20 @@ public class AllianceAnalysisController {
             }
         });
         stabilityCol.setStyle("-fx-alignment: CENTER;");
-
         styleCol.setCellValueFactory(new PropertyValueFactory<>("styleDesc"));
         styleCol.setStyle("-fx-alignment: CENTER_LEFT;");
     }
 
-    // 结果类中的字段现在保持原始数值类型
     public static class AnalysisResult {
         private final int partnerTeam;
         private final double totalEfficiency;
         private final double combinedAccuracy;
         private final double stability;
         private final String styleDesc;
-
         public AnalysisResult(int partnerTeam, double totalEfficiency, double combinedAccuracy, double stability, String styleDesc) {
-            this.partnerTeam = partnerTeam;
-            this.totalEfficiency = totalEfficiency;
-            this.combinedAccuracy = combinedAccuracy;
-            this.stability = stability;
-            this.styleDesc = styleDesc;
+            this.partnerTeam = partnerTeam; this.totalEfficiency = totalEfficiency; this.combinedAccuracy = combinedAccuracy;
+            this.stability = stability; this.styleDesc = styleDesc;
         }
-
         public int getPartnerTeam() { return partnerTeam; }
         public double getTotalEfficiency() { return totalEfficiency; }
         public double getCombinedAccuracy() { return combinedAccuracy; }

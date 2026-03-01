@@ -2,10 +2,13 @@ package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.MainApplication;
 import com.bear27570.ftc.scouting.services.domain.UserService;
+import javafx.animation.PauseTransition;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
+import javafx.util.Duration;
 import java.io.IOException;
 
 public class LoginController {
@@ -15,16 +18,30 @@ public class LoginController {
     @FXML private Label messageLabel;
 
     private MainApplication mainApp;
-
-    // 核心改造：控制器不再依赖具体的 DatabaseService，而是依赖抽象的 UserService 接口
     private UserService userService;
 
-    /**
-     * 依赖注入点：由调用方 (MainApplication) 在加载 FXML 后调用此方法传入具体的实现。
-     */
     public void setDependencies(MainApplication mainApp, UserService userService) {
         this.mainApp = mainApp;
         this.userService = userService;
+
+        // 绑定回车键：在密码框按回车 -> 登录
+        passwordField.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER) handleLoginWrapper();
+        });
+
+        // 绑定回车键：在用户名框按回车 -> 跳转到密码框
+        usernameField.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER) passwordField.requestFocus();
+        });
+    }
+
+    // 包装一下异常处理，方便 Lambda 调用
+    private void handleLoginWrapper() {
+        try {
+            handleLoginButton();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @FXML
@@ -32,11 +49,26 @@ public class LoginController {
         String username = usernameField.getText();
         String password = passwordField.getText();
 
-        // 改造后：调用注入的实例方法，不再使用 DatabaseService.authenticateUser(...)
+        if (username == null || username.trim().isEmpty() || password == null || password.isEmpty()) {
+            setMessage("Please enter both username and password.", true);
+            return;
+        }
+
         if (userService.login(username, password)) {
-            mainApp.showHubView(username);
+            setMessage("Login Successful! Entering Hub...", false);
+            // 延迟 0.5 秒跳转，提升用户体验
+            PauseTransition pause = new PauseTransition(Duration.seconds(0.5));
+            pause.setOnFinished(e -> {
+                try {
+                    mainApp.showHubView(username);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            });
+            pause.play();
         } else {
-            messageLabel.setText("Invalid username or password.");
+            // 这里对应 authenticateUser 返回 false
+            setMessage("Login Failed: Incorrect username or password.", true);
         }
     }
 
@@ -45,18 +77,52 @@ public class LoginController {
         String username = usernameField.getText();
         String password = passwordField.getText();
 
-        if (username.isEmpty() || password.isEmpty()) {
-            messageLabel.setText("Username and password are required to create a user.");
+        // 1. 基础非空校验
+        if (username == null || username.trim().isEmpty()) {
+            setMessage("Username cannot be empty.", true);
+            return;
+        }
+        if (password == null || password.isEmpty()) {
+            setMessage("Password cannot be empty.", true);
             return;
         }
 
-        // 改造后：调用实例方法
-        if (userService.register(username, password)) {
-            messageLabel.setStyle("-fx-text-fill: #4CAF50;"); // 成功为绿色
-            messageLabel.setText("User '" + username + "' created successfully! You can now log in.");
+        // 2. 调用业务层注册
+        // 注意：这里没有密码长度检查了，完全依赖数据库写入结果
+        boolean success = userService.register(username, password);
+
+        // 3. 根据真实结果反馈
+        if (success) {
+            setMessage("User '" + username + "' created! Please Log In.", false);
+            // 注册成功后，自动清空密码框以便用户重新输入确认
+            passwordField.clear();
         } else {
-            messageLabel.setStyle("-fx-text-fill: #FF5252;"); // 失败为红色
-            messageLabel.setText("Username '" + username + "' already exists or password too short (min 6 chars).");
+            // 如果返回 false，通常是因为主键(username)冲突
+            setMessage("Registration Failed: Username '" + username + "' already exists.", true);
+        }
+    }
+
+    /**
+     * 统一的消息显示方法
+     * @param text 显示的文本
+     * @param isError true=红色错误警告, false=绿色成功提示
+     */
+    private void setMessage(String text, boolean isError) {
+        messageLabel.setText(text);
+        // 清除旧样式
+        messageLabel.getStyleClass().removeAll("error-label", "success-label");
+
+        // 添加新样式 (对应 MainApplication 中的 CSS)
+        if (isError) {
+            messageLabel.getStyleClass().add("error-label");
+            // 错误时抖动输入框增强反馈 (可选)
+            usernameField.setStyle("-fx-border-color: #f87171;");
+            passwordField.setStyle("-fx-border-color: #f87171;");
+        } else {
+            messageLabel.getStyleClass().add("success-label");
+            // 成功时恢复边框颜色
+            usernameField.setStyle("");
+            passwordField.setStyle("");
         }
     }
 }

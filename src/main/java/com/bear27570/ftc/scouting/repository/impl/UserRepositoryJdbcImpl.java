@@ -23,9 +23,12 @@ public class UserRepositoryJdbcImpl implements UserRepository {
             pstmt.setString(1, username);
             pstmt.setString(2, password);
             pstmt.executeUpdate();
+            System.out.println("DEBUG: User created successfully -> " + username);
             return true;
         } catch (SQLException e) {
-            return false; // 用户名已存在等冲突
+            System.err.println("DEBUG: Create User Failed for " + username + ". Reason: " + e.getMessage());
+            // 通常是主键重复 (IntegrityConstraintViolationException)
+            return false;
         }
     }
 
@@ -34,12 +37,19 @@ public class UserRepositoryJdbcImpl implements UserRepository {
         String sql = "SELECT password FROM users WHERE username = ?";
         try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, username);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                return rs.getString("password").equals(password);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    String storedPass = rs.getString("password");
+                    boolean match = storedPass.equals(password);
+                    if (!match) System.out.println("DEBUG: Password mismatch for user " + username);
+                    return match;
+                }
+                System.out.println("DEBUG: User not found -> " + username);
+                return false;
             }
-            return false;
         } catch (SQLException e) {
+            System.err.println("CRITICAL DB ERROR during login: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
@@ -49,17 +59,23 @@ public class UserRepositoryJdbcImpl implements UserRepository {
         String checkSql = "SELECT 1 FROM users WHERE username = ?";
         String insertSql = "INSERT INTO users(username, password) VALUES(?, 'guest_account')";
         try (Connection conn = DriverManager.getConnection(dbUrl)) {
+            boolean exists = false;
             try (PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
                 checkStmt.setString(1, username);
-                if (checkStmt.executeQuery().next()) {
-                    return; // 用户已存在
+                try (ResultSet rs = checkStmt.executeQuery()) {
+                    if (rs.next()) exists = true;
                 }
             }
-            try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
-                insertStmt.setString(1, username);
-                insertStmt.executeUpdate();
+
+            if (!exists) {
+                try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
+                    insertStmt.setString(1, username);
+                    insertStmt.executeUpdate();
+                    System.out.println("DEBUG: Ensured guest user exists: " + username);
+                }
             }
         } catch (SQLException e) {
+            System.err.println("DEBUG: Ensure user failed: " + e.getMessage());
             e.printStackTrace();
         }
     }

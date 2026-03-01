@@ -1,3 +1,4 @@
+// File: HubController.java
 package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.MainApplication;
@@ -8,11 +9,8 @@ import com.bear27570.ftc.scouting.services.domain.CompetitionService;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
 
 import java.io.IOException;
 
@@ -27,13 +25,10 @@ public class HubController {
 
     private MainApplication mainApp;
     private String currentUsername;
-    private CompetitionService competitionService; // 核心解耦：依赖接口
+    private CompetitionService competitionService;
 
     private ObservableList<Competition> discoveredCompetitions = FXCollections.observableArrayList();
 
-    /**
-     * 依赖注入点：加载 FXML 后调用
-     */
     public void setDependencies(MainApplication mainApp, String username, CompetitionService competitionService) {
         this.mainApp = mainApp;
         this.currentUsername = username;
@@ -42,6 +37,10 @@ public class HubController {
         welcomeLabel.setText("Welcome, " + username + "!");
         discoveredCompetitionsListView.setItems(discoveredCompetitions);
 
+        // 初始状态优化：隐藏面板
+        hostPane.setVisible(false); hostPane.setManaged(false);
+        joinPane.setVisible(false); joinPane.setManaged(false);
+
         refreshMyCompetitionsList();
     }
 
@@ -49,8 +48,9 @@ public class HubController {
     private void selectHostMode() {
         hostPane.setVisible(true); hostPane.setManaged(true);
         joinPane.setVisible(false); joinPane.setManaged(false);
+        statusLabel.setStyle("-fx-text-fill: #a6adc8;");
         statusLabel.setText("Host Mode: Select a competition to start.");
-        hostModeButton.setStyle("-fx-background-color: #007BFF;");
+        hostModeButton.setStyle("-fx-background-color: #89b4fa; -fx-text-fill: #11111b;");
         joinModeButton.setStyle("");
     }
 
@@ -58,8 +58,9 @@ public class HubController {
     private void selectJoinMode() {
         hostPane.setVisible(false); hostPane.setManaged(false);
         joinPane.setVisible(true); joinPane.setManaged(true);
-        statusLabel.setText("Searching for local competitions...");
-        joinModeButton.setStyle("-fx-background-color: #007BFF;");
+        statusLabel.setStyle("-fx-text-fill: #f9e2af;");
+        statusLabel.setText("Searching for local competitions via UDP...");
+        joinModeButton.setStyle("-fx-background-color: #89b4fa; -fx-text-fill: #11111b;");
         hostModeButton.setStyle("");
 
         discoveredCompetitions.clear();
@@ -67,7 +68,6 @@ public class HubController {
     }
 
     private void refreshMyCompetitionsList() {
-        // 改造后：直接调用业务逻辑层的专门方法，不再从全表里手动过滤
         myCompetitionsListView.setItems(FXCollections.observableArrayList(
                 competitionService.getCompetitionsCreatedByUser(currentUsername)
         ));
@@ -77,12 +77,13 @@ public class HubController {
     private void handleCreateButton() {
         String newName = newCompetitionField.getText();
 
-        // 改造后：调用业务层方法，将复杂的建表和权限绑定逻辑交由后端处理
         if (competitionService.createCompetition(newName, currentUsername)) {
             newCompetitionField.clear();
             refreshMyCompetitionsList();
-            statusLabel.setText("Created: " + newName);
+            statusLabel.setStyle("-fx-text-fill: #a6e3a1; -fx-font-weight: bold;");
+            statusLabel.setText("Created successfully: " + newName);
         } else {
+            statusLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold;");
             statusLabel.setText("Error: Name is empty or already exists.");
         }
     }
@@ -91,7 +92,8 @@ public class HubController {
     private void handleHostButton() throws IOException {
         Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
         if (selected == null) {
-            statusLabel.setText("Select a competition first!");
+            statusLabel.setStyle("-fx-text-fill: #fab387;");
+            statusLabel.setText("Please select a competition first!");
             return;
         }
         mainApp.showScoringView(selected, currentUsername, true);
@@ -101,10 +103,12 @@ public class HubController {
     private void handleJoinButton() throws IOException {
         Competition selected = discoveredCompetitionsListView.getSelectionModel().getSelectedItem();
         if (selected == null) {
-            statusLabel.setText("Select a competition from the list.");
+            statusLabel.setStyle("-fx-text-fill: #fab387;");
+            statusLabel.setText("Please select a competition from the discovery list.");
             return;
         }
 
+        statusLabel.setStyle("-fx-text-fill: #89dceb;");
         statusLabel.setText("Connecting to " + selected.getName() + "...");
         NetworkService.getInstance().connectToHost(selected.getHostAddress(), currentUsername, (packet) -> {
             if (packet.getType() == NetworkPacket.PacketType.JOIN_RESPONSE) {
@@ -113,7 +117,8 @@ public class HubController {
                         mainApp.showScoringView(selected, currentUsername, false);
                     } catch (IOException e) { e.printStackTrace(); }
                 } else {
-                    statusLabel.setText("Join request denied.");
+                    statusLabel.setStyle("-fx-text-fill: #f38ba8;");
+                    statusLabel.setText("Join request denied by host.");
                 }
             }
         });
@@ -122,27 +127,33 @@ public class HubController {
     @FXML
     private void handleAllianceAnalysis() {
         Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
-        if (selected == null) selected = discoveredCompetitionsListView.getSelectionModel().getSelectedItem();
+        if (selected == null && discoveredCompetitionsListView.isVisible()) {
+            selected = discoveredCompetitionsListView.getSelectionModel().getSelectedItem();
+        }
 
         if (selected == null) {
+            statusLabel.setStyle("-fx-text-fill: #fab387;");
             statusLabel.setText("Select a competition to analyze.");
             return;
         }
+
         try {
-            FXMLLoader loader = new FXMLLoader(mainApp.getClass().getResource("fxml/AllianceAnalysisView.fxml"));
-            Stage stage = new Stage();
-            stage.setTitle("Analysis - " + selected.getName());
-            stage.setScene(new Scene(loader.load()));
-            AllianceAnalysisController controller = loader.getController();
-            controller.setDialogStage(stage, selected);
-            stage.show();
-        } catch (IOException e) { e.printStackTrace(); }
+            // 核心修复：委托给 MainApplication 去进行实例化依赖注入
+            mainApp.showAllianceAnalysisView(selected);
+        } catch (IOException e) {
+            e.printStackTrace();
+            statusLabel.setText("Failed to open analysis window.");
+        }
     }
 
     @FXML
     private void handleManageMembers() {
         Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
-        if (selected == null) return;
+        if (selected == null) {
+            statusLabel.setStyle("-fx-text-fill: #fab387;");
+            statusLabel.setText("Select your competition first.");
+            return;
+        }
         try {
             mainApp.showCoordinatorView(selected);
         } catch (IOException e) { e.printStackTrace(); }

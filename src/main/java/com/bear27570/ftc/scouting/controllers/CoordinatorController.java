@@ -2,7 +2,7 @@ package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.models.Competition;
 import com.bear27570.ftc.scouting.models.Membership;
-import com.bear27570.ftc.scouting.services.DatabaseService;
+import com.bear27570.ftc.scouting.repository.MembershipRepository;
 import com.bear27570.ftc.scouting.services.NetworkService;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -18,15 +18,17 @@ public class CoordinatorController {
     private Timeline autoRefreshTimeline;
     private Stage dialogStage;
     private Competition competition;
+    private MembershipRepository membershipRepository;
 
-    public void setDialogStage(Stage dialogStage, Competition competition) {
+    // --- 核心注入方法 ---
+    public void setDependencies(Stage dialogStage, Competition competition, MembershipRepository membershipRepository) {
         this.dialogStage = dialogStage;
         this.competition = competition;
+        this.membershipRepository = membershipRepository;
 
         refreshLists();
         startAutoRefresh();
 
-        // 关键：当有新的网络请求进入时，立即刷新列表
         NetworkService.getInstance().setOnMemberJoinCallback(this::refreshLists);
 
         dialogStage.setOnHidden(e -> {
@@ -50,17 +52,18 @@ public class CoordinatorController {
     }
 
     private void refreshLists() {
+        // --- 使用注入的 Repo ---
         pendingListView.setItems(FXCollections.observableArrayList(
-                DatabaseService.getMembersByStatus(competition.getName(), Membership.Status.PENDING)));
+                membershipRepository.getMembersByStatus(competition.getName(), Membership.Status.PENDING)));
         approvedListView.setItems(FXCollections.observableArrayList(
-                DatabaseService.getMembersByStatus(competition.getName(), Membership.Status.APPROVED)));
+                membershipRepository.getMembersByStatus(competition.getName(), Membership.Status.APPROVED)));
     }
 
     @FXML
     private void handleApprove() {
         String selected = pendingListView.getSelectionModel().getSelectedItem();
         if (selected != null) {
-            DatabaseService.updateMembershipStatus(selected, competition.getName(), Membership.Status.APPROVED);
+            membershipRepository.updateMembershipStatus(selected, competition.getName(), Membership.Status.APPROVED);
             NetworkService.getInstance().approveClient(selected);
             refreshLists();
         }
@@ -70,7 +73,7 @@ public class CoordinatorController {
     private void handleDeny() {
         String selected = pendingListView.getSelectionModel().getSelectedItem();
         if (selected != null) {
-            DatabaseService.removeMembership(selected, competition.getName());
+            membershipRepository.removeMembership(selected, competition.getName());
             refreshLists();
         }
     }
@@ -79,8 +82,7 @@ public class CoordinatorController {
     private void handleKick() {
         String selected = approvedListView.getSelectionModel().getSelectedItem();
         if (selected != null) {
-            DatabaseService.removeMembership(selected, competition.getName());
-            // 发送包通知客户端被踢出
+            membershipRepository.removeMembership(selected, competition.getName());
             refreshLists();
         }
     }

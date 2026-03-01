@@ -1,7 +1,7 @@
 package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.models.Competition;
-import com.bear27570.ftc.scouting.services.DatabaseService;
+import com.bear27570.ftc.scouting.repository.CompetitionRepository;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
@@ -14,10 +14,13 @@ public class FormulaEditController {
 
     private Stage dialogStage;
     private Competition competition;
+    private CompetitionRepository competitionRepository;
 
-    public void setDialogStage(Stage dialogStage, Competition competition) {
+    // --- 核心注入方法 ---
+    public void setDependencies(Stage dialogStage, Competition competition, CompetitionRepository competitionRepository) {
         this.dialogStage = dialogStage;
         this.competition = competition;
+        this.competitionRepository = competitionRepository;
         formulaField.setText(competition.getRatingFormula());
     }
 
@@ -29,14 +32,14 @@ public class FormulaEditController {
             return;
         }
 
-        // 校验公式语法
         try {
             new ExpressionBuilder(formula)
                     .variables("auto", "teleop", "total", "seq", "climb")
                     .build();
 
-            DatabaseService.updateCompetitionFormula(competition.getName(), formula);
-            competition.setRatingFormula(formula); // 更新内存对象
+            // --- 使用注入的 Repo ---
+            competitionRepository.updateFormula(competition.getName(), formula);
+            competition.setRatingFormula(formula);
             dialogStage.close();
         } catch (Exception e) {
             errorLabel.setText("Invalid syntax: " + e.getMessage());

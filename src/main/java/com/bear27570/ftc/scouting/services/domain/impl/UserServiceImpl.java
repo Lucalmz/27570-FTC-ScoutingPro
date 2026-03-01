@@ -7,14 +7,12 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
 
-    // 构造函数注入：需要什么 Repository 就传什么进来，绝不在内部 new
     public UserServiceImpl(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 
     @Override
     public boolean login(String username, String password) {
-        // 业务层可以在这里加上数据校验，比如防 SQL 注入、判空等
         if (username == null || username.trim().isEmpty() || password == null || password.isEmpty()) {
             return false;
         }
@@ -23,10 +21,17 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public boolean register(String username, String password) {
-        // 注册业务逻辑：比如校验密码长度是否大于6位
-        if (username == null || username.trim().isEmpty() || password == null || password.length() < 6) {
+        // 核心修改：移除了密码长度限制，只校验非空
+        if (username == null || username.trim().isEmpty()) {
+            System.err.println("DEBUG: Register failed - Username is empty");
             return false;
         }
+        if (password == null || password.isEmpty()) {
+            System.err.println("DEBUG: Register failed - Password is empty");
+            return false;
+        }
+
+        // 尝试写入数据库，如果返回 true 代表写入成功，false 代表用户名重复或SQL错误
         return userRepository.createUser(username, password);
     }
 }
