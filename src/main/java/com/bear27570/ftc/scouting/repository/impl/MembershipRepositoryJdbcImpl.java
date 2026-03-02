@@ -42,7 +42,9 @@ public class MembershipRepositoryJdbcImpl implements MembershipRepository {
             pstmt.setString(2, competitionName);
             pstmt.setString(3, status.name());
             pstmt.executeUpdate();
+            System.out.println("DEBUG: 成功插入成员关系 -> User: " + username + ", Comp: " + competitionName);
         } catch (SQLException ignored) {
+            System.err.println("CRITICAL DB ERROR: 无法添加成员 " + username);
         }
     }
 

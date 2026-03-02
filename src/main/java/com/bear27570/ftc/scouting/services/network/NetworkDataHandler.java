@@ -12,6 +12,8 @@ import java.util.List;
 public interface NetworkDataHandler {
     void addPendingMembership(String username, String competitionName);
     boolean isUserApprovedOrCreator(String username, String competitionName);
+    void ensureUserExists(String username);
+
     List<ScoreEntry> getScores(String competitionName);
     List<TeamRanking> getRankings(String competitionName);
 }

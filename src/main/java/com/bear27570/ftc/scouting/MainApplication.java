@@ -105,7 +105,7 @@ public class MainApplication extends Application {
         matchDataService = new MatchDataServiceImpl(scoreRepository, penaltyRepository);
         rankingService = new RankingService(scoreRepository, penaltyRepository, competitionRepository);
 
-        NetworkDataHandler networkDataHandler = new DefaultNetworkDataHandler(membershipRepository, matchDataService, rankingService);
+        NetworkDataHandler networkDataHandler = new DefaultNetworkDataHandler(membershipRepository, userRepository,matchDataService, rankingService);
         NetworkService.getInstance().setDataHandler(networkDataHandler);
     }
 

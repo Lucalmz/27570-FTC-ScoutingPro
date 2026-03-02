@@ -155,35 +155,28 @@ public class NetworkService {
                         System.out.println("[网络调试] 主机收到数据包: " + packet.getType());
 
                         switch (packet.getType()) {
+
                             case JOIN_REQUEST:
                                 this.clientUsername = packet.getUsername();
                                 System.out.println("[网络调试] 正在处理 [" + clientUsername + "] 的加入请求...");
 
                                 if (dataHandler != null) {
-                                    // ★ 修复点 1：捕获数据库写入异常，防止因为重复申请导致线程崩溃断连
                                     try {
+                                        // =================================================================
+                                        // ★★★ 核心修复开始 ★★★
+                                        // 必须先确保 users 表里有这个用户，否则 memberships 插入必失败 (外键报错)
+                                        // =================================================================
+                                        dataHandler.ensureUserExists(clientUsername);
+
+                                        // 然后再添加成员关系
                                         dataHandler.addPendingMembership(clientUsername, hostingCompetitionName);
+
                                         System.out.println("[网络调试] 成功将[" + clientUsername + "] 写入数据库 Pending 列表");
                                     } catch (Exception dbEx) {
-                                        System.out.println("[网络调试] 数据库写入警告 (可能是重复申请，安全忽略): " + dbEx.getMessage());
+                                        System.err.println("[网络调试] 数据库操作失败: " + dbEx.getMessage());
+                                        dbEx.printStackTrace(); // 打印详细错误，方便排查
                                     }
-
-                                    try {
-                                        if (dataHandler.isUserApprovedOrCreator(clientUsername, hostingCompetitionName)) {
-                                            System.out.println("[网络调试] [" + clientUsername + "] 已获批准，正在下发比赛全量数据...");
-                                            sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
-                                            sendPacket(new NetworkPacket(
-                                                    new java.util.ArrayList<>(dataHandler.getScores(hostingCompetitionName)),
-                                                    new java.util.ArrayList<>(dataHandler.getRankings(hostingCompetitionName)),
-                                                    officialEventName));
-                                        } else {
-                                            System.out.println("[网络调试][" + clientUsername + "] 需要房主手动批准，目前挂起。");
-                                        }
-                                    } catch (Exception e) {
-                                        System.err.println("[网络调试] 检查权限或发送数据时报错:");
-                                        e.printStackTrace();
-                                    }
-                                } else {
+                                }else {
                                     System.err.println("[网络调试] 严重错误：主机的 dataHandler 为 NULL！请检查 MainApplication.init() 逻辑。");
                                 }
 

@@ -5,24 +5,26 @@ import com.bear27570.ftc.scouting.models.Membership;
 import com.bear27570.ftc.scouting.models.ScoreEntry;
 import com.bear27570.ftc.scouting.models.TeamRanking;
 import com.bear27570.ftc.scouting.repository.MembershipRepository;
+import com.bear27570.ftc.scouting.repository.UserRepository;
 import com.bear27570.ftc.scouting.services.domain.MatchDataService;
 import com.bear27570.ftc.scouting.services.domain.RankingService;
 
 import java.util.List;
 
-/**
- * 实现网络层与数据层的解耦。利用依赖注入直接对接真实的 Service。
- */
 public class DefaultNetworkDataHandler implements NetworkDataHandler {
 
     private final MembershipRepository membershipRepository;
+    private final UserRepository userRepository; // ★ 建议改成 final
     private final MatchDataService matchDataService;
     private final RankingService rankingService;
 
+    // ★ 修改构造函数，添加 UserRepository 参数
     public DefaultNetworkDataHandler(MembershipRepository membershipRepository,
+                                     UserRepository userRepository, // <--- 新增参数
                                      MatchDataService matchDataService,
                                      RankingService rankingService) {
         this.membershipRepository = membershipRepository;
+        this.userRepository = userRepository; // <--- ★★★ 必须在这里赋值！之前漏了这行 ★★★
         this.matchDataService = matchDataService;
         this.rankingService = rankingService;
     }
@@ -41,6 +43,16 @@ public class DefaultNetworkDataHandler implements NetworkDataHandler {
     @Override
     public List<ScoreEntry> getScores(String competitionName) {
         return matchDataService.getHistory(competitionName);
+    }
+
+    @Override
+    public void ensureUserExists(String username) {
+        // 现在 userRepository 不会是 null 了
+        if (userRepository != null) {
+            userRepository.ensureUserExists(username);
+        } else {
+            System.err.println("CRITICAL ERROR: UserRepository is null in DataHandler!");
+        }
     }
 
     @Override
