@@ -35,19 +35,21 @@ public class NetworkService {
     private NetworkDataHandler dataHandler;
     private String officialEventName = null;
 
-    public void setOfficialEventName(String name) {
-        this.officialEventName = name;
-    }
-
     public NetworkService() {}
 
     public void setDataHandler(NetworkDataHandler dataHandler) {
         this.dataHandler = dataHandler;
     }
 
+    public void setOfficialEventName(String name) {
+        this.officialEventName = name;
+    }
+
     public void setOnMemberJoinCallback(Runnable callback) {
         this.onMemberJoinCallback = callback;
     }
+
+    // ==================== 主机逻辑 (Host) ====================
 
     public synchronized void startHost(Competition competition, Consumer<ScoreEntry> onScoreReceived) {
         this.hostingCompetitionName = competition.getName();
@@ -64,23 +66,18 @@ public class NetworkService {
 
         new Thread(() -> {
             try {
-                // ★ 修复点：使用局部变量，防止旧线程误用已被置空的全局变量
-                ServerSocket currentServerSocket = new ServerSocket(TCP_PORT);
-                serverSocket = currentServerSocket;
-
-                // ★ 修复点：除了 running，还要判断当前的 Socket 是否已被关闭
-                while (running && !currentServerSocket.isClosed()) {
+                ServerSocket currentServer = new ServerSocket(TCP_PORT);
+                serverSocket = currentServer;
+                System.out.println("[网络调试] 主机 TCP 服务已启动，端口: " + TCP_PORT);
+                while (running && !currentServer.isClosed()) {
                     try {
-                        Socket client = currentServerSocket.accept();
+                        Socket client = currentServer.accept();
+                        System.out.println("[网络调试] 收到新连接: " + client.getInetAddress().getHostAddress());
                         ClientHandler handler = new ClientHandler(client, onScoreReceived);
                         connectedClients.add(handler);
                         handler.start();
                     } catch (IOException e) {
-                        if (running && !currentServerSocket.isClosed()) {
-                            System.err.println("TCP Accept error: " + e.getMessage());
-                        } else {
-                            break; // 正常退出旧线程
-                        }
+                        if (running && !currentServer.isClosed()) System.err.println("TCP Accept error: " + e.getMessage());
                     }
                 }
             } catch (IOException e) {
@@ -98,43 +95,29 @@ public class NetworkService {
                 String msg = "FTC_SCOUTER;" + comp.getName() + ";" + comp.getCreatorUsername();
                 byte[] buf = msg.getBytes();
 
+                InetAddress broadcastAddr = InetAddress.getByName("255.255.255.255");
+                DatagramPacket packet = new DatagramPacket(buf, buf.length, broadcastAddr, UDP_PORT);
+
+                System.out.println("[网络调试] 主机 UDP 广播已启动...");
                 while (running && !beacon.isClosed()) {
-                    java.util.Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-                    while (interfaces.hasMoreElements()) {
-                        NetworkInterface networkInterface = interfaces.nextElement();
-                        if (networkInterface.isLoopback() || !networkInterface.isUp()) continue;
-
-                        for (InterfaceAddress interfaceAddress : networkInterface.getInterfaceAddresses()) {
-                            InetAddress broadcast = interfaceAddress.getBroadcast();
-                            if (broadcast != null) {
-                                try {
-                                    DatagramPacket packet = new DatagramPacket(buf, buf.length, broadcast, UDP_PORT);
-                                    beacon.send(packet);
-                                } catch (Exception ignored) {}
-                            }
-                        }
-                    }
-
                     try {
-                        DatagramPacket packet = new DatagramPacket(buf, buf.length, InetAddress.getByName("255.255.255.255"), UDP_PORT);
                         beacon.send(packet);
-                    } catch (Exception ignored) {}
-
-                    Thread.sleep(2000);
+                        Thread.sleep(2000);
+                    } catch (Exception e) {
+                        if (running) e.printStackTrace();
+                    }
                 }
             } catch (Exception e) {
-                System.err.println("CRITICAL: UDP Beacon Error: " + e.getMessage());
-                e.printStackTrace();
+                System.err.println("UDP Beacon failed to start: " + e.getMessage());
             }
         }, "UDP-Beacon-Thread").start();
     }
-
 
     private class ClientHandler extends Thread {
         private final Socket socket;
         private ObjectOutputStream out;
         private volatile Consumer<ScoreEntry> onScoreReceived;
-        private String clientUsername;
+        private String clientUsername = "未知用户";
 
         ClientHandler(Socket socket, Consumer<ScoreEntry> onScoreReceived) {
             this.socket = socket;
@@ -166,28 +149,54 @@ public class NetworkService {
                 out.flush();
                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
 
-                // ★ 修复点：加入 !socket.isClosed() 判断
                 while (running && !socket.isClosed()) {
                     Object obj = in.readObject();
                     if (obj instanceof NetworkPacket packet) {
+                        System.out.println("[网络调试] 主机收到数据包: " + packet.getType());
+
                         switch (packet.getType()) {
                             case JOIN_REQUEST:
                                 this.clientUsername = packet.getUsername();
-                                if(dataHandler != null) {
-                                    dataHandler.addPendingMembership(clientUsername, hostingCompetitionName);
-                                    if (dataHandler.isUserApprovedOrCreator(clientUsername, hostingCompetitionName)) {
-                                        sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
-                                        sendPacket(new NetworkPacket(
-                                                new java.util.ArrayList<>(dataHandler.getScores(hostingCompetitionName)),
-                                                new java.util.ArrayList<>(dataHandler.getRankings(hostingCompetitionName)),
-                                                officialEventName));
+                                System.out.println("[网络调试] 正在处理 [" + clientUsername + "] 的加入请求...");
+
+                                if (dataHandler != null) {
+                                    // ★ 修复点 1：捕获数据库写入异常，防止因为重复申请导致线程崩溃断连
+                                    try {
+                                        dataHandler.addPendingMembership(clientUsername, hostingCompetitionName);
+                                        System.out.println("[网络调试] 成功将[" + clientUsername + "] 写入数据库 Pending 列表");
+                                    } catch (Exception dbEx) {
+                                        System.out.println("[网络调试] 数据库写入警告 (可能是重复申请，安全忽略): " + dbEx.getMessage());
                                     }
+
+                                    try {
+                                        if (dataHandler.isUserApprovedOrCreator(clientUsername, hostingCompetitionName)) {
+                                            System.out.println("[网络调试] [" + clientUsername + "] 已获批准，正在下发比赛全量数据...");
+                                            sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
+                                            sendPacket(new NetworkPacket(
+                                                    new java.util.ArrayList<>(dataHandler.getScores(hostingCompetitionName)),
+                                                    new java.util.ArrayList<>(dataHandler.getRankings(hostingCompetitionName)),
+                                                    officialEventName));
+                                        } else {
+                                            System.out.println("[网络调试][" + clientUsername + "] 需要房主手动批准，目前挂起。");
+                                        }
+                                    } catch (Exception e) {
+                                        System.err.println("[网络调试] 检查权限或发送数据时报错:");
+                                        e.printStackTrace();
+                                    }
+                                } else {
+                                    System.err.println("[网络调试] 严重错误：主机的 dataHandler 为 NULL！请检查 MainApplication.init() 逻辑。");
                                 }
+
                                 if (onMemberJoinCallback != null) {
                                     Platform.runLater(onMemberJoinCallback);
+                                    System.out.println("[网络调试] 触发了主机 UI 的 MemberJoinCallback 刷新");
+                                } else {
+                                    System.out.println("[网络调试] 提示：主机的 onMemberJoinCallback 为空，请手动关闭并重新打开管理成员界面刷新。");
                                 }
                                 break;
+
                             case SUBMIT_SCORE:
+                                System.out.println("[网络调试] 收到 [" + clientUsername + "] 提交的成绩");
                                 if (onScoreReceived != null) {
                                     Platform.runLater(() -> onScoreReceived.accept(packet.getScoreEntry()));
                                 }
@@ -195,7 +204,13 @@ public class NetworkService {
                         }
                     }
                 }
+                // ★ 修复点 2：显式打印 EOF 断开或 Class 异常，拒绝对静默崩溃一无所知
+            } catch (EOFException e) {
+                System.out.println("[网络调试] 从机 [" + clientUsername + "] 已断开连接。");
+                stopClient();
             } catch (Exception e) {
+                System.err.println("[网络调试] 主机处理 [" + clientUsername + "] 的网络流时发生严重崩溃:");
+                e.printStackTrace();
                 stopClient();
             }
         }
@@ -208,20 +223,22 @@ public class NetworkService {
                 if(dataHandler != null) {
                     handler.sendPacket(new NetworkPacket(
                             new java.util.ArrayList<>(dataHandler.getScores(hostingCompetitionName)),
-                            new java.util.ArrayList<>(dataHandler.getRankings(hostingCompetitionName)),officialEventName));
+                            new java.util.ArrayList<>(dataHandler.getRankings(hostingCompetitionName)),
+                            officialEventName));
                 }
+                System.out.println("[网络调试] 主机已批准并下发数据给: " + username);
                 return;
             }
         }
     }
+
+    // ==================== 从机逻辑 (Client) ====================
 
     public synchronized void startDiscovery(ObservableList<Competition> discoveredCompetitions) {
         this.running = true;
         new Thread(() -> {
             try {
                 if (udpSocket != null && !udpSocket.isClosed()) { udpSocket.close(); }
-
-                // ★ 修复点：同上，使用局部变量防止串线
                 DatagramSocket currentUdpSocket = new DatagramSocket(UDP_PORT);
                 currentUdpSocket.setSoTimeout(2000);
                 udpSocket = currentUdpSocket;
@@ -240,7 +257,9 @@ public class NetworkService {
                                 d.setHostAddress(packet.getAddress().getHostAddress());
 
                                 Platform.runLater(() -> {
-                                    if (discoveredCompetitions.stream().noneMatch(c -> c.getName().equals(d.getName()) && c.getHostAddress().equals(d.getHostAddress()))) {
+                                    boolean exists = discoveredCompetitions.stream()
+                                            .anyMatch(c -> c.getName().equals(d.getName()) && c.getHostAddress().equals(d.getHostAddress()));
+                                    if (!exists) {
                                         discoveredCompetitions.add(d);
                                     }
                                 });
@@ -248,16 +267,13 @@ public class NetworkService {
                         }
                     } catch (SocketTimeoutException ignored) {
                     } catch (IOException e) {
-                        if (running && !currentUdpSocket.isClosed()) {
-                            System.err.println("UDP Receive Error: " + e.getMessage());
-                        }
-                        break;
+                        if (running) break;
                     }
                 }
-            } catch (java.net.BindException e) {
-                System.err.println("CRITICAL ERROR: UDP Port " + UDP_PORT + " is already in use!");
+            } catch (BindException e) {
+                System.err.println("UDP Discovery Port occupied.");
             } catch (IOException e) {
-                System.err.println("Failed to start UDP Discovery: " + e.getMessage());
+                e.printStackTrace();
             }
         }, "UDP-Discovery-Thread").start();
     }
@@ -268,30 +284,36 @@ public class NetworkService {
         clientSocket = new Socket();
 
         try {
+            System.out.println("[网络调试] 从机尝试连接主机: " + hostAddress);
             clientSocket.connect(new InetSocketAddress(hostAddress, TCP_PORT), 5000);
             outToServer = new ObjectOutputStream(clientSocket.getOutputStream());
             outToServer.flush();
 
+            System.out.println("[网络调试] 连接成功！发送 JOIN_REQUEST...");
             outToServer.writeObject(new NetworkPacket(NetworkPacket.PacketType.JOIN_REQUEST, myUsername));
             outToServer.flush();
             outToServer.reset();
 
             Socket currentClientSocket = clientSocket;
-
             new Thread(() -> {
                 try (ObjectInputStream in = new ObjectInputStream(currentClientSocket.getInputStream())) {
                     while (running && !currentClientSocket.isClosed()) {
                         Object obj = in.readObject();
                         if (obj instanceof NetworkPacket p) {
+                            System.out.println("[网络调试] 从机收到响应: " + p.getType());
                             Platform.runLater(() -> onPacketReceived.accept(p));
                         }
                     }
+                } catch (EOFException e) {
+                    System.out.println("[网络调试] 与主机的连接已断开 (对方已关闭)");
                 } catch (Exception e) {
-                    if(running && !currentClientSocket.isClosed()) System.err.println("Connection to Host lost.");
+                    if(running && !currentClientSocket.isClosed()) {
+                        System.err.println("[网络调试] 从机读取主机数据报错:");
+                        e.printStackTrace();
+                    }
                 }
             }, "Client-Listen-Thread").start();
         } catch (IOException e) {
-            // ★ 修复点：一旦连接异常，立刻把状态设为 false，以免产生垃圾线程
             this.running = false;
             clientSocket = null;
             throw e;
@@ -308,6 +330,7 @@ public class NetworkService {
                 outToServer.writeObject(new NetworkPacket(scoreEntry));
                 outToServer.flush();
                 outToServer.reset();
+                System.out.println("[网络调试] 从机已发送成绩数据");
             } catch (IOException e) { e.printStackTrace(); }
         }
     }
