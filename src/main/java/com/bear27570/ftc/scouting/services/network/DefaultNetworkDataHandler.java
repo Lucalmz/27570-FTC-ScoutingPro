@@ -14,17 +14,17 @@ import java.util.List;
 public class DefaultNetworkDataHandler implements NetworkDataHandler {
 
     private final MembershipRepository membershipRepository;
-    private final UserRepository userRepository; // ★ 建议改成 final
+    private final UserRepository userRepository; // ★ 新增字段
     private final MatchDataService matchDataService;
     private final RankingService rankingService;
 
-    // ★ 修改构造函数，添加 UserRepository 参数
+    // ★ 修改构造函数：增加 UserRepository 参数
     public DefaultNetworkDataHandler(MembershipRepository membershipRepository,
-                                     UserRepository userRepository, // <--- 新增参数
+                                     UserRepository userRepository,
                                      MatchDataService matchDataService,
                                      RankingService rankingService) {
         this.membershipRepository = membershipRepository;
-        this.userRepository = userRepository; // <--- ★★★ 必须在这里赋值！之前漏了这行 ★★★
+        this.userRepository = userRepository; // ★ 必须在这里赋值！
         this.matchDataService = matchDataService;
         this.rankingService = rankingService;
     }
@@ -47,11 +47,10 @@ public class DefaultNetworkDataHandler implements NetworkDataHandler {
 
     @Override
     public void ensureUserExists(String username) {
-        // 现在 userRepository 不会是 null 了
         if (userRepository != null) {
             userRepository.ensureUserExists(username);
         } else {
-            System.err.println("CRITICAL ERROR: UserRepository is null in DataHandler!");
+            System.err.println("CRITICAL: UserRepository is null in DataHandler");
         }
     }
 

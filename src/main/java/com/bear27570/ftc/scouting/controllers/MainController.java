@@ -136,7 +136,22 @@ public class MainController {
         setupScoringTab();
         setupRankingsTab();
         setupHistoryTab();
+        if (isHost) {
+            editRatingButton.setVisible(true);
+            editRatingButton.setManaged(true);
+            manageMembersBtn.setVisible(true);
+            manageMembersBtn.setManaged(true);
+            startAsHost();
+        } else {
+            // =======================================================
+            // ★ 新增：从机启动前，强制确保本地数据库有这个赛事记录，避免外键报错
+            // =======================================================
+            competitionRepository.ensureLocalCompetitionSync(currentCompetition);
 
+            manageMembersBtn.setVisible(false);
+            manageMembersBtn.setManaged(false);
+            startAsClient();
+        }
         if (isHost) {
             editRatingButton.setVisible(true);
             editRatingButton.setManaged(true);

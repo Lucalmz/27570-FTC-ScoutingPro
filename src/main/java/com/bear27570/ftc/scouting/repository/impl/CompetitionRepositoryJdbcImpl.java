@@ -50,7 +50,41 @@ public class CompetitionRepositoryJdbcImpl implements CompetitionRepository {
             e.printStackTrace();
         }
     }
+    @Override
+    public void ensureLocalCompetitionSync(Competition competition) {
+        String checkSql = "SELECT COUNT(*) FROM competitions WHERE name = ?";
+        boolean exists = false;
+        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(checkSql)) {
+            pstmt.setString(1, competition.getName());
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next() && rs.getInt(1) > 0) {
+                exists = true;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
 
+        if (!exists) {
+            // 1. 本地没有同名比赛，安全插入
+            String insertSql = "INSERT INTO competitions(name, creatorUsername, ratingFormula, eventSeason, eventCode, officialEventName) VALUES(?, ?, ?, ?, ?, ?)";
+            try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
+                pstmt.setString(1, competition.getName());
+                pstmt.setString(2, competition.getCreatorUsername() != null ? competition.getCreatorUsername() : "HOST_SYNC");
+                pstmt.setString(3, competition.getRatingFormula() != null ? competition.getRatingFormula() : "total");
+                pstmt.setInt(4, competition.getEventSeason());
+                pstmt.setString(5, competition.getEventCode());
+                pstmt.setString(6, competition.getOfficialEventName());
+                pstmt.executeUpdate();
+                System.out.println("DEBUG: [从机] 本地无同名赛事，已自动创建: " + competition.getName());
+            } catch (SQLException e) {
+                System.err.println("DEBUG: [从机] 同步赛事信息时发生并发冲突(安全忽略)");
+            }
+        } else {
+            // 2. 本地已经有同名比赛，不要报错，直接更新官方 API 信息以保持与主机一致
+            updateEventInfo(competition.getName(), competition.getEventSeason(), competition.getEventCode(), competition.getOfficialEventName());
+            System.out.println("DEBUG: [从机] 本地已有同名赛事，已更新赛事API元数据: " + competition.getName());
+        }
+    }
     @Override
     public boolean create(String name, String creatorUsername, String ratingFormula) {
         String sql = "INSERT INTO competitions(name, creatorUsername, ratingFormula) VALUES(?, ?, ?)";
