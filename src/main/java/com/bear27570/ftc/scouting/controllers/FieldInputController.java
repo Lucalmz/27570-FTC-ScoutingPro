@@ -22,6 +22,7 @@ import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 
 public class FieldInputController {
 
@@ -34,7 +35,11 @@ public class FieldInputController {
 
     private Stage dialogStage;
     private MainController parentController;
+
     private final List<TeamPoint> points = new ArrayList<>();
+    // 新增：用于存放历史记录的栈，实现撤销功能
+    private final Stack<List<TeamPoint>> undoStack = new Stack<>();
+
     private boolean isAllianceMode = true;
     private Label warningLabel;
 
@@ -49,6 +54,11 @@ public class FieldInputController {
         public TeamPoint(double x, double y, int teamIndex, boolean isMiss, long timestamp) {
             this.x = x; this.y = y; this.teamIndex = teamIndex; this.isMiss = isMiss;
             this.timestamp = timestamp;
+        }
+
+        // 深拷贝方法
+        public TeamPoint copy() {
+            return new TeamPoint(x, y, teamIndex, isMiss, timestamp);
         }
     }
 
@@ -93,7 +103,32 @@ public class FieldInputController {
         dialogStage.getScene().setOnKeyReleased(this::handleKeyReleased);
     }
 
+    // --- 新增：保存当前状态到撤销栈 ---
+    private void saveState() {
+        List<TeamPoint> snapshot = new ArrayList<>();
+        for (TeamPoint p : points) {
+            snapshot.add(p.copy());
+        }
+        undoStack.push(snapshot);
+    }
+
+    // --- 新增：处理撤销逻辑 ---
+    @FXML
+    private void handleUndo() {
+        if (!undoStack.isEmpty()) {
+            points.clear();
+            points.addAll(undoStack.pop());
+            updateUI();
+        }
+    }
+
     private void handleKeyPressed(KeyEvent event) {
+        // 新增：拦截 Ctrl + Z
+        if (event.isControlDown() && event.getCode() == KeyCode.Z) {
+            handleUndo();
+            return;
+        }
+
         if (event.getCode() == KeyCode.X) {
             if (addModeBtn.isSelected()) removeModeBtn.setSelected(true);
             else addModeBtn.setSelected(true);
@@ -119,6 +154,9 @@ public class FieldInputController {
             showWarning();
             return;
         }
+
+        // 修改：在修改数组之前，保存快照到撤销栈
+        saveState();
 
         double x = event.getX();
         double y = event.getY();
@@ -206,6 +244,8 @@ public class FieldInputController {
 
     private void loadExistingPoints(String locationStr) {
         points.clear();
+        undoStack.clear(); // 加载已有数据时清空撤销栈，防止撤销到空白
+
         String[] entries = locationStr.split(";");
         for (String entry : entries) {
             try {
@@ -233,9 +273,15 @@ public class FieldInputController {
         return sb.toString();
     }
 
-    @FXML private void handleClear() { points.clear(); updateUI(); }
+    @FXML
+    private void handleClear() {
+        saveState(); // 清空前保存快照，允许撤销清空操作
+        points.clear();
+        updateUI();
+    }
 
-    @FXML private void handleConfirm() {
+    @FXML
+    private void handleConfirm() {
         int totalHits = (int) points.stream().filter(p -> !p.isMiss).count();
         parentController.onFieldInputConfirmed(totalHits, getLocationsString());
         dialogStage.close();

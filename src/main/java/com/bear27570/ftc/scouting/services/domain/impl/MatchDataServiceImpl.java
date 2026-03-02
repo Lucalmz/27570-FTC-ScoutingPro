@@ -1,3 +1,4 @@
+// File: MatchDataServiceImpl.java
 package com.bear27570.ftc.scouting.services.domain.impl;
 
 import com.bear27570.ftc.scouting.models.PenaltyEntry;
@@ -45,5 +46,20 @@ public class MatchDataServiceImpl implements MatchDataService {
     @Override
     public List<ScoreEntry> getTeamHistory(String competitionName, int teamNumber) {
         return scoreRepository.findByTeam(competitionName, teamNumber);
+    }
+
+    @Override
+    public void syncWithHostData(String competitionName, List<ScoreEntry> hostData) {
+        scoreRepository.syncWithHostData(competitionName, hostData);
+    }
+
+    @Override
+    public List<ScoreEntry> getPendingExports(String competitionName) {
+        return scoreRepository.findPendingExports(competitionName);
+    }
+
+    @Override
+    public void markAsExported(List<Integer> ids) {
+        scoreRepository.updateStatuses(ids, ScoreEntry.SyncStatus.EXPORTED);
     }
 }

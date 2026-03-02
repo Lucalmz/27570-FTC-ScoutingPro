@@ -1,72 +1,123 @@
 
+# 🏆 FTC Scouting Pro
 
-# 27570 FTC ScoutingPro: 2025-2026 "DECODE" Season
+![Java](https://img.shields.io/badge/Java-21-orange.svg)
+![JavaFX](https://img.shields.io/badge/JavaFX-21-blue.svg)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-lightgrey.svg)
+![Release](https://img.shields.io/badge/Release-v2.1.5-success.svg)
 
-![Season](https://img.shields.io/badge/FTC-DECODE_2025--2026-blueviolet)
-![Algorithm](https://img.shields.io/badge/Algorithm-Gaussian_KDE-red)
-![Network](https://img.shields.io/badge/Reliability-LAN_Distributed-green)
+**FTC Scouting Pro** is an enterprise-grade, desktop-based local area network (LAN) collaborative scouting application designed specifically for the FIRST Tech Challenge (FTC).
+**FTC Scouting Pro** 是一款专为 FIRST Tech Challenge (FTC) 设计的企业级桌面端局域网协作侦查应用。
 
-**27570-FTC-ScoutingPro** 是一款专为 FTC 竞赛巅峰表现而生的分布式赛场侦察与战略决策系统。在 **2025-2026 "DECODE"** 赛季，我们不仅在记录数据，更在通过深度算法重塑比赛策略。
-
-## 🏆 为什么选择 ScoutingPro？（核心竞争优势）
-
-与其他通用或简易 Scouting 应用相比，本项目在以下维度具有压倒性优势：
-
-### 1. 极端环境下的“零延迟”局域网架构
-*   **挑战**：大型赛场（如世界赛、省赛）通常伴随严重的 4G/5G 信号屏蔽和不稳定的公共 Wi-Fi。
-*   **对策**：本项目采用基于 **UDP 广播自动发现** 与 **TCP 异步长连接** 的全局域网架构。
-*   **优势**：无需互联网连接，通过自建路由器或手机热点即可实现秒级数据同步。即便网络波动，分布式客户端也会暂存数据并自动重连补发，确保在高压赛场万无一失。
-
-### 2. 空间协同分析算法 (Spatial Synergy Algorithm)
-*   **挑战**：很多赛队平均分很高，但组合在一起却因“抢位”导致 1+1 < 2。
-*   **对策**：ScoutingPro 独有的 **Alliance Analysis** 模块会分析每个机器人的空间足迹。
-*   **优势**：系统会自动识别机器人的“得分风格”（Near Zone Specialist / Far Zone Specialist）。在模拟选人时，它能自动避开空间冲突，推荐能够实现**异位互补**的队友，最大化联盟总得分。
-
-### 3. 高斯核密度概率云 (Gaussian KDE Heatmap)
-*   **挑战**：传统的打点图只是坐标点的堆砌，难以体现真实成功率趋势。
-*   **对策**：引入工业级 **高斯核密度估计（KDE）算法**。
-*   **优势**：将离散的得分点转化为**连续的概率云图**。通过热力颜色深度反映机器人操作的稳定性与抗干扰能力。红色区域不仅代表“去过”，更代表该赛队在 DECODE 复杂场地中具有极高的可靠性。
-
-### 4. 动态战略评估引擎 (Custom Formula Engine)
-*   **挑战**：赛季不同阶段（排位赛 vs 淘汰赛）对数据的关注点不同。
-*   **对策**：内置自定义评分公式编辑器（支持 `exp4j` 语法）。
-*   **优势**：队长可以实时修改权重。例如，在 DECODE 赛季后期，若发现悬挂（Climb）分比重增加，只需修改公式，全场排名将瞬间按新战略重新生成。
+Say goodbye to unreliable internet connections and messy Google Forms. With real-time LAN synchronization, advanced heatmap analytics, and a sleek **Black & Gold Cyber-Luxury UI**, your team can scout smarter and draft the perfect alliance.
+告别不稳定的赛场网络和混乱的 Google Forms。凭借实时的局域网同步、先进的热力图分析以及全新的**黑金赛博奢华 UI**，让你的团队能够更智能地侦查并组建完美的联盟。
 
 ---
 
-## 🚀 2025-2026 "DECODE" 赛季特化功能
+## ✨ Core Advantages / 核心优势
 
-本项目已针对最新赛季 **DECODE** 的场地特性进行了深度定制：
+### 💎 1. Premium Cyber-Luxury UI (黑金赛博 UI)
+*   **English:** A completely revamped stereoscopic 3D UI featuring glowing outlines, sleek animations, and a high-contrast Black & Gold theme optimized for dark environments (like stadium bleachers).
+*   **中文:** 全新重构的立体 3D UI，拥有流光溢彩的边框、丝滑的动画效果，以及专为暗光环境（如赛场看台）优化的高对比度黑金主题。
 
-*   **DECODE 场地镜像适配**：图绘系统支持红蓝联盟位置镜像处理，确保热力图分析不因初始位置不同而产生偏差。
-*   **三场锁定保护逻辑**：为了排除机器人突发故障（Broken）对长期平均分的影响，系统的 `Mark as Weak` 功能仅在赛队完成 2 场基础比赛后解锁，确保数据筛选的客观与严肃。
-*   **DECODE 变量支持**：评分引擎原生支持 `auto`、`teleop`、`seq`、`climb` 等 DECODE 赛季核心得分指标。
+### 📡 2. Zero-Internet Synchronization (零依赖局域网同步)
+*   **English:** The Host acts as a local server. Clients connect via a local router (no internet required) with **UDP Auto-Discovery**. No IP typing needed! Also supports USB `.ftcsync` fallback.
+*   **中文:** 主机作为本地服务器，从机通过局域网路由器连接（无需外网）。支持 **UDP 自动发现**，无需手动输入 IP 地址！同时支持 USB `.ftcsync` 离线文件导入导出作为备用方案。
 
----
+### 🤖 3. Advanced Analytics & Heatmaps (高阶数据分析与热力图)
+*   **English:** Interactive field mapping with **Ctrl+Click** recording. Now supports **Undo (Ctrl+Z)** for precise input! The system calculates PPS (Points Per Second) and classifies playstyles (e.g., *Far Zone Specialist*).
+*   **中文:** 交互式场地热力图，支持 **Ctrl+点击** 录入。**新增撤销功能 (Ctrl+Z)**，误触也不怕！系统自动计算 PPS（每秒得分）并智能分类队伍打法（如“远端专精”）。
 
-## 📖 快速操作手册
+### ☁️ 4. FTCScout.org Integration (FTCScout 官方同步)
+*   **English:** Hosts can bind the app to an official Event Code. It automatically fetches official match data, syncs **Penalty Stats**, and broadcasts the **Official Event Name** to all clients.
+*   **中文:** 主机可绑定官方赛事代码。应用将自动拉取官方赛程数据，同步**红蓝联盟判罚数据**，并将**官方赛事全称**广播给所有连接的从机，确保信息统一。
 
-### 1. 建立协同网络
-*   **Host (队长)**：开启比赛，电脑会自动在局域网广播。
-*   **Join (侦察员)**：一键扫描加入。即便在几千人的场馆，也能通过内部 Wi-Fi 建立稳固的数据链路。
-
-### 2. 战场数据采集 (Scoring)
-*   **📍 视觉打点**：在 `Scoring` 面板点击 `Record`，通过鼠标左/右键精确记录命中与脱靶位置。
-*   **状态标记**：实时勾选 `Broken`（损毁）或 `Sequence`（序列完成情况）。
-
-### 3. 战略情报室 (Analysis)
-*   **实时榜单**：查看基于自定义公式的实时赛队战力排行。
-*   **概率分析**：打开 `Heatmap`，观察对手在 DECODE 场地各个 Zone 的真实投射概率。
-*   **最优联盟模拟**：输入自己的编号，让系统为你计算出淘汰赛的最佳拍档。
+### 📐 5. Custom Formulas (自定义评分公式)
+*   **English:** Write your own math formulas (e.g., `(auto * 2) + teleop + (seq ? 10 : 0)`) to rank teams based on *your* strategy.
+*   **中文:** 支持编写自定义数学公式（例如 `(auto * 2) + teleop + (seq ? 10 : 0)`），根据*你*的战术需求对队伍进行排名。
 
 ---
 
-## 🛠️ 技术栈
-*   **核心架构**：JavaFX 21 + Maven
-*   **数据引擎**：H2 Embedded Database (持久化存储)
-*   **数学库**：exp4j (公式解析)
-*   **算法实现**：自研 Gaussian Kernel Density Estimation (可视化分析)
+## 🚀 Installation Guide / 安装指南
+
+We provide standalone installers for Windows and macOS. **No Java installation required!**
+我们提供 Windows 和 macOS 的独立安装包，**无需预先安装 Java 环境！**
+
+### 🪟 For Windows Users (`.exe`)
+1.  Go to the [Releases](../../releases) page. (前往 Releases 页面)
+2.  Download `FTCScoutingPro-Windows-x64.zip` and extract it. (下载并解压)
+3.  Double-click the installer (`.exe`) and follow the setup wizard. (双击运行安装程序)
+4.  Launch via Start Menu or Desktop shortcut. (通过开始菜单或桌面快捷方式启动)
+
+### 🍎 For macOS Users (`.dmg`)
+*Designed for Apple Silicon (M1/M2/M3) & Intel Macs.*
+
+1.  Go to the [Releases](../../releases) page. (前往 Releases 页面)
+2.  Download `FTCScoutingPro-macOS-AppleSilicon.zip` (or Intel version) and open the `.dmg`. (下载并打开 dmg 文件)
+3.  Drag `FTCScoutingPro` into your `Applications` folder. (将应用拖入“应用程序”文件夹)
+
+> ⚠️ **IMPORTANT: macOS "Unidentified Developer" Fix**
+> **重要提示：解决 macOS“无法验证开发者”问题**
+>
+> Because this is an open-source project, it is not signed with a paid Apple certificate. macOS may block the first launch.
+> 因为这是开源项目，未购买苹果付费证书签名，macOS 可能会拦截首次启动。
+>
+> **How to open it (Only needed once / 仅需操作一次):**
+> 1.  Open **Finder** -> **Applications**. (打开 访达 -> 应用程序)
+> 2.  Find `FTCScoutingPro`. (找到应用)
+> 3.  **Hold `Control` key + Click** (or Right-Click) the app icon. (**按住 Control 键 + 点击** 或 右键点击应用图标)
+> 4.  Select **Open** (`打开`) from the menu. (在菜单中选择“打开”)
+> 5.  Click **Open** (`打开`) again in the popup dialog. (在弹出的警告框中再次点击“打开”)
+>
+> *After this, you can open it normally like any other app.*
+> *操作一次后，以后即可像普通应用一样直接双击打开。*
 
 ---
-**Team 27570 | 为冠军而设计的专业数据侦察系统**
-*Decode the field, Code the victory.*
+
+## 🛠️ Quick Start / 快速开始
+
+### 👑 As a Host (Lead Scout / 侦查组长)
+1.  **Create:** Login -> Hub -> Create New Competition. (创建比赛)
+2.  **Host:** Select competition -> "Start Hosting". (开始主机模式)
+3.  **Bind (Optional):** Go to `FTCScout` tab -> Enter Season/Event Code -> "Bind Event". (绑定官方赛事)
+4.  **Manage:** Click "Members" -> Approve join requests. (批准成员加入)
+
+### 💻 As a Client (Scouter / 侦查员)
+1.  **Join:** Login -> Hub -> "Join Competition". (加入比赛)
+2.  **Discover:** Wait for the Host to appear in the list (UDP Auto-Discovery). (等待自动发现主机)
+3.  **Request:** Click "Request to Join". (申请加入)
+4.  **Scout:** Once approved, start scoring! (获批后开始记录数据)
+
+---
+
+## 👨‍💻 Build from Source / 源码构建
+
+**Prerequisites (环境要求):**
+*   JDK 21
+*   Maven 3.8+
+
+```bash
+# Clone repository
+git clone https://github.com/YourName/FTC-Scouting-Pro.git
+
+# Build Fat JAR (Includes JavaFX)
+mvn clean package -DskipTests
+
+# Run directly
+mvn javafx:run
+
+# Create Installer (Windows/Mac)
+# Note: Check pom.xml for platform-specific config
+mvn jpackage:jpackage
+```
+
+---
+
+## 📜 Credits
+
+*   **UI Framework:** [AtlantaFX](https://github.com/mkpaz/atlantafx)
+*   **Icons:** [Ikonli](https://kordamp.org/ikonli/)
+*   **Database:** [H2 Database](https://www.h2database.com/)
+*   **Network:** Java Standard Socket (TCP/UDP)
+
+Developed with ❤️ for the FIRST Tech Challenge community.

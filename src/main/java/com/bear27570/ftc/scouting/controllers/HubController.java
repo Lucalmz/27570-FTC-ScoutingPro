@@ -50,7 +50,7 @@ public class HubController {
         joinPane.setVisible(false); joinPane.setManaged(false);
         statusLabel.setStyle("-fx-text-fill: #a6adc8;");
         statusLabel.setText("Host Mode: Select a competition to start.");
-        hostModeButton.setStyle("-fx-background-color: #89b4fa; -fx-text-fill: #11111b;");
+        hostModeButton.setStyle("-fx-background-color: rgba(212, 175, 55, 0.25) !important; -fx-border-color: #FFDF73 !important; -fx-text-fill: #FFDF73 !important; -fx-effect: dropshadow(gaussian, rgba(212, 175, 55, 0.65), 15, 0.5, 0, 0) !important;");
         joinModeButton.setStyle("");
     }
 
@@ -60,9 +60,8 @@ public class HubController {
         joinPane.setVisible(true); joinPane.setManaged(true);
         statusLabel.setStyle("-fx-text-fill: #f9e2af;");
         statusLabel.setText("Searching for local competitions via UDP...");
-        joinModeButton.setStyle("-fx-background-color: #89b4fa; -fx-text-fill: #11111b;");
+        joinModeButton.setStyle("-fx-background-color: rgba(212, 175, 55, 0.25) !important; -fx-border-color: #FFDF73 !important; -fx-text-fill: #FFDF73 !important; -fx-effect: dropshadow(gaussian, rgba(212, 175, 55, 0.65), 15, 0.5, 0, 0) !important;");
         hostModeButton.setStyle("");
-
         discoveredCompetitions.clear();
         NetworkService.getInstance().startDiscovery(discoveredCompetitions);
     }

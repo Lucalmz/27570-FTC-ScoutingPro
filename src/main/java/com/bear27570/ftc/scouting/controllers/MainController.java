@@ -1,3 +1,4 @@
+// File: MainController.java
 package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.MainApplication;
@@ -15,17 +16,28 @@ import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 
-import java.io.IOException;
+import java.io.*;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class MainController {
 
     @FXML private Label competitionNameLabel, submitterLabel, errorLabel, statusLabel;
-    @FXML private Button manageMembersBtn, submitButton, editRatingButton;
+    @FXML private Button manageMembersBtn, submitButton, editRatingButton, offlineSyncBtn;
 
     // Scoring Tab
     @FXML private VBox scoringFormVBox;
@@ -43,9 +55,8 @@ public class MainController {
     @FXML private CheckBox team2SequenceCheck, team2L2ClimbCheck;
 
     // Penalty Tab
-    @FXML private TextField penMatchField, penMajor, penMinor;
-    @FXML private ToggleButton penRedToggle, penBlueToggle;
-    @FXML private Label penStatusLabel;
+    @FXML private TextField ftcScoutSeasonField, ftcScoutEventField;
+    @FXML private Label boundEventNameLabel, autoFetchStatusLabel;
 
     // Rankings Tab
     @FXML private Label rankingLegendLabel;
@@ -61,10 +72,12 @@ public class MainController {
     // History Tab
     @FXML private TextField searchField;
     @FXML private TableView<ScoreEntry> historyTableView;
+    @FXML private TableColumn<ScoreEntry, ScoreEntry.SyncStatus> histSyncCol;
     @FXML private TableColumn<ScoreEntry, Integer> histMatchCol, histTotalCol;
     @FXML private TableColumn<ScoreEntry, String> histAllianceCol, histTeamsCol, histSubmitterCol, histTimeCol;
+    @FXML private TableColumn<ScoreEntry, Void> histActionsCol;
 
-    private ToggleGroup allianceToggleGroup, penaltyAllianceGroup, modeToggleGroup;
+    private ToggleGroup allianceToggleGroup, modeToggleGroup;
     private String currentClickLocations = "";
 
     // --- 依赖注入的服务 ---
@@ -80,6 +93,16 @@ public class MainController {
 
     private int editingScoreId = -1;
     private String editingOriginalTime = null;
+    private ScoreEntry.SyncStatus editingOriginalSyncStatus = null;
+    private String officialEventName = null;
+    private void updateTopLabel() {
+        String role = isHost ? " [HOST]" : " [CLIENT]";
+        if (officialEventName != null && !officialEventName.trim().isEmpty()) {
+            competitionNameLabel.setText(officialEventName + role);
+        } else {
+            competitionNameLabel.setText(currentCompetition.getName() + role);
+        }
+    }
 
     // --- 核心注入方法 ---
     public void setDependencies(MainApplication mainApp, Competition competition, String username, boolean isHost,
@@ -93,13 +116,26 @@ public class MainController {
         this.rankingService = rankingService;
         this.competitionRepository = competitionRepository;
 
-        competitionNameLabel.setText(competition.getName() + (isHost ? " (HOSTING)" : " (CLIENT)"));
+        updateTopLabel();
+        if (currentCompetition.getOfficialEventName() != null && !currentCompetition.getOfficialEventName().isEmpty()) {
+            this.officialEventName = currentCompetition.getOfficialEventName();
+            NetworkService.getInstance().setOfficialEventName(this.officialEventName);
+
+            ftcScoutSeasonField.setText(String.valueOf(currentCompetition.getEventSeason()));
+            ftcScoutEventField.setText(currentCompetition.getEventCode());
+            boundEventNameLabel.setText("Bound Event: " + this.officialEventName);
+            updateTopLabel(); // 再次更新顶部大标题
+        }
+
         submitterLabel.setText("Submitter: " + username);
+
+        if (offlineSyncBtn != null) {
+            offlineSyncBtn.setText(isHost ? "Import Offline Data" : "Export Offline Data");
+        }
 
         setupScoringTab();
         setupRankingsTab();
         setupHistoryTab();
-        setupPenaltyTab();
 
         if (isHost) {
             editRatingButton.setVisible(true);
@@ -120,20 +156,14 @@ public class MainController {
     }
 
     private void startAsClient() {
-        setUIEnabled(false);
+        refreshAllDataFromDatabase();
+        setUIEnabled(true);
         try {
             NetworkService.getInstance().connectToHost(currentCompetition.getHostAddress(), currentUsername, this::handleUpdateReceivedFromHost);
             statusLabel.setText("Authenticating with Host...");
         } catch (IOException e) {
-            statusLabel.setText("Connection Failed.");
+            statusLabel.setText("Working Offline (Caching Locally)");
         }
-    }
-
-    private void setupPenaltyTab() {
-        penaltyAllianceGroup = new ToggleGroup();
-        penRedToggle.setToggleGroup(penaltyAllianceGroup);
-        penBlueToggle.setToggleGroup(penaltyAllianceGroup);
-        penRedToggle.setSelected(true);
     }
 
     private void setupScoringTab() {
@@ -242,24 +272,209 @@ public class MainController {
         };
     }
 
+    // --- 自动同步 FTCScout API 数据 (修正版) ---
     @FXML
-    private void handleSubmitPenalty() {
+    private void handleBindAndFetch() {
+        if (!isHost) {
+            autoFetchStatusLabel.setText("Error: Only Host can sync with FTCScout.");
+            autoFetchStatusLabel.setStyle("-fx-text-fill: #FF453A;");
+            return;
+        }
+
+        String seasonStr = ftcScoutSeasonField.getText().trim();
+        String eventCode = ftcScoutEventField.getText().trim();
+
+        if (seasonStr.isEmpty() || eventCode.isEmpty()) {
+            autoFetchStatusLabel.setText("Please enter Season (Int) and Event Code.");
+            return;
+        }
+
+        final int season;
         try {
-            int matchNum = Integer.parseInt(penMatchField.getText());
-            ToggleButton selected = (ToggleButton) penaltyAllianceGroup.getSelectedToggle();
-            if (selected == null) throw new IllegalArgumentException("Select Alliance");
-            String alliance = selected.getText().contains("Red") ? "RED" : "BLUE";
+            season = Integer.parseInt(seasonStr);
+        } catch (NumberFormatException e) {
+            autoFetchStatusLabel.setText("Error: Season must be a valid year.");
+            return;
+        }
 
-            PenaltyEntry entry = new PenaltyEntry(matchNum, alliance,
-                    Integer.parseInt(penMajor.getText()), Integer.parseInt(penMinor.getText()));
+        autoFetchStatusLabel.setText("Connecting to FTCScout...");
+        autoFetchStatusLabel.setStyle("-fx-text-fill: #0A84FF;");
+        boundEventNameLabel.setText("Event: Fetching...");
 
-            // --- 调用 Service ---
-            matchDataService.submitPenalty(currentCompetition.getName(), entry);
+        new Thread(() -> {
+            try {
+                HttpClient client = HttpClient.newHttpClient();
+                String gqlUrl = "https://api.ftcscout.org/graphql";
 
-            refreshAllDataFromDatabase();
-            if (isHost) broadcastUpdate();
-            penStatusLabel.setText("Saved: " + alliance + " Match " + matchNum);
-        } catch (Exception e) { penStatusLabel.setText("Error: " + e.getMessage()); }
+                // 1. 获取赛事基本信息
+                String infoQuery = String.format(
+                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { name hasMatches } }\"}",
+                        season, eventCode
+                );
+
+                HttpRequest infoReq = HttpRequest.newBuilder()
+                        .uri(URI.create(gqlUrl))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(infoQuery))
+                        .build();
+                HttpResponse<String> infoRes = client.send(infoReq, HttpResponse.BodyHandlers.ofString());
+
+                if (infoRes.statusCode() != 200 || infoRes.body().contains("\"errors\"")) {
+                    Platform.runLater(() -> {
+                        boundEventNameLabel.setText("Event: Error/Not Found");
+                        autoFetchStatusLabel.setText("API Error. Check Season/Event Code.");
+                        autoFetchStatusLabel.setStyle("-fx-text-fill: #FF453A;");
+                    });
+                    return;
+                }
+
+                String eventName = "Unknown Event";
+                boolean hasMatches = false;
+
+                Matcher nameMatcher = Pattern.compile("\"name\"\\s*:\\s*\"([^\"]+)\"").matcher(infoRes.body());
+                if (nameMatcher.find()) eventName = nameMatcher.group(1);
+
+                Matcher hasMatchesMatcher = Pattern.compile("\"hasMatches\"\\s*:\\s*(true|false)").matcher(infoRes.body());
+                if (hasMatchesMatcher.find()) hasMatches = Boolean.parseBoolean(hasMatchesMatcher.group(1));
+
+                final String finalEventName = eventName;
+                if (!hasMatches) {
+                    Platform.runLater(() -> {
+                        boundEventNameLabel.setText("Bound Event: " + finalEventName);
+                        autoFetchStatusLabel.setText("Event found, but 'hasMatches' is false.");
+                        autoFetchStatusLabel.setStyle("-fx-text-fill: #FF9F0A;");
+                    });
+                    return;
+                }
+
+                // 2. 获取详细比赛数据
+                // 关键修正：字段名改为 'scores' 而不是 'results'
+                // 关键修正：内部使用 Union Fragment，字段名为 'majorsCommitted' 和 'minorsCommitted'
+                int matchCount = 0;
+                String[] queriesToTry = {
+                        // 2025 (Into The Deep) 结构匹配 - 对应 Image 5, 6, 7
+                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2025 { red { majorsCommitted minorsCommitted } blue { majorsCommitted minorsCommitted } } } } } }\"}",
+                        // 2024 (Centerstage) 结构备用
+                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2024 { red { majorsCommitted minorsCommitted } blue { majorsCommitted minorsCommitted } } } } } }\"}"
+                };
+
+                for (String qFormat : queriesToTry) {
+                    String query = String.format(qFormat, season, eventCode);
+                    HttpRequest dataReq = HttpRequest.newBuilder()
+                            .uri(URI.create(gqlUrl))
+                            .header("Content-Type", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofString(query))
+                            .build();
+
+                    HttpResponse<String> dataRes = client.send(dataReq, HttpResponse.BodyHandlers.ofString());
+
+                    if (dataRes.statusCode() == 200 && !dataRes.body().contains("\"errors\"")) {
+                        matchCount = parseMatchData(dataRes.body());
+                        if (matchCount > 0) break;
+                    }
+                }
+
+                final int finalCount = matchCount;
+
+                Platform.runLater(() -> {
+                    boundEventNameLabel.setText("Bound Event: " + finalEventName);
+
+                    // --- 【修改】：不仅广播，还要写入数据库持久化保存 ---
+                    this.officialEventName = finalEventName;
+                    NetworkService.getInstance().setOfficialEventName(finalEventName);
+
+                    currentCompetition.setEventSeason(season);
+                    currentCompetition.setEventCode(eventCode);
+                    currentCompetition.setOfficialEventName(finalEventName);
+
+                    // 调用 Repository 保存入数据库
+                    competitionRepository.updateEventInfo(currentCompetition.getName(), season, eventCode, finalEventName);
+                    updateTopLabel(); // 更新顶部大标题
+                    // ----------------------------------------------
+
+                    refreshAllDataFromDatabase();
+                    broadcastUpdate();
+                    if (finalCount > 0) {
+                        autoFetchStatusLabel.setText("Success! Synced penalties for " + finalCount + " matches.");
+                        autoFetchStatusLabel.setStyle("-fx-text-fill: #32D74B;");
+                    } else {
+                        autoFetchStatusLabel.setText("Event Linked. No matches found yet.");
+                        autoFetchStatusLabel.setStyle("-fx-text-fill: #FF9F0A;");
+                    }
+                });
+
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    boundEventNameLabel.setText("Event: Connection Failed");
+                    autoFetchStatusLabel.setText("Failed: " + e.getMessage());
+                    autoFetchStatusLabel.setStyle("-fx-text-fill: #FF453A;");
+                });
+            }
+        }).start();
+    }
+
+    private int parseMatchData(String json) {
+        int count = 0;
+        // 关键修正：寻找 "scores" 之前是 "matches"
+        int startIdx = json.indexOf("\"matches\"");
+        if (startIdx == -1) return 0;
+        String content = json.substring(startIdx);
+
+        // 分割 match 块
+        String[] matchBlocks = content.split("\"matchNum\"\\s*:");
+
+        for (int i = 1; i < matchBlocks.length; i++) {
+            String block = matchBlocks[i];
+
+            // 提取 matchNum (位于分割后的开头)
+            Matcher mNum = Pattern.compile("^\\s*(\\d+)").matcher(block);
+            if (!mNum.find()) continue;
+            int matchNum = Integer.parseInt(mNum.group(1));
+
+            String lowerBlock = block.toLowerCase();
+
+            // 提取红蓝联盟数据
+            // 注意：GraphQL 返回的顺序通常是查询的顺序，但最好通过 indexOf 动态定位
+            int redIdx = lowerBlock.indexOf("\"red\"");
+            int blueIdx = lowerBlock.indexOf("\"blue\"");
+
+            if (redIdx != -1 && blueIdx != -1) {
+                String redPart, bluePart;
+                if (redIdx < blueIdx) {
+                    redPart = lowerBlock.substring(redIdx, blueIdx);
+                    // 截取 blue 部分直到可能的结束符（简单截取一段长度防止溢出）
+                    bluePart = lowerBlock.substring(blueIdx, Math.min(lowerBlock.length(), blueIdx + 300));
+                } else {
+                    bluePart = lowerBlock.substring(blueIdx, redIdx);
+                    redPart = lowerBlock.substring(redIdx, Math.min(lowerBlock.length(), redIdx + 300));
+                }
+
+                // 关键修正：根据 Image 7 提取具体的 committed 字段
+                int rMin = extractPenalty(redPart, "minorscommitted");
+                int rMaj = extractPenalty(redPart, "majorscommitted");
+                int bMin = extractPenalty(bluePart, "minorscommitted");
+                int bMaj = extractPenalty(bluePart, "majorscommitted");
+
+                if (rMaj > 0 || rMin > 0) {
+                    matchDataService.submitPenalty(currentCompetition.getName(), new PenaltyEntry(matchNum, "RED", rMaj, rMin));
+                }
+                if (bMaj > 0 || bMin > 0) {
+                    matchDataService.submitPenalty(currentCompetition.getName(), new PenaltyEntry(matchNum, "BLUE", bMaj, bMin));
+                }
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int extractPenalty(String jsonPart, String keyNameLowerCase) {
+        // 匹配 "majorsCommitted": 5
+        Pattern p = Pattern.compile("\"" + keyNameLowerCase + "\"\\s*:\\s*(\\d+)");
+        Matcher m = p.matcher(jsonPart);
+        if (m.find()) {
+            return Integer.parseInt(m.group(1));
+        }
+        return 0;
     }
 
     @FXML
@@ -269,6 +484,9 @@ public class MainController {
             if (selectedToggle == null) throw new IllegalArgumentException("Select an alliance.");
             String alliance = selectedToggle.getText().contains("Red") ? "RED" : "BLUE";
             boolean isSingle = singleModeRadio.isSelected();
+
+            ScoreEntry.SyncStatus targetStatus = isHost ? ScoreEntry.SyncStatus.SYNCED :
+                    (editingOriginalSyncStatus != null ? editingOriginalSyncStatus : ScoreEntry.SyncStatus.UNSYNCED);
 
             ScoreEntry entry;
             if (editingScoreId != -1) {
@@ -281,7 +499,7 @@ public class MainController {
                         team1L2ClimbCheck.isSelected(), isSingle ? false : team2L2ClimbCheck.isSelected(),
                         team1IgnoreCheck.isSelected(), isSingle ? false : team2IgnoreCheck.isSelected(),
                         team1BrokenCheck.isSelected(), isSingle ? false : team2BrokenCheck.isSelected(),
-                        currentClickLocations, currentUsername, editingOriginalTime
+                        currentClickLocations, currentUsername, editingOriginalTime, targetStatus
                 );
             } else {
                 entry = new ScoreEntry(
@@ -294,23 +512,24 @@ public class MainController {
                         team1IgnoreCheck.isSelected(), isSingle ? false : team2IgnoreCheck.isSelected(),
                         team1BrokenCheck.isSelected(), isSingle ? false : team2BrokenCheck.isSelected(),
                         currentClickLocations, currentUsername);
+                entry.setSyncStatus(targetStatus);
             }
 
+            matchDataService.submitScore(currentCompetition.getName(), entry);
+
             if (isHost) {
-                // --- 调用 Service ---
-                matchDataService.submitScore(currentCompetition.getName(), entry);
-                refreshAllDataFromDatabase();
                 broadcastUpdate();
             } else {
                 NetworkService.getInstance().sendScoreToServer(entry);
             }
-            errorLabel.setText("Score saved!");
+            refreshAllDataFromDatabase();
+            errorLabel.setText("Score saved locally!");
             resetFormState();
         } catch (Exception e) { errorLabel.setText("Error: " + e.getMessage()); }
     }
 
     private void resetFormState() {
-        editingScoreId = -1; editingOriginalTime = null;
+        editingScoreId = -1; editingOriginalTime = null; editingOriginalSyncStatus = null;
         if(submitButton != null) { submitButton.setText("Submit Score"); submitButton.setStyle(""); }
         submitterLabel.setText("Submitter: " + currentUsername); submitterLabel.setStyle("");
         currentClickLocations = ""; autoArtifactsField.setText("0"); teleopArtifactsField.setText("0");
@@ -323,7 +542,6 @@ public class MainController {
     }
 
     private void refreshAllDataFromDatabase() {
-        // --- 调用 Service ---
         List<ScoreEntry> fullHistory = matchDataService.getHistory(currentCompetition.getName());
         List<TeamRanking> newRankings = rankingService.calculateRankings(currentCompetition.getName());
         updateUIAfterDataChange(fullHistory, newRankings);
@@ -334,7 +552,6 @@ public class MainController {
             rankingsTableView.setItems(FXCollections.observableArrayList(rankings));
             scoreHistoryList.setAll(history);
             if (currentCompetition != null && isHost) {
-                // --- 刷新 Competition 对象，获取最新公式 ---
                 currentCompetition = competitionRepository.findByName(currentCompetition.getName());
                 rankRatingCol.setText(currentCompetition.getRatingFormula().equals("total") ? "Rating" : "Rating *");
             }
@@ -344,21 +561,20 @@ public class MainController {
     private void broadcastUpdate() {
         List<ScoreEntry> fullHistory = matchDataService.getHistory(currentCompetition.getName());
         List<TeamRanking> newRankings = rankingService.calculateRankings(currentCompetition.getName());
-        NetworkService.getInstance().broadcastUpdateToClients(new NetworkPacket(fullHistory, newRankings));
+        NetworkService.getInstance().broadcastUpdateToClients(new NetworkPacket(fullHistory, newRankings, officialEventName));
     }
 
     private void updateWeakCheckboxStatus(String teamNumberStr, CheckBox checkBox) {
         if (checkBox == null || teamNumberStr == null || teamNumberStr.trim().isEmpty() || currentCompetition == null) return;
         try {
             int teamNum = Integer.parseInt(teamNumberStr.trim());
-            // --- 调用 Service ---
             int matchCount = matchDataService.getTeamHistory(currentCompetition.getName(), teamNum).size();
             checkBox.setDisable(matchCount < 2 && editingScoreId == -1);
         } catch (Exception e) { checkBox.setDisable(true); }
     }
 
     private void handleScoreReceivedFromClient(ScoreEntry scoreEntry) {
-        // --- 调用 Service ---
+        scoreEntry.setSyncStatus(ScoreEntry.SyncStatus.SYNCED);
         matchDataService.submitScore(currentCompetition.getName(), scoreEntry);
         refreshAllDataFromDatabase();
         broadcastUpdate();
@@ -367,9 +583,17 @@ public class MainController {
     private void handleUpdateReceivedFromHost(NetworkPacket packet) {
         Platform.runLater(() -> {
             if (packet.getType() == NetworkPacket.PacketType.UPDATE_DATA) {
-                updateUIAfterDataChange(packet.getScoreHistory(), packet.getTeamRankings());
-                setUIEnabled(true);
+                matchDataService.syncWithHostData(currentCompetition.getName(), packet.getScoreHistory());
+                refreshAllDataFromDatabase();
                 statusLabel.setText("Connected & Synced.");
+
+                List<ScoreEntry> pending = matchDataService.getPendingExports(currentCompetition.getName());
+                if (!pending.isEmpty()) {
+                    for (ScoreEntry s : pending) {
+                        NetworkService.getInstance().sendScoreToServer(s);
+                    }
+                    statusLabel.setText("Auto-synced " + pending.size() + " local records to host.");
+                }
             }
         });
     }
@@ -380,7 +604,6 @@ public class MainController {
         } catch (IOException e) { e.printStackTrace(); }
     }
 
-    // 回调方法供 FieldInputController 使用
     public void onFieldInputConfirmed(int totalHits, String clickLocations) {
         teleopArtifactsField.setText(String.valueOf(totalHits));
         currentClickLocations = clickLocations;
@@ -393,6 +616,51 @@ public class MainController {
         histTotalCol.setCellValueFactory(new PropertyValueFactory<>("totalScore"));
         histSubmitterCol.setCellValueFactory(new PropertyValueFactory<>("submitter"));
         histTimeCol.setCellValueFactory(new PropertyValueFactory<>("submissionTime"));
+
+        histSyncCol.setCellValueFactory(new PropertyValueFactory<>("syncStatus"));
+        histSyncCol.setCellFactory(param -> new TableCell<>() {
+            private final Circle circle = new Circle(6);
+            { setAlignment(javafx.geometry.Pos.CENTER); }
+            @Override protected void updateItem(ScoreEntry.SyncStatus status, boolean empty) {
+                super.updateItem(status, empty);
+                if (empty || status == null) { setGraphic(null); } else {
+                    switch(status) {
+                        case UNSYNCED -> circle.setFill(Color.web("#FF453A"));
+                        case EXPORTED -> circle.setFill(Color.web("#FF9F0A"));
+                        case SYNCED -> circle.setFill(Color.web("#32D74B"));
+                    }
+                    setGraphic(circle);
+                }
+            }
+        });
+
+        histActionsCol.setCellFactory(param -> new TableCell<>() {
+            private final Button editBtn = new Button("Edit");
+            private final Button delBtn = new Button("Delete");
+            private final HBox pane = new HBox(8, editBtn, delBtn);
+            {
+                pane.setAlignment(javafx.geometry.Pos.CENTER);
+                editBtn.getStyleClass().addAll("accent", "button-small");
+                delBtn.getStyleClass().addAll("danger", "button-small");
+                editBtn.setOnAction(e -> handleEditAction(getTableView().getItems().get(getIndex())));
+                delBtn.setOnAction(e -> handleDeleteAction(getTableView().getItems().get(getIndex())));
+            }
+            @Override protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || getIndex() >= getTableView().getItems().size()) { setGraphic(null); } else {
+                    ScoreEntry entry = getTableView().getItems().get(getIndex());
+                    boolean canEdit = isHost || entry.getSubmitter().equals(currentUsername);
+                    boolean canDel = isHost;
+
+                    editBtn.setVisible(canEdit); editBtn.setManaged(canEdit);
+                    delBtn.setVisible(canDel); delBtn.setManaged(canDel);
+
+                    if(!canEdit && !canDel) setGraphic(null);
+                    else setGraphic(pane);
+                }
+            }
+        });
+
         FilteredList<ScoreEntry> filtered = new FilteredList<>(scoreHistoryList, p -> true);
         searchField.textProperty().addListener((o, old, newVal) -> filtered.setPredicate(s -> {
             if (newVal == null || newVal.isEmpty()) return true;
@@ -400,26 +668,14 @@ public class MainController {
             return String.valueOf(s.getMatchNumber()).contains(low) || s.getTeams().contains(low);
         }));
         historyTableView.setItems(filtered);
-
-        ContextMenu contextMenu = new ContextMenu();
-        MenuItem editItem = new MenuItem("Edit This Entry");
-        editItem.setOnAction(e -> handleEditAction());
-        MenuItem deleteItem = new MenuItem("Delete Entry (Danger)");
-        deleteItem.setStyle("-fx-text-fill: red;");
-        deleteItem.setOnAction(e -> handleDeleteAction());
-        contextMenu.getItems().addAll(editItem, deleteItem);
-        historyTableView.setRowFactory(tv -> {
-            TableRow<ScoreEntry> row = new TableRow<>();
-            row.contextMenuProperty().bind(javafx.beans.binding.Bindings.when(row.emptyProperty()).then((ContextMenu) null).otherwise(contextMenu));
-            return row;
-        });
     }
 
-    private void handleEditAction() {
-        ScoreEntry selected = historyTableView.getSelectionModel().getSelectedItem();
-        if (selected == null) return;
-        editingScoreId = selected.getId(); editingOriginalTime = selected.getSubmissionTime();
-        submitterLabel.setText("EDITING RECORD ID: " + editingScoreId); submitterLabel.setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
+    private void handleEditAction(ScoreEntry selected) {
+        editingScoreId = selected.getId();
+        editingOriginalTime = selected.getSubmissionTime();
+        editingOriginalSyncStatus = selected.getSyncStatus();
+        submitterLabel.setText("EDITING RECORD ID: " + editingScoreId);
+        submitterLabel.setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
         if(submitButton != null) { submitButton.setText("Update Record"); submitButton.setStyle("-fx-background-color: #f39c12; -fx-text-fill: white;"); }
         matchNumberField.setText(String.valueOf(selected.getMatchNumber()));
         team1Field.setText(String.valueOf(selected.getTeam1())); team2Field.setText(String.valueOf(selected.getTeam2()));
@@ -434,14 +690,11 @@ public class MainController {
         currentClickLocations = selected.getClickLocations(); errorLabel.setText("Editing record loaded.");
     }
 
-    private void handleDeleteAction() {
-        ScoreEntry selected = historyTableView.getSelectionModel().getSelectedItem();
-        if (selected == null) return;
+    private void handleDeleteAction(ScoreEntry selected) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION, "Delete Match " + selected.getMatchNumber() + "?", ButtonType.YES, ButtonType.NO);
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.YES) {
                 if (isHost) {
-                    // --- 调用 Service ---
                     matchDataService.deleteScore(selected.getId());
                     refreshAllDataFromDatabase();
                     broadcastUpdate();
@@ -452,13 +705,54 @@ public class MainController {
     }
 
     @FXML
+    private void handleOfflineSync() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("FTC Sync Data (*.ftcsync)", "*.ftcsync"));
+
+        if (isHost) {
+            fileChooser.setTitle("Import Client Offline Data");
+            File file = fileChooser.showOpenDialog(competitionNameLabel.getScene().getWindow());
+            if (file != null) {
+                try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
+                    @SuppressWarnings("unchecked")
+                    List<ScoreEntry> importedScores = (List<ScoreEntry>) in.readObject();
+                    for(ScoreEntry s : importedScores) {
+                        s.setId(0);
+                        s.setSyncStatus(ScoreEntry.SyncStatus.SYNCED);
+                        matchDataService.submitScore(currentCompetition.getName(), s);
+                    }
+                    refreshAllDataFromDatabase();
+                    broadcastUpdate();
+                    statusLabel.setText("Imported " + importedScores.size() + " records!");
+                } catch (Exception e) { errorLabel.setText("Import Failed."); }
+            }
+        } else {
+            List<ScoreEntry> pending = matchDataService.getPendingExports(currentCompetition.getName());
+            if (pending.isEmpty()) { statusLabel.setText("No pending offline data to export."); return; }
+
+            fileChooser.setTitle("Export Offline Data");
+            fileChooser.setInitialFileName("OfflineSync_" + currentUsername + "_" + System.currentTimeMillis() + ".ftcsync");
+            File file = fileChooser.showSaveDialog(competitionNameLabel.getScene().getWindow());
+
+            if (file != null) {
+                try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file))) {
+                    out.writeObject(pending);
+                    matchDataService.markAsExported(pending.stream().map(ScoreEntry::getId).collect(Collectors.toList()));
+                    refreshAllDataFromDatabase();
+                    statusLabel.setText("Exported successfully!");
+                } catch (Exception e) { errorLabel.setText("Export Failed."); }
+            }
+        }
+    }
+
+    @FXML
     private void handleExport() {
         final Stage dialog = new Stage();
         dialog.initOwner(competitionNameLabel.getScene().getWindow());
         dialog.setTitle("Export Data");
         VBox dialogVbox = new VBox(20); dialogVbox.setAlignment(javafx.geometry.Pos.CENTER); dialogVbox.setPadding(new javafx.geometry.Insets(30));
         dialogVbox.setStyle("-fx-border-color: #4A5C70; -fx-border-width: 2;");
-        Label headerLabel = new Label("Export Data"); headerLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        Label headerLabel = new Label("Export CSV Data"); headerLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
         Button btnHistory = new Button("Export Match History"); btnHistory.setOnAction(e -> { dialog.close(); exportData("Match History"); });
         Button btnRankings = new Button("Export Team Rankings"); btnRankings.setOnAction(e -> { dialog.close(); exportData("Team Rankings"); });
         Button btnCancel = new Button("Cancel"); btnCancel.setOnAction(e -> dialog.close());
@@ -467,11 +761,11 @@ public class MainController {
     }
 
     private void exportData(String type) {
-        javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
-        fileChooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("CSV Files (*.csv)", "*.csv"));
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Files (*.csv)", "*.csv"));
         String timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmm").format(new java.util.Date());
         fileChooser.setInitialFileName(currentCompetition.getName() + "_" + type.replace(" ", "") + "_" + timestamp + ".csv");
-        java.io.File file = fileChooser.showSaveDialog((Stage) competitionNameLabel.getScene().getWindow());
+        java.io.File file = fileChooser.showSaveDialog(competitionNameLabel.getScene().getWindow());
         if (file != null) {
             try (java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.FileWriter(file))) {
                 if (type.equals("Match History")) writeMatchHistoryCSV(writer); else writeRankingsCSV(writer);
@@ -481,27 +775,26 @@ public class MainController {
     }
 
     private void writeMatchHistoryCSV(java.io.BufferedWriter writer) throws IOException {
-        writer.write("Match,Alliance,T1,T2,Auto,Teleop,Total,T1Seq,T1Climb,T2Seq,T2Climb,Submitter,Time"); writer.newLine();
+        writer.write("Match,Alliance,T1,T2,Auto,Teleop,Total,T1Seq,T1Climb,T2Seq,T2Climb,Submitter,Time,SyncStatus"); writer.newLine();
         for (ScoreEntry s : scoreHistoryList) {
-            writer.write(String.format("%d,%s,%d,%d,%d,%d,%d,%b,%b,%b,%b,%s,%s",
+            writer.write(String.format("%d,%s,%d,%d,%d,%d,%d,%b,%b,%b,%b,%s,%s,%s",
                     s.getMatchNumber(), s.getAlliance(), s.getTeam1(), s.getTeam2(), s.getAutoArtifacts(), s.getTeleopArtifacts(),
-                    s.getTotalScore(), s.isTeam1CanSequence(), s.isTeam1L2Climb(), s.isTeam2CanSequence(), s.isTeam2L2Climb(), s.getSubmitter(), s.getSubmissionTime()));
+                    s.getTotalScore(), s.isTeam1CanSequence(), s.isTeam1L2Climb(), s.isTeam2CanSequence(), s.isTeam2L2Climb(), s.getSubmitter(), s.getSubmissionTime(), s.getSyncStatus().name()));
             writer.newLine();
         }
     }
 
     private void writeRankingsCSV(java.io.BufferedWriter writer) throws IOException {
-        writer.write("Rank,Team,Rating,Matches,Auto,Teleop,Accuracy"); writer.newLine();
+        writer.write("Rank,Team,Rating,Matches,Auto,Teleop,Accuracy,PenComm,PenOpp,L2Climb,Sequence"); writer.newLine();
         int rank = 1;
         for (TeamRanking r : rankingsTableView.getItems()) {
-            writer.write(String.format("%d,%d,%s,%d,%s,%s,%s", rank++, r.getTeamNumber(), r.getRatingFormatted(), r.getMatchesPlayed(), r.getAvgAutoArtifactsFormatted(), r.getAvgTeleopArtifactsFormatted(), r.getAccuracyFormatted()));
+            writer.write(String.format("%d,%d,%s,%d,%s,%s,%s,%s,%s,%s,%s", rank++, r.getTeamNumber(), r.getRatingFormatted(), r.getMatchesPlayed(), r.getAvgAutoArtifactsFormatted(), r.getAvgTeleopArtifactsFormatted(), r.getAccuracyFormatted(), r.getAvgPenaltyCommittedFormatted(), r.getAvgOpponentPenaltyFormatted(), r.getL2Capable(), r.getCanSequence()));
             writer.newLine();
         }
     }
 
     private void setUIEnabled(boolean e) { scoringFormVBox.setDisable(!e); }
 
-    // --- 页面跳转逻辑交由 MainApplication 统一处理 ---
     @FXML private void handleEditRating() throws IOException { if(isHost) mainApp.showFormulaEditView(currentCompetition); refreshAllDataFromDatabase(); }
     @FXML private void handleManageMembers() throws IOException { mainApp.showCoordinatorView(currentCompetition); }
     @FXML private void handleAllianceAnalysis() throws IOException { mainApp.showAllianceAnalysisView(currentCompetition); }

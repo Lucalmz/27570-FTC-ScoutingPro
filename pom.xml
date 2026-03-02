@@ -119,28 +119,26 @@
                 <artifactId>jpackage-maven-plugin</artifactId>
                 <version>1.6.0</version>
                 <configuration>
-                    <!-- 应用信息 -->
                     <name>FTCScoutingPro</name>
-                    <appVersion>2.1.5</appVersion>
+                    <appVersion>3.0.0</appVersion>
                     <vendor>Bear27570</vendor>
                     <destination>${project.build.directory}/dist</destination>
 
-                    <!-- 指定主 JAR -->
                     <mainJar>${project.build.finalName}.jar</mainJar>
                     <mainClass>com.bear27570.ftc.scouting.Launcher</mainClass>
-                    <!-- 指定输入目录 (必须先运行 mvn package 生成 jar 到这里) -->
-                    <input>${project.build.directory}</input>
+
+                    <input>${project.build.directory}/jpackage-input</input>
+
+                    <macPackageIdentifier>com.bear27570.ftcscouting</macPackageIdentifier>
+                    <macPackageName>FTCScoutingPro</macPackageName>
 
                     <javaOptions>
                         <option>-Dfile.encoding=UTF-8</option>
                     </javaOptions>
 
-                    <!-- *** 删除了 modulePath 和 addModules *** -->
-                    <!-- 因为 Shade 插件已经把 JavaFX 打包进 JAR 了 -->
-
-                    <!-- Windows 特定配置 -->
+                    <!-- Windows 特定配置保持不变 -->
                     <winMenu>true</winMenu>
-                    <winConsole>false</winConsole> <!-- 如果想看报错，暂时改成 true -->
+                    <winConsole>false</winConsole>
                     <winShortcut>true</winShortcut>
                     <winDirChooser>true</winDirChooser>
                     <winUpgradeUuid>d8d1e2e3-f4b5-46c7-8d9e-0f1a2b3c4d5e</winUpgradeUuid>

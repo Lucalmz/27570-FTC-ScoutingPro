@@ -1,3 +1,4 @@
+// File: ScoreRepositoryJdbcImpl.java
 package com.bear27570.ftc.scouting.repository.impl;
 
 import com.bear27570.ftc.scouting.models.ScoreEntry;
@@ -20,9 +21,9 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
         String sql = "INSERT INTO scores(competitionName, scoreType, matchNumber, alliance, team1, team2, " +
                 "autoArtifacts, teleopArtifacts, team1CanSequence, team2CanSequence, team1L2Climb, team2L2Climb, " +
                 "team1Ignored, team2Ignored, team1Broken, team2Broken, " +
-                "totalScore, clickLocations, submitter, submissionTime) " +
-                "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                "totalScore, clickLocations, submitter, submissionTime, syncStatus) " +
+                "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setString(1, competitionName);
             pstmt.setString(2, entry.getScoreType().name());
             pstmt.setInt(3, entry.getMatchNumber());
@@ -43,7 +44,13 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
             pstmt.setString(18, entry.getClickLocations());
             pstmt.setString(19, entry.getSubmitter());
             pstmt.setString(20, entry.getSubmissionTime());
+            pstmt.setString(21, entry.getSyncStatus().name());
             pstmt.executeUpdate();
+            try (ResultSet rs = pstmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    entry.setId(rs.getInt(1));
+                }
+            }
         } catch (SQLException e) {
             System.err.println("Error saving score: " + e.getMessage());
             e.printStackTrace();
@@ -54,7 +61,7 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
     public void update(ScoreEntry entry) {
         String sql = "UPDATE scores SET matchNumber=?, alliance=?, team1=?, team2=?, autoArtifacts=?, teleopArtifacts=?, " +
                 "team1CanSequence=?, team2CanSequence=?, team1L2Climb=?, team2L2Climb=?, " +
-                "team1Ignored=?, team2Ignored=?, team1Broken=?, team2Broken=?, totalScore=?, clickLocations=? " +
+                "team1Ignored=?, team2Ignored=?, team1Broken=?, team2Broken=?, totalScore=?, clickLocations=?, syncStatus=? " +
                 "WHERE id=?";
         try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, entry.getMatchNumber());
@@ -73,10 +80,85 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
             pstmt.setBoolean(14, entry.isTeam2Broken());
             pstmt.setInt(15, entry.getTotalScore());
             pstmt.setString(16, entry.getClickLocations());
-            pstmt.setInt(17, entry.getId());
+            pstmt.setString(17, entry.getSyncStatus().name());
+            pstmt.setInt(18, entry.getId());
             pstmt.executeUpdate();
         } catch (SQLException e) {
             System.err.println("Error updating score (ID: " + entry.getId() + "): " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void syncWithHostData(String competitionName, List<ScoreEntry> hostData) {
+        try (Connection conn = DriverManager.getConnection(dbUrl)) {
+            conn.setAutoCommit(false);
+
+            // 1. 获取本地目前所有尚未同步的记录
+            List<ScoreEntry> localPending = findPendingExports(competitionName);
+
+            // 2. 清空本地对应赛事的记录
+            try(PreparedStatement del = conn.prepareStatement("DELETE FROM scores WHERE competitionName = ?")) {
+                del.setString(1, competitionName);
+                del.executeUpdate();
+            }
+
+            // 3. 把主机数据全部插回去 (此时已经是完全同步的状态)
+            for (ScoreEntry hs : hostData) {
+                hs.setSyncStatus(ScoreEntry.SyncStatus.SYNCED);
+                save(competitionName, hs);
+            }
+
+            // 4. 将刚才保留的未同步数据比对，如果主机里没有，则插回本地
+            for (ScoreEntry pending : localPending) {
+                boolean alreadyInHost = hostData.stream().anyMatch(h ->
+                        h.getSubmitter().equals(pending.getSubmitter()) &&
+                                h.getSubmissionTime().equals(pending.getSubmissionTime())
+                );
+                if (!alreadyInHost) {
+                    save(competitionName, pending);
+                }
+            }
+            conn.commit();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public List<ScoreEntry> findPendingExports(String competitionName) {
+        List<ScoreEntry> list = new ArrayList<>();
+        String sql = "SELECT * FROM scores WHERE competitionName = ? AND syncStatus IN ('UNSYNCED', 'EXPORTED')";
+        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, competitionName);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapResultSetToScoreEntry(rs));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    @Override
+    public void updateStatuses(List<Integer> ids, ScoreEntry.SyncStatus status) {
+        if (ids == null || ids.isEmpty()) return;
+        List<String> placeholdersList = new ArrayList<>();
+        for (int i = 0; i < ids.size(); i++) {
+            placeholdersList.add("?");
+        }
+        String placeholders = String.join(",", placeholdersList);
+        String sql = "UPDATE scores SET syncStatus = ? WHERE id IN (" + placeholders + ")";
+        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, status.name());
+            int idx = 2;
+            for (int id : ids) {
+                pstmt.setInt(idx++, id);
+            }
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
             e.printStackTrace();
         }
     }
@@ -131,15 +213,21 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
 
     private ScoreEntry mapResultSetToScoreEntry(ResultSet rs) throws SQLException {
         String typeStr = rs.getString("scoreType");
-        ScoreEntry.Type type = ScoreEntry.Type.ALLIANCE; // 默认防脏数据后备值
-
-        // 修复：防脏数据的 Enum 解析
+        ScoreEntry.Type type = ScoreEntry.Type.ALLIANCE;
         if (typeStr != null && !typeStr.trim().isEmpty()) {
             try {
                 type = ScoreEntry.Type.valueOf(typeStr.trim().toUpperCase());
             } catch (IllegalArgumentException e) {
                 System.err.println("Warning: Unknown score type found in DB -> " + typeStr);
             }
+        }
+
+        ScoreEntry.SyncStatus sync = ScoreEntry.SyncStatus.UNSYNCED;
+        String syncStr = rs.getString("syncStatus");
+        if (syncStr != null && !syncStr.trim().isEmpty()) {
+            try {
+                sync = ScoreEntry.SyncStatus.valueOf(syncStr.trim().toUpperCase());
+            } catch (IllegalArgumentException ignored) {}
         }
 
         boolean t1Ign = false, t2Ign = false, t1Brk = false, t2Brk = false;
@@ -167,7 +255,8 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
                 t2Brk,
                 rs.getString("clickLocations"),
                 rs.getString("submitter"),
-                rs.getString("submissionTime")
+                rs.getString("submissionTime"),
+                sync
         );
     }
 }

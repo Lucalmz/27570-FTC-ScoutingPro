@@ -45,6 +45,11 @@
             </VBox>
 
             <Region VBox.vgrow="ALWAYS"/>
+            <!-- 新增的 Undo 按钮 -->
+            <Button onAction="#handleUndo" text="Undo (Ctrl+Z)" styleClass="warning" prefWidth="160" prefHeight="40">
+                <graphic><FontIcon iconLiteral="fth-rotate-ccw" iconSize="14" iconColor="black"/></graphic>
+            </Button>
+
             <Button onAction="#handleClear" text="Clear Canvas" styleClass="danger" prefWidth="160" prefHeight="40">
                 <graphic><FontIcon iconLiteral="fth-trash-2" iconSize="14" iconColor="white"/></graphic>
             </Button>

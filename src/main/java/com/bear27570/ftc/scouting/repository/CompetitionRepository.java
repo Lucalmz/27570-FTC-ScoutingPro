@@ -8,4 +8,6 @@ public interface CompetitionRepository {
     Competition findByName(String name);
     void updateFormula(String competitionName, String newFormula);
     boolean create(String name, String creatorUsername, String ratingFormula);
+    void updateEventInfo(String competitionName, int season, String eventCode, String officialName);
+
 }

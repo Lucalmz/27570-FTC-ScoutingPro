@@ -32,7 +32,12 @@ public class NetworkService {
     private String hostingCompetitionName;
     private Runnable onMemberJoinCallback;
 
-    private NetworkDataHandler dataHandler;
+    private NetworkDataHandler dataHandler;// 在类的变量定义区（约 20 行附近）新增以下变量：
+    private String officialEventName = null;
+
+    public void setOfficialEventName(String name) {
+        this.officialEventName = name;
+    }
 
     // 修改为 public 以便单元测试可以独立实例化模拟 Client
     public NetworkService() {}
@@ -140,7 +145,8 @@ public class NetworkService {
                                         sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
                                         sendPacket(new NetworkPacket(
                                                 dataHandler.getScores(hostingCompetitionName),
-                                                dataHandler.getRankings(hostingCompetitionName)));
+                                                dataHandler.getRankings(hostingCompetitionName),
+                                                officialEventName));
                                     }
                                 }
                                 if (onMemberJoinCallback != null) {
@@ -168,7 +174,7 @@ public class NetworkService {
                 if(dataHandler != null) {
                     handler.sendPacket(new NetworkPacket(
                             dataHandler.getScores(hostingCompetitionName),
-                            dataHandler.getRankings(hostingCompetitionName)));
+                            dataHandler.getRankings(hostingCompetitionName),officialEventName));
                 }
                 return;
             }

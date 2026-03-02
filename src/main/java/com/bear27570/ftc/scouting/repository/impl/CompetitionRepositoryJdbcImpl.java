@@ -21,7 +21,12 @@ public class CompetitionRepositoryJdbcImpl implements CompetitionRepository {
         String sql = "SELECT * FROM competitions";
         try (Connection conn = DriverManager.getConnection(dbUrl); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
-                competitions.add(new Competition(rs.getString("name"), rs.getString("creatorUsername"), rs.getString("ratingFormula")));
+                Competition c = new Competition(rs.getString("name"), rs.getString("creatorUsername"), rs.getString("ratingFormula"));
+                // 新增：从数据库读取官方赛事信息
+                c.setEventSeason(rs.getInt("eventSeason"));
+                c.setEventCode(rs.getString("eventCode"));
+                c.setOfficialEventName(rs.getString("officialEventName"));
+                competitions.add(c);
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -57,6 +62,21 @@ public class CompetitionRepositoryJdbcImpl implements CompetitionRepository {
             return true;
         } catch (SQLException e) {
             return false;
+        }
+    }
+
+    // 新增：将绑定的赛事信息写入数据库
+    @Override
+    public void updateEventInfo(String competitionName, int season, String eventCode, String officialName) {
+        String sql = "UPDATE competitions SET eventSeason = ?, eventCode = ?, officialEventName = ? WHERE name = ?";
+        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, season);
+            pstmt.setString(2, eventCode);
+            pstmt.setString(3, officialName);
+            pstmt.setString(4, competitionName);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
     }
 }

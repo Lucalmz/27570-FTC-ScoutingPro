@@ -1,3 +1,4 @@
+// File: ScoreEntry.java
 package com.bear27570.ftc.scouting.models;
 
 import java.io.Serializable;
@@ -5,12 +6,12 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 public class ScoreEntry implements Serializable {
-    // 更新版本号以确保新字段序列化兼容
-    private static final long serialVersionUID = 11L;
+    private static final long serialVersionUID = 12L;
 
     public enum Type { ALLIANCE, SINGLE }
+    public enum SyncStatus { UNSYNCED, EXPORTED, SYNCED } // 新增离线同步状态枚举
 
-    private int id; // 新增：映射数据库的自增主键
+    private int id;
     private Type scoreType;
     private int matchNumber;
     private String alliance;
@@ -31,7 +32,9 @@ public class ScoreEntry implements Serializable {
     private String submissionTime;
     private String clickLocations;
 
-    // --- 构造函数 1：用于新建提交 (ID=0, 自动生成时间) ---
+    private SyncStatus syncStatus; // 新增状态变量
+
+    // 用于新建提交的构造函数
     public ScoreEntry(Type scoreType, int matchNumber, String alliance, int team1, int team2, int autoArtifacts, int teleopArtifacts,
                       boolean team1CanSequence, boolean team2CanSequence, boolean team1L2Climb, boolean team2L2Climb,
                       boolean team1Ignored, boolean team2Ignored,
@@ -41,15 +44,16 @@ public class ScoreEntry implements Serializable {
                 team1CanSequence, team2CanSequence, team1L2Climb, team2L2Climb,
                 team1Ignored, team2Ignored, team1Broken, team2Broken,
                 clickLocations, submitter,
-                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                SyncStatus.UNSYNCED); // 默认初始为未同步
     }
 
-    // --- 构造函数 2：用于从数据库读取或更新 (包含 ID 和 原有时间) ---
+    // 用于数据库加载的完整构造函数
     public ScoreEntry(int id, Type scoreType, int matchNumber, String alliance, int team1, int team2, int autoArtifacts, int teleopArtifacts,
                       boolean team1CanSequence, boolean team2CanSequence, boolean team1L2Climb, boolean team2L2Climb,
                       boolean team1Ignored, boolean team2Ignored,
                       boolean team1Broken, boolean team2Broken,
-                      String clickLocations, String submitter, String existingTimestamp) {
+                      String clickLocations, String submitter, String existingTimestamp, SyncStatus syncStatus) {
         this.id = id;
         this.scoreType = scoreType;
         this.matchNumber = matchNumber;
@@ -69,6 +73,7 @@ public class ScoreEntry implements Serializable {
         this.clickLocations = clickLocations;
         this.submitter = submitter;
         this.submissionTime = existingTimestamp;
+        this.syncStatus = syncStatus != null ? syncStatus : SyncStatus.UNSYNCED;
         this.totalScore = calculateTotalScore();
     }
 
@@ -81,7 +86,7 @@ public class ScoreEntry implements Serializable {
         return score;
     }
 
-    // Getters and Setters
+    // Getters and Setters...
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
     public Type getScoreType() { return scoreType; }
@@ -104,4 +109,8 @@ public class ScoreEntry implements Serializable {
     public boolean isTeam1Broken() { return team1Broken; }
     public boolean isTeam2Broken() { return team2Broken; }
     public String getClickLocations() { return clickLocations; }
+
+    // SyncStatus Getter/Setter
+    public SyncStatus getSyncStatus() { return syncStatus; }
+    public void setSyncStatus(SyncStatus syncStatus) { this.syncStatus = syncStatus; }
 }
