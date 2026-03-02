@@ -39,7 +39,6 @@ public class NetworkService {
         this.officialEventName = name;
     }
 
-    // 修改为 public 以便单元测试可以独立实例化模拟 Client
     public NetworkService() {}
 
     public void setDataHandler(NetworkDataHandler dataHandler) {
@@ -65,15 +64,23 @@ public class NetworkService {
 
         new Thread(() -> {
             try {
-                serverSocket = new ServerSocket(TCP_PORT);
-                while (running) {
+                // ★ 修复点：使用局部变量，防止旧线程误用已被置空的全局变量
+                ServerSocket currentServerSocket = new ServerSocket(TCP_PORT);
+                serverSocket = currentServerSocket;
+
+                // ★ 修复点：除了 running，还要判断当前的 Socket 是否已被关闭
+                while (running && !currentServerSocket.isClosed()) {
                     try {
-                        Socket client = serverSocket.accept();
+                        Socket client = currentServerSocket.accept();
                         ClientHandler handler = new ClientHandler(client, onScoreReceived);
                         connectedClients.add(handler);
                         handler.start();
                     } catch (IOException e) {
-                        if (running) System.err.println("TCP Accept error: " + e.getMessage());
+                        if (running && !currentServerSocket.isClosed()) {
+                            System.err.println("TCP Accept error: " + e.getMessage());
+                        } else {
+                            break; // 正常退出旧线程
+                        }
                     }
                 }
             } catch (IOException e) {
@@ -91,8 +98,7 @@ public class NetworkService {
                 String msg = "FTC_SCOUTER;" + comp.getName() + ";" + comp.getCreatorUsername();
                 byte[] buf = msg.getBytes();
 
-                while (running) {
-                    // 1. 遍历所有真实网卡，对每个网卡专属的广播地址发送 (修复多网卡/虚拟机网卡丢包问题)
+                while (running && !beacon.isClosed()) {
                     java.util.Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
                     while (interfaces.hasMoreElements()) {
                         NetworkInterface networkInterface = interfaces.nextElement();
@@ -104,12 +110,11 @@ public class NetworkService {
                                 try {
                                     DatagramPacket packet = new DatagramPacket(buf, buf.length, broadcast, UDP_PORT);
                                     beacon.send(packet);
-                                } catch (Exception ignored) {} // 忽略不可达网卡
+                                } catch (Exception ignored) {}
                             }
                         }
                     }
 
-                    // 2. 依然发一份全局广播 255.255.255.255 作为保底
                     try {
                         DatagramPacket packet = new DatagramPacket(buf, buf.length, InetAddress.getByName("255.255.255.255"), UDP_PORT);
                         beacon.send(packet);
@@ -158,9 +163,11 @@ public class NetworkService {
         public void run() {
             try {
                 out = new ObjectOutputStream(socket.getOutputStream());
-                out.flush(); // ★ 修复点1：强制推送流协议头，防止两端互相死锁等待
+                out.flush();
                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-                while (running) {
+
+                // ★ 修复点：加入 !socket.isClosed() 判断
+                while (running && !socket.isClosed()) {
                     Object obj = in.readObject();
                     if (obj instanceof NetworkPacket packet) {
                         switch (packet.getType()) {
@@ -170,8 +177,6 @@ public class NetworkService {
                                     dataHandler.addPendingMembership(clientUsername, hostingCompetitionName);
                                     if (dataHandler.isUserApprovedOrCreator(clientUsername, hostingCompetitionName)) {
                                         sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
-
-                                        // ★ 修复点2：使用 new java.util.ArrayList<>() 包装，防止 ObservableList 导致序列化失败静默断开
                                         sendPacket(new NetworkPacket(
                                                 new java.util.ArrayList<>(dataHandler.getScores(hostingCompetitionName)),
                                                 new java.util.ArrayList<>(dataHandler.getRankings(hostingCompetitionName)),
@@ -201,11 +206,9 @@ public class NetworkService {
             if (username.equals(handler.clientUsername)) {
                 handler.sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
                 if(dataHandler != null) {
-                    // ★ 修复点3：同上，防止主机在点击“批准”时向从机发送不支持序列化的 ObservableList 导致断开连接
                     handler.sendPacket(new NetworkPacket(
                             new java.util.ArrayList<>(dataHandler.getScores(hostingCompetitionName)),
-                            new java.util.ArrayList<>(dataHandler.getRankings(hostingCompetitionName)),
-                            officialEventName));
+                            new java.util.ArrayList<>(dataHandler.getRankings(hostingCompetitionName)),officialEventName));
                 }
                 return;
             }
@@ -217,15 +220,17 @@ public class NetworkService {
         new Thread(() -> {
             try {
                 if (udpSocket != null && !udpSocket.isClosed()) { udpSocket.close(); }
-                // 如果端口被占用，这里会抛出 BindException，必须打印出来
-                udpSocket = new DatagramSocket(UDP_PORT);
-                udpSocket.setSoTimeout(2000);
+
+                // ★ 修复点：同上，使用局部变量防止串线
+                DatagramSocket currentUdpSocket = new DatagramSocket(UDP_PORT);
+                currentUdpSocket.setSoTimeout(2000);
+                udpSocket = currentUdpSocket;
                 byte[] buffer = new byte[1024];
 
-                while (running) {
+                while (running && !currentUdpSocket.isClosed()) {
                     try {
                         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                        udpSocket.receive(packet);
+                        currentUdpSocket.receive(packet);
                         String msg = new String(packet.getData(), 0, packet.getLength());
 
                         if (msg.startsWith("FTC_SCOUTER;")) {
@@ -237,15 +242,13 @@ public class NetworkService {
                                 Platform.runLater(() -> {
                                     if (discoveredCompetitions.stream().noneMatch(c -> c.getName().equals(d.getName()) && c.getHostAddress().equals(d.getHostAddress()))) {
                                         discoveredCompetitions.add(d);
-                                        System.out.println("Discovered Match: " + d.getName() + " at " + d.getHostAddress());
                                     }
                                 });
                             }
                         }
                     } catch (SocketTimeoutException ignored) {
-                        // 正常的两秒超时，继续循环监听
                     } catch (IOException e) {
-                        if (running) {
+                        if (running && !currentUdpSocket.isClosed()) {
                             System.err.println("UDP Receive Error: " + e.getMessage());
                         }
                         break;
@@ -253,7 +256,6 @@ public class NetworkService {
                 }
             } catch (java.net.BindException e) {
                 System.err.println("CRITICAL ERROR: UDP Port " + UDP_PORT + " is already in use!");
-                System.err.println("Another instance of this app might be running in the background. Please close it in Task Manager.");
             } catch (IOException e) {
                 System.err.println("Failed to start UDP Discovery: " + e.getMessage());
             }
@@ -264,28 +266,36 @@ public class NetworkService {
         stop();
         this.running = true;
         clientSocket = new Socket();
-        clientSocket.connect(new InetSocketAddress(hostAddress, TCP_PORT), 5000);
-        outToServer = new ObjectOutputStream(clientSocket.getOutputStream());
 
-        // ★ 优化点：建立连接时也加上 outToServer.flush(); 防御性编程确保安全
-        outToServer.flush();
+        try {
+            clientSocket.connect(new InetSocketAddress(hostAddress, TCP_PORT), 5000);
+            outToServer = new ObjectOutputStream(clientSocket.getOutputStream());
+            outToServer.flush();
 
-        outToServer.writeObject(new NetworkPacket(NetworkPacket.PacketType.JOIN_REQUEST, myUsername));
-        outToServer.flush();
-        outToServer.reset();
+            outToServer.writeObject(new NetworkPacket(NetworkPacket.PacketType.JOIN_REQUEST, myUsername));
+            outToServer.flush();
+            outToServer.reset();
 
-        new Thread(() -> {
-            try (ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream())) {
-                while (running) {
-                    Object obj = in.readObject();
-                    if (obj instanceof NetworkPacket p) {
-                        Platform.runLater(() -> onPacketReceived.accept(p));
+            Socket currentClientSocket = clientSocket;
+
+            new Thread(() -> {
+                try (ObjectInputStream in = new ObjectInputStream(currentClientSocket.getInputStream())) {
+                    while (running && !currentClientSocket.isClosed()) {
+                        Object obj = in.readObject();
+                        if (obj instanceof NetworkPacket p) {
+                            Platform.runLater(() -> onPacketReceived.accept(p));
+                        }
                     }
+                } catch (Exception e) {
+                    if(running && !currentClientSocket.isClosed()) System.err.println("Connection to Host lost.");
                 }
-            } catch (Exception e) {
-                if(running) System.err.println("Connection to Host lost.");
-            }
-        }, "Client-Listen-Thread").start();
+            }, "Client-Listen-Thread").start();
+        } catch (IOException e) {
+            // ★ 修复点：一旦连接异常，立刻把状态设为 false，以免产生垃圾线程
+            this.running = false;
+            clientSocket = null;
+            throw e;
+        }
     }
 
     public void broadcastUpdateToClients(NetworkPacket updatePacket) {

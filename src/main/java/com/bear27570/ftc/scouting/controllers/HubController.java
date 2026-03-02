@@ -99,7 +99,7 @@ public class HubController {
     }
 
     @FXML
-    private void handleJoinButton() throws IOException {
+    private void handleJoinButton() { // ★ 修复点：去掉 throws IOException，不要抛给 JavaFX
         Competition selected = discoveredCompetitionsListView.getSelectionModel().getSelectedItem();
         if (selected == null) {
             statusLabel.setStyle("-fx-text-fill: #fab387;");
@@ -109,18 +109,25 @@ public class HubController {
 
         statusLabel.setStyle("-fx-text-fill: #89dceb;");
         statusLabel.setText("Connecting to " + selected.getName() + "...");
-        NetworkService.getInstance().connectToHost(selected.getHostAddress(), currentUsername, (packet) -> {
-            if (packet.getType() == NetworkPacket.PacketType.JOIN_RESPONSE) {
-                if (packet.isApproved()) {
-                    try {
-                        mainApp.showScoringView(selected, currentUsername, false);
-                    } catch (IOException e) { e.printStackTrace(); }
-                } else {
-                    statusLabel.setStyle("-fx-text-fill: #f38ba8;");
-                    statusLabel.setText("Join request denied by host.");
+
+        try {
+            NetworkService.getInstance().connectToHost(selected.getHostAddress(), currentUsername, (packet) -> {
+                if (packet.getType() == NetworkPacket.PacketType.JOIN_RESPONSE) {
+                    if (packet.isApproved()) {
+                        try {
+                            mainApp.showScoringView(selected, currentUsername, false);
+                        } catch (IOException e) { e.printStackTrace(); }
+                    } else {
+                        statusLabel.setStyle("-fx-text-fill: #f38ba8;");
+                        statusLabel.setText("Join request denied by host.");
+                    }
                 }
-            }
-        });
+            });
+        } catch (IOException e) {
+            // ★ 修复点：捕获网络拒绝连接的异常，不仅防止了软件崩溃，还能在 UI 上友好提示用户
+            statusLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold;");
+            statusLabel.setText("Connection failed: Host may be offline or closed.");
+        }
     }
 
     @FXML
