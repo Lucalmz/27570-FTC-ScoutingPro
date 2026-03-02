@@ -162,29 +162,33 @@ public class NetworkService {
 
                                 if (dataHandler != null) {
                                     try {
-                                        // =================================================================
-                                        // ★★★ 核心修复开始 ★★★
-                                        // 必须先确保 users 表里有这个用户，否则 memberships 插入必失败 (外键报错)
-                                        // =================================================================
                                         dataHandler.ensureUserExists(clientUsername);
 
-                                        // 然后再添加成员关系
-                                        dataHandler.addPendingMembership(clientUsername, hostingCompetitionName);
-
-                                        System.out.println("[网络调试] 成功将[" + clientUsername + "] 写入数据库 Pending 列表");
+                                        // ★★★ 核心修复开始：判断用户是否以前已经获批过了 ★★★
+                                        if (dataHandler.isUserApprovedOrCreator(clientUsername, hostingCompetitionName)) {
+                                            System.out.println("[网络调试] 用户 [" + clientUsername + "] 已批准，直接恢复连接通行");
+                                            sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
+                                            sendPacket(new NetworkPacket(
+                                                    new java.util.ArrayList<>(dataHandler.getScores(hostingCompetitionName)),
+                                                    new java.util.ArrayList<>(dataHandler.getRankings(hostingCompetitionName)),
+                                                    officialEventName));
+                                        } else {
+                                            // 是个真正的新人，老老实实进 Pending 列表等待批准
+                                            dataHandler.addPendingMembership(clientUsername, hostingCompetitionName);
+                                            System.out.println("[网络调试] 成功将[" + clientUsername + "] 写入数据库 Pending 列表");
+                                            if (onMemberJoinCallback != null) {
+                                                Platform.runLater(onMemberJoinCallback);
+                                                System.out.println("[网络调试] 触发了主机 UI 的 MemberJoinCallback 刷新");
+                                            } else {
+                                                System.out.println("[网络调试] 提示：主机的 onMemberJoinCallback 为空，请手动刷新。");
+                                            }
+                                        }
                                     } catch (Exception dbEx) {
                                         System.err.println("[网络调试] 数据库操作失败: " + dbEx.getMessage());
-                                        dbEx.printStackTrace(); // 打印详细错误，方便排查
+                                        dbEx.printStackTrace();
                                     }
                                 }else {
                                     System.err.println("[网络调试] 严重错误：主机的 dataHandler 为 NULL！请检查 MainApplication.init() 逻辑。");
-                                }
-
-                                if (onMemberJoinCallback != null) {
-                                    Platform.runLater(onMemberJoinCallback);
-                                    System.out.println("[网络调试] 触发了主机 UI 的 MemberJoinCallback 刷新");
-                                } else {
-                                    System.out.println("[网络调试] 提示：主机的 onMemberJoinCallback 为空，请手动关闭并重新打开管理成员界面刷新。");
                                 }
                                 break;
 
@@ -197,7 +201,6 @@ public class NetworkService {
                         }
                     }
                 }
-                // ★ 修复点 2：显式打印 EOF 断开或 Class 异常，拒绝对静默崩溃一无所知
             } catch (EOFException e) {
                 System.out.println("[网络调试] 从机 [" + clientUsername + "] 已断开连接。");
                 stopClient();

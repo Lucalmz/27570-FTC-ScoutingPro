@@ -7,6 +7,7 @@ import com.bear27570.ftc.scouting.repository.CompetitionRepository;
 import com.bear27570.ftc.scouting.services.NetworkService;
 import com.bear27570.ftc.scouting.services.domain.MatchDataService;
 import com.bear27570.ftc.scouting.services.domain.RankingService;
+import com.bear27570.ftc.scouting.services.domain.UserService;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
@@ -85,6 +86,7 @@ public class MainController {
     private MatchDataService matchDataService;
     private RankingService rankingService;
     private CompetitionRepository competitionRepository;
+    private UserService userService;
 
     private Competition currentCompetition;
     private String currentUsername;
@@ -95,6 +97,7 @@ public class MainController {
     private String editingOriginalTime = null;
     private ScoreEntry.SyncStatus editingOriginalSyncStatus = null;
     private String officialEventName = null;
+
     private void updateTopLabel() {
         String role = isHost ? " [HOST]" : " [CLIENT]";
         if (officialEventName != null && !officialEventName.trim().isEmpty()) {
@@ -107,7 +110,7 @@ public class MainController {
     // --- 核心注入方法 ---
     public void setDependencies(MainApplication mainApp, Competition competition, String username, boolean isHost,
                                 MatchDataService matchDataService, RankingService rankingService,
-                                CompetitionRepository competitionRepository) {
+                                CompetitionRepository competitionRepository, UserService userService) {
         this.mainApp = mainApp;
         this.currentCompetition = competition;
         this.currentUsername = username;
@@ -115,6 +118,7 @@ public class MainController {
         this.matchDataService = matchDataService;
         this.rankingService = rankingService;
         this.competitionRepository = competitionRepository;
+        this.userService = userService; // 引入 UserService 解决外键问题
 
         updateTopLabel();
         if (currentCompetition.getOfficialEventName() != null && !currentCompetition.getOfficialEventName().isEmpty()) {
@@ -124,7 +128,7 @@ public class MainController {
             ftcScoutSeasonField.setText(String.valueOf(currentCompetition.getEventSeason()));
             ftcScoutEventField.setText(currentCompetition.getEventCode());
             boundEventNameLabel.setText("Bound Event: " + this.officialEventName);
-            updateTopLabel(); // 再次更新顶部大标题
+            updateTopLabel();
         }
 
         submitterLabel.setText("Submitter: " + username);
@@ -136,6 +140,7 @@ public class MainController {
         setupScoringTab();
         setupRankingsTab();
         setupHistoryTab();
+
         if (isHost) {
             editRatingButton.setVisible(true);
             editRatingButton.setManaged(true);
@@ -144,21 +149,13 @@ public class MainController {
             startAsHost();
         } else {
             // =======================================================
-            // ★ 新增：从机启动前，强制确保本地数据库有这个赛事记录，避免外键报错
+            // ★ 完美修复数据无法同步：从机启动前，静默创建一个同名的房主账户，确保满足 users 外键依赖
             // =======================================================
+            if (this.userService != null && currentCompetition.getCreatorUsername() != null) {
+                this.userService.register(currentCompetition.getCreatorUsername(), "dummy_password_for_fk");
+            }
             competitionRepository.ensureLocalCompetitionSync(currentCompetition);
 
-            manageMembersBtn.setVisible(false);
-            manageMembersBtn.setManaged(false);
-            startAsClient();
-        }
-        if (isHost) {
-            editRatingButton.setVisible(true);
-            editRatingButton.setManaged(true);
-            manageMembersBtn.setVisible(true);
-            manageMembersBtn.setManaged(true);
-            startAsHost();
-        } else {
             manageMembersBtn.setVisible(false);
             manageMembersBtn.setManaged(false);
             startAsClient();
@@ -287,7 +284,6 @@ public class MainController {
         };
     }
 
-    // --- 自动同步 FTCScout API 数据 (修正版) ---
     @FXML
     private void handleBindAndFetch() {
         if (!isHost) {
@@ -321,7 +317,6 @@ public class MainController {
                 HttpClient client = HttpClient.newHttpClient();
                 String gqlUrl = "https://api.ftcscout.org/graphql";
 
-                // 1. 获取赛事基本信息
                 String infoQuery = String.format(
                         "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { name hasMatches } }\"}",
                         season, eventCode
@@ -362,14 +357,9 @@ public class MainController {
                     return;
                 }
 
-                // 2. 获取详细比赛数据
-                // 关键修正：字段名改为 'scores' 而不是 'results'
-                // 关键修正：内部使用 Union Fragment，字段名为 'majorsCommitted' 和 'minorsCommitted'
                 int matchCount = 0;
                 String[] queriesToTry = {
-                        // 2025 (Into The Deep) 结构匹配 - 对应 Image 5, 6, 7
                         "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2025 { red { majorsCommitted minorsCommitted } blue { majorsCommitted minorsCommitted } } } } } }\"}",
-                        // 2024 (Centerstage) 结构备用
                         "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2024 { red { majorsCommitted minorsCommitted } blue { majorsCommitted minorsCommitted } } } } } }\"}"
                 };
 
@@ -394,7 +384,6 @@ public class MainController {
                 Platform.runLater(() -> {
                     boundEventNameLabel.setText("Bound Event: " + finalEventName);
 
-                    // --- 【修改】：不仅广播，还要写入数据库持久化保存 ---
                     this.officialEventName = finalEventName;
                     NetworkService.getInstance().setOfficialEventName(finalEventName);
 
@@ -402,10 +391,8 @@ public class MainController {
                     currentCompetition.setEventCode(eventCode);
                     currentCompetition.setOfficialEventName(finalEventName);
 
-                    // 调用 Repository 保存入数据库
                     competitionRepository.updateEventInfo(currentCompetition.getName(), season, eventCode, finalEventName);
-                    updateTopLabel(); // 更新顶部大标题
-                    // ----------------------------------------------
+                    updateTopLabel();
 
                     refreshAllDataFromDatabase();
                     broadcastUpdate();
@@ -430,26 +417,21 @@ public class MainController {
 
     private int parseMatchData(String json) {
         int count = 0;
-        // 关键修正：寻找 "scores" 之前是 "matches"
         int startIdx = json.indexOf("\"matches\"");
         if (startIdx == -1) return 0;
         String content = json.substring(startIdx);
 
-        // 分割 match 块
         String[] matchBlocks = content.split("\"matchNum\"\\s*:");
 
         for (int i = 1; i < matchBlocks.length; i++) {
             String block = matchBlocks[i];
 
-            // 提取 matchNum (位于分割后的开头)
             Matcher mNum = Pattern.compile("^\\s*(\\d+)").matcher(block);
             if (!mNum.find()) continue;
             int matchNum = Integer.parseInt(mNum.group(1));
 
             String lowerBlock = block.toLowerCase();
 
-            // 提取红蓝联盟数据
-            // 注意：GraphQL 返回的顺序通常是查询的顺序，但最好通过 indexOf 动态定位
             int redIdx = lowerBlock.indexOf("\"red\"");
             int blueIdx = lowerBlock.indexOf("\"blue\"");
 
@@ -457,14 +439,12 @@ public class MainController {
                 String redPart, bluePart;
                 if (redIdx < blueIdx) {
                     redPart = lowerBlock.substring(redIdx, blueIdx);
-                    // 截取 blue 部分直到可能的结束符（简单截取一段长度防止溢出）
                     bluePart = lowerBlock.substring(blueIdx, Math.min(lowerBlock.length(), blueIdx + 300));
                 } else {
                     bluePart = lowerBlock.substring(blueIdx, redIdx);
                     redPart = lowerBlock.substring(redIdx, Math.min(lowerBlock.length(), redIdx + 300));
                 }
 
-                // 关键修正：根据 Image 7 提取具体的 committed 字段
                 int rMin = extractPenalty(redPart, "minorscommitted");
                 int rMaj = extractPenalty(redPart, "majorscommitted");
                 int bMin = extractPenalty(bluePart, "minorscommitted");
@@ -483,7 +463,6 @@ public class MainController {
     }
 
     private int extractPenalty(String jsonPart, String keyNameLowerCase) {
-        // 匹配 "majorsCommitted": 5
         Pattern p = Pattern.compile("\"" + keyNameLowerCase + "\"\\s*:\\s*(\\d+)");
         Matcher m = p.matcher(jsonPart);
         if (m.find()) {
@@ -598,6 +577,15 @@ public class MainController {
     private void handleUpdateReceivedFromHost(NetworkPacket packet) {
         Platform.runLater(() -> {
             if (packet.getType() == NetworkPacket.PacketType.UPDATE_DATA) {
+
+                // ★ 修复点：确保把主机的事件名称也更新到从机本地
+                if (packet.getOfficialEventName() != null && !packet.getOfficialEventName().isEmpty()) {
+                    this.officialEventName = packet.getOfficialEventName();
+                    currentCompetition.setOfficialEventName(this.officialEventName);
+                    competitionRepository.updateEventInfo(currentCompetition.getName(), currentCompetition.getEventSeason(), currentCompetition.getEventCode(), this.officialEventName);
+                    updateTopLabel();
+                }
+
                 matchDataService.syncWithHostData(currentCompetition.getName(), packet.getScoreHistory());
                 refreshAllDataFromDatabase();
                 statusLabel.setText("Connected & Synced.");
@@ -813,10 +801,7 @@ public class MainController {
 
     @FXML private void handleEditRating() throws IOException { if(isHost) mainApp.showFormulaEditView(currentCompetition); refreshAllDataFromDatabase(); }
     @FXML private void handleManageMembers() throws IOException { mainApp.showCoordinatorView(currentCompetition); }
-    @FXML
-    private void handleAllianceAnalysis() throws IOException {
-        mainApp.showAllianceAnalysisView(currentCompetition, currentUsername);
-    }
+    @FXML private void handleAllianceAnalysis() throws IOException { mainApp.showAllianceAnalysisView(currentCompetition, currentUsername); }
     @FXML private void handleBackButton() throws IOException { mainApp.showHubView(currentUsername); }
     @FXML private void handleLogout() throws IOException { mainApp.showLoginView(); }
 }
