@@ -32,7 +32,7 @@ public class NetworkService {
     private String hostingCompetitionName;
     private Runnable onMemberJoinCallback;
 
-    private NetworkDataHandler dataHandler;// 在类的变量定义区（约 20 行附近）新增以下变量：
+    private NetworkDataHandler dataHandler;
     private String officialEventName = null;
 
     public void setOfficialEventName(String name) {
@@ -90,14 +90,40 @@ public class NetworkService {
                 beacon.setBroadcast(true);
                 String msg = "FTC_SCOUTER;" + comp.getName() + ";" + comp.getCreatorUsername();
                 byte[] buf = msg.getBytes();
-                DatagramPacket packet = new DatagramPacket(buf, buf.length, InetAddress.getByName("255.255.255.255"), UDP_PORT);
+
                 while (running) {
-                    beacon.send(packet);
+                    // 1. 遍历所有真实网卡，对每个网卡专属的广播地址发送 (修复多网卡/虚拟机网卡丢包问题)
+                    java.util.Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                    while (interfaces.hasMoreElements()) {
+                        NetworkInterface networkInterface = interfaces.nextElement();
+                        if (networkInterface.isLoopback() || !networkInterface.isUp()) continue;
+
+                        for (InterfaceAddress interfaceAddress : networkInterface.getInterfaceAddresses()) {
+                            InetAddress broadcast = interfaceAddress.getBroadcast();
+                            if (broadcast != null) {
+                                try {
+                                    DatagramPacket packet = new DatagramPacket(buf, buf.length, broadcast, UDP_PORT);
+                                    beacon.send(packet);
+                                } catch (Exception ignored) {} // 忽略不可达网卡
+                            }
+                        }
+                    }
+
+                    // 2. 依然发一份全局广播 255.255.255.255 作为保底
+                    try {
+                        DatagramPacket packet = new DatagramPacket(buf, buf.length, InetAddress.getByName("255.255.255.255"), UDP_PORT);
+                        beacon.send(packet);
+                    } catch (Exception ignored) {}
+
                     Thread.sleep(2000);
                 }
-            } catch (Exception ignored) {}
-        }).start();
+            } catch (Exception e) {
+                System.err.println("CRITICAL: UDP Beacon Error: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }, "UDP-Beacon-Thread").start();
     }
+
 
     private class ClientHandler extends Thread {
         private final Socket socket;
@@ -132,6 +158,7 @@ public class NetworkService {
         public void run() {
             try {
                 out = new ObjectOutputStream(socket.getOutputStream());
+                out.flush(); // ★ 修复点1：强制推送流协议头，防止两端互相死锁等待
                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
                 while (running) {
                     Object obj = in.readObject();
@@ -143,9 +170,11 @@ public class NetworkService {
                                     dataHandler.addPendingMembership(clientUsername, hostingCompetitionName);
                                     if (dataHandler.isUserApprovedOrCreator(clientUsername, hostingCompetitionName)) {
                                         sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
+
+                                        // ★ 修复点2：使用 new java.util.ArrayList<>() 包装，防止 ObservableList 导致序列化失败静默断开
                                         sendPacket(new NetworkPacket(
-                                                dataHandler.getScores(hostingCompetitionName),
-                                                dataHandler.getRankings(hostingCompetitionName),
+                                                new java.util.ArrayList<>(dataHandler.getScores(hostingCompetitionName)),
+                                                new java.util.ArrayList<>(dataHandler.getRankings(hostingCompetitionName)),
                                                 officialEventName));
                                     }
                                 }
@@ -172,9 +201,11 @@ public class NetworkService {
             if (username.equals(handler.clientUsername)) {
                 handler.sendPacket(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true));
                 if(dataHandler != null) {
+                    // ★ 修复点3：同上，防止主机在点击“批准”时向从机发送不支持序列化的 ObservableList 导致断开连接
                     handler.sendPacket(new NetworkPacket(
-                            dataHandler.getScores(hostingCompetitionName),
-                            dataHandler.getRankings(hostingCompetitionName),officialEventName));
+                            new java.util.ArrayList<>(dataHandler.getScores(hostingCompetitionName)),
+                            new java.util.ArrayList<>(dataHandler.getRankings(hostingCompetitionName)),
+                            officialEventName));
                 }
                 return;
             }
@@ -185,29 +216,48 @@ public class NetworkService {
         this.running = true;
         new Thread(() -> {
             try {
-                if (udpSocket != null) { udpSocket.close(); }
+                if (udpSocket != null && !udpSocket.isClosed()) { udpSocket.close(); }
+                // 如果端口被占用，这里会抛出 BindException，必须打印出来
                 udpSocket = new DatagramSocket(UDP_PORT);
                 udpSocket.setSoTimeout(2000);
                 byte[] buffer = new byte[1024];
+
                 while (running) {
                     try {
                         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                         udpSocket.receive(packet);
                         String msg = new String(packet.getData(), 0, packet.getLength());
+
                         if (msg.startsWith("FTC_SCOUTER;")) {
                             String[] parts = msg.split(";");
-                            Competition d = new Competition(parts[1], parts[2]);
-                            d.setHostAddress(packet.getAddress().getHostAddress());
-                            Platform.runLater(() -> {
-                                if (discoveredCompetitions.stream().noneMatch(c -> c.getName().equals(d.getName()) && c.getHostAddress().equals(d.getHostAddress())))
-                                    discoveredCompetitions.add(d);
-                            });
+                            if (parts.length >= 3) {
+                                Competition d = new Competition(parts[1], parts[2]);
+                                d.setHostAddress(packet.getAddress().getHostAddress());
+
+                                Platform.runLater(() -> {
+                                    if (discoveredCompetitions.stream().noneMatch(c -> c.getName().equals(d.getName()) && c.getHostAddress().equals(d.getHostAddress()))) {
+                                        discoveredCompetitions.add(d);
+                                        System.out.println("Discovered Match: " + d.getName() + " at " + d.getHostAddress());
+                                    }
+                                });
+                            }
                         }
-                    } catch (SocketTimeoutException ignored) {}
-                    catch (IOException e) { break; }
+                    } catch (SocketTimeoutException ignored) {
+                        // 正常的两秒超时，继续循环监听
+                    } catch (IOException e) {
+                        if (running) {
+                            System.err.println("UDP Receive Error: " + e.getMessage());
+                        }
+                        break;
+                    }
                 }
-            } catch (IOException ignored) {}
-        }).start();
+            } catch (java.net.BindException e) {
+                System.err.println("CRITICAL ERROR: UDP Port " + UDP_PORT + " is already in use!");
+                System.err.println("Another instance of this app might be running in the background. Please close it in Task Manager.");
+            } catch (IOException e) {
+                System.err.println("Failed to start UDP Discovery: " + e.getMessage());
+            }
+        }, "UDP-Discovery-Thread").start();
     }
 
     public synchronized void connectToHost(String hostAddress, String myUsername, Consumer<NetworkPacket> onPacketReceived) throws IOException {
@@ -216,6 +266,9 @@ public class NetworkService {
         clientSocket = new Socket();
         clientSocket.connect(new InetSocketAddress(hostAddress, TCP_PORT), 5000);
         outToServer = new ObjectOutputStream(clientSocket.getOutputStream());
+
+        // ★ 优化点：建立连接时也加上 outToServer.flush(); 防御性编程确保安全
+        outToServer.flush();
 
         outToServer.writeObject(new NetworkPacket(NetworkPacket.PacketType.JOIN_REQUEST, myUsername));
         outToServer.flush();
