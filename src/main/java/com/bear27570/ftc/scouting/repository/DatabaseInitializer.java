@@ -11,7 +11,7 @@ public class DatabaseInitializer {
             System.out.println("DEBUG: Initializing Database...");
 
             stmt.execute("CREATE TABLE IF NOT EXISTS users (username VARCHAR(255) PRIMARY KEY, password VARCHAR(255))");
-
+            try { stmt.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS geminiApiKey VARCHAR(255)"); } catch (SQLException ignore) {}
             stmt.execute("CREATE TABLE IF NOT EXISTS competitions (name VARCHAR(255) PRIMARY KEY, creatorUsername VARCHAR(255), ratingFormula VARCHAR(500) DEFAULT 'total', FOREIGN KEY (creatorUsername) REFERENCES users(username))");
 
             // 兼容旧数据库：尝试添加列 (新增 FTCScout 字段)

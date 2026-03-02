@@ -137,8 +137,8 @@ public class HubController {
         }
 
         try {
-            // 核心修复：委托给 MainApplication 去进行实例化依赖注入
-            mainApp.showAllianceAnalysisView(selected);
+            // ★ 核心修复：传入 currentUsername
+            mainApp.showAllianceAnalysisView(selected, currentUsername);
         } catch (IOException e) {
             e.printStackTrace();
             statusLabel.setText("Failed to open analysis window.");

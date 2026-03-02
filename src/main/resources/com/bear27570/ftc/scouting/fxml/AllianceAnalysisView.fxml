@@ -2,28 +2,59 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<VBox spacing="20" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.AllianceAnalysisController" prefHeight="550" prefWidth="850">
-    <padding><Insets top="30" right="30" bottom="30" left="30"/></padding>
+<SplitPane dividerPositions="0.60" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.AllianceAnalysisController" prefHeight="700" prefWidth="1200">
 
-    <Label text="Alliance Partner Analysis" styleClass="header-label"/>
+    <!-- 左侧：原有分析面板 -->
+    <VBox spacing="20" styleClass="mac-card">
+        <padding><Insets top="30" right="30" bottom="30" left="30"/></padding>
 
-    <HBox spacing="20" alignment="CENTER_LEFT" styleClass="card" style="-fx-padding: 20;">
-        <Label text="Target Main Team:" styleClass="text-muted, text-bold"/>
-        <TextField fx:id="mainTeamField" promptText="Team #" prefWidth="140" prefHeight="38"/>
-        <Button text="Analyze Potential Partners" onAction="#handleAnalyze" styleClass="submit-button" prefHeight="38"/>
-        <Region HBox.hgrow="ALWAYS"/>
-        <Label fx:id="mainTeamStatsLabel" text="Waiting for input..." styleClass="text-accent, text-bold"/>
-    </HBox>
+        <Label text="Alliance Partner Analysis" styleClass="header-label"/>
 
-    <TableView fx:id="analysisTable" VBox.vgrow="ALWAYS">
-        <columns>
-            <TableColumn fx:id="partnerCol" text="Partner Team" prefWidth="100"/>
-            <TableColumn fx:id="totalEffCol" text="Proj. Total Score" prefWidth="130"/>
-            <TableColumn fx:id="combinedAccCol" text="Comb. Accuracy" prefWidth="130"/>
-            <TableColumn fx:id="stabilityCol" text="Stability (StdDev)" prefWidth="130"/>
-            <TableColumn fx:id="styleCol" text="Analysis Note" prefWidth="280"/>
-        </columns>
-        <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
-    </TableView>
-</VBox>
+        <HBox spacing="20" alignment="CENTER_LEFT" styleClass="panel-inner" style="-fx-padding: 20;">
+            <Label text="Target Main Team:" styleClass="text-muted, text-bold"/>
+            <TextField fx:id="mainTeamField" promptText="Team #" prefWidth="140" prefHeight="38"/>
+            <Button text="Analyze Potential Partners" onAction="#handleAnalyze" styleClass="submit-button" prefHeight="38"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="mainTeamStatsLabel" text="Waiting for input..." styleClass="text-accent, text-bold"/>
+        </HBox>
+
+        <TableView fx:id="analysisTable" VBox.vgrow="ALWAYS">
+            <columns>
+                <TableColumn fx:id="partnerCol" text="Partner Team" prefWidth="100"/>
+                <TableColumn fx:id="totalEffCol" text="Proj. Total Score" prefWidth="130"/>
+                <TableColumn fx:id="combinedAccCol" text="Comb. Accuracy" prefWidth="130"/>
+                <TableColumn fx:id="stabilityCol" text="Stability (StdDev)" prefWidth="130"/>
+                <TableColumn fx:id="styleCol" text="Analysis Note" prefWidth="280"/>
+            </columns>
+            <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
+        </TableView>
+    </VBox>
+
+    <!-- 右侧：Gemini AI 聊天区域 -->
+    <VBox spacing="15" styleClass="mac-card">
+        <padding><Insets top="30" right="30" bottom="30" left="30"/></padding>
+        <Label text="AI Assistant (Gemini)" styleClass="title-3"/>
+        <Label text="Chat with your local match data." styleClass="text-muted"/>
+
+        <!-- API Key 配置栏 -->
+        <HBox spacing="10" alignment="CENTER_LEFT">
+            <PasswordField fx:id="apiKeyField" promptText="Enter Gemini API Key..." HBox.hgrow="ALWAYS" prefHeight="38"/>
+            <Button text="Save Key" onAction="#handleSaveApiKey" styleClass="accent" prefHeight="38">
+                <graphic><FontIcon iconLiteral="fth-key" iconSize="16" iconColor="white"/></graphic>
+            </Button>
+        </HBox>
+
+        <!-- 聊天信息面板 -->
+        <TextArea fx:id="chatArea" VBox.vgrow="ALWAYS" editable="false" wrapText="true" styleClass="panel-inner" style="-fx-font-size: 14px;"/>
+
+        <!-- 发送指令输入 -->
+        <HBox spacing="10" alignment="CENTER_LEFT">
+            <TextField fx:id="chatInputField" promptText="Ask Gemini about the data..." onAction="#handleSendChat" HBox.hgrow="ALWAYS" prefHeight="45"/>
+            <Button text="Send" onAction="#handleSendChat" styleClass="success" prefHeight="45" prefWidth="80">
+                <graphic><FontIcon iconLiteral="fth-send" iconSize="16" iconColor="white"/></graphic>
+            </Button>
+        </HBox>
+    </VBox>
+</SplitPane>

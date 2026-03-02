@@ -634,6 +634,7 @@ public class MainController {
             }
         });
 
+
         histActionsCol.setCellFactory(param -> new TableCell<>() {
             private final Button editBtn = new Button("Edit");
             private final Button delBtn = new Button("Delete");
@@ -797,7 +798,10 @@ public class MainController {
 
     @FXML private void handleEditRating() throws IOException { if(isHost) mainApp.showFormulaEditView(currentCompetition); refreshAllDataFromDatabase(); }
     @FXML private void handleManageMembers() throws IOException { mainApp.showCoordinatorView(currentCompetition); }
-    @FXML private void handleAllianceAnalysis() throws IOException { mainApp.showAllianceAnalysisView(currentCompetition); }
+    @FXML
+    private void handleAllianceAnalysis() throws IOException {
+        mainApp.showAllianceAnalysisView(currentCompetition, currentUsername);
+    }
     @FXML private void handleBackButton() throws IOException { mainApp.showHubView(currentUsername); }
     @FXML private void handleLogout() throws IOException { mainApp.showLoginView(); }
 }

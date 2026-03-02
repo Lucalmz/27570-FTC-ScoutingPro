@@ -6,4 +6,6 @@ package com.bear27570.ftc.scouting.services.domain;
 public interface UserService {
     boolean login(String username, String password);
     boolean register(String username, String password);
+    void updateApiKey(String username, String apiKey); // 新增
+    String getApiKey(String username);
 }

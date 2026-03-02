@@ -79,4 +79,31 @@ public class UserRepositoryJdbcImpl implements UserRepository {
             e.printStackTrace();
         }
     }
+    @Override
+    public void updateApiKey(String username, String apiKey) {
+        String sql = "UPDATE users SET geminiApiKey = ? WHERE username = ?";
+        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, apiKey);
+            pstmt.setString(2, username);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public String getApiKey(String username) {
+        String sql = "SELECT geminiApiKey FROM users WHERE username = ?";
+        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("geminiApiKey");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 }

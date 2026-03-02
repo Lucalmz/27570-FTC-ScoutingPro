@@ -177,19 +177,6 @@ public class MainApplication extends Application {
         stage.show();
     }
 
-    public void showAllianceAnalysisView(Competition competition) throws IOException {
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("fxml/AllianceAnalysisView.fxml"));
-        Stage stage = new Stage();
-        stage.setTitle("Alliance Analysis");
-        setStageIcon(stage);
-        Scene scene = new Scene(loader.load());
-        applyTheme(scene); // 应用外部 CSS
-        stage.setScene(scene);
-        AllianceAnalysisController controller = loader.getController();
-        controller.setDependencies(stage, competition, rankingService, matchDataService);
-        stage.show();
-    }
-
     public void showHeatmapView(Competition competition, int teamNum) throws IOException {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("fxml/HeatmapView.fxml"));
         Stage stage = new Stage();
@@ -202,7 +189,21 @@ public class MainApplication extends Application {
         controller.setData(teamNum, matchDataService.getTeamHistory(competition.getName(), teamNum));
         stage.show();
     }
+    public void showAllianceAnalysisView(Competition competition, String username) throws IOException {
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("fxml/AllianceAnalysisView.fxml"));
+        Stage stage = new Stage();
+        stage.setTitle("Alliance Analysis & AI Assistant");
+        setStageIcon(stage);
+        Scene scene = new Scene(loader.load());
+        applyTheme(scene);
+        stage.setScene(scene);
+        AllianceAnalysisController controller = loader.getController();
 
+        // ★ 核心修复：在这里传入 6 个参数 (加上 userService 和 username)
+        controller.setDependencies(stage, competition, rankingService, matchDataService, userService, username);
+
+        stage.show();
+    }
     public void showFieldInputView(MainController parentController, boolean isAllianceMode, String existingLocations) throws IOException {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("fxml/FieldInputView.fxml"));
         Stage stage = new Stage();
