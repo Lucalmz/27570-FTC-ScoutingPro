@@ -8,6 +8,7 @@ import com.bear27570.ftc.scouting.services.NetworkService;
 import com.bear27570.ftc.scouting.services.domain.MatchDataService;
 import com.bear27570.ftc.scouting.services.domain.RankingService;
 import com.bear27570.ftc.scouting.services.domain.UserService;
+import com.bear27570.ftc.scouting.services.network.FtcScoutApiClient; // 新引入的 API 客户端
 import javafx.application.Platform;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
@@ -26,13 +27,7 @@ import javafx.stage.Stage;
 import javafx.util.Callback;
 
 import java.io.*;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class MainController {
@@ -87,6 +82,7 @@ public class MainController {
     private RankingService rankingService;
     private CompetitionRepository competitionRepository;
     private UserService userService;
+    private FtcScoutApiClient ftcScoutApiClient;
 
     private Competition currentCompetition;
     private String currentUsername;
@@ -118,7 +114,10 @@ public class MainController {
         this.matchDataService = matchDataService;
         this.rankingService = rankingService;
         this.competitionRepository = competitionRepository;
-        this.userService = userService; // 引入 UserService 解决外键问题
+        this.userService = userService;
+
+        // 实例化专门负责 FTC Scout API 的客户端
+        this.ftcScoutApiClient = new FtcScoutApiClient(matchDataService);
 
         updateTopLabel();
         if (currentCompetition.getOfficialEventName() != null && !currentCompetition.getOfficialEventName().isEmpty()) {
@@ -148,9 +147,7 @@ public class MainController {
             manageMembersBtn.setManaged(true);
             startAsHost();
         } else {
-            // =======================================================
             // ★ 完美修复数据无法同步：从机启动前，静默创建一个同名的房主账户，确保满足 users 外键依赖
-            // =======================================================
             if (this.userService != null && currentCompetition.getCreatorUsername() != null) {
                 this.userService.register(currentCompetition.getCreatorUsername(), "dummy_password_for_fk");
             }
@@ -284,6 +281,7 @@ public class MainController {
         };
     }
 
+    // ★ 重构后：利用独立的 API Client 异步获取数据
     @FXML
     private void handleBindAndFetch() {
         if (!isHost) {
@@ -312,163 +310,48 @@ public class MainController {
         autoFetchStatusLabel.setStyle("-fx-text-fill: #0A84FF;");
         boundEventNameLabel.setText("Event: Fetching...");
 
-        new Thread(() -> {
-            try {
-                HttpClient client = HttpClient.newHttpClient();
-                String gqlUrl = "https://api.ftcscout.org/graphql";
+        // 调用重构到服务层的方法
+        ftcScoutApiClient.fetchAndSyncEventDataAsync(season, eventCode, currentCompetition.getName(), new FtcScoutApiClient.ApiCallback() {
+            @Override
+            public void onEventFound(String eventName, boolean hasMatches) {
+                Platform.runLater(() -> boundEventNameLabel.setText("Bound Event: " + eventName));
+            }
 
-                String infoQuery = String.format(
-                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { name hasMatches } }\"}",
-                        season, eventCode
-                );
-
-                HttpRequest infoReq = HttpRequest.newBuilder()
-                        .uri(URI.create(gqlUrl))
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(infoQuery))
-                        .build();
-                HttpResponse<String> infoRes = client.send(infoReq, HttpResponse.BodyHandlers.ofString());
-
-                if (infoRes.statusCode() != 200 || infoRes.body().contains("\"errors\"")) {
-                    Platform.runLater(() -> {
-                        boundEventNameLabel.setText("Event: Error/Not Found");
-                        autoFetchStatusLabel.setText("API Error. Check Season/Event Code.");
-                        autoFetchStatusLabel.setStyle("-fx-text-fill: #FF453A;");
-                    });
-                    return;
-                }
-
-                String eventName = "Unknown Event";
-                boolean hasMatches = false;
-
-                Matcher nameMatcher = Pattern.compile("\"name\"\\s*:\\s*\"([^\"]+)\"").matcher(infoRes.body());
-                if (nameMatcher.find()) eventName = nameMatcher.group(1);
-
-                Matcher hasMatchesMatcher = Pattern.compile("\"hasMatches\"\\s*:\\s*(true|false)").matcher(infoRes.body());
-                if (hasMatchesMatcher.find()) hasMatches = Boolean.parseBoolean(hasMatchesMatcher.group(1));
-
-                final String finalEventName = eventName;
-                if (!hasMatches) {
-                    Platform.runLater(() -> {
-                        boundEventNameLabel.setText("Bound Event: " + finalEventName);
-                        autoFetchStatusLabel.setText("Event found, but 'hasMatches' is false.");
-                        autoFetchStatusLabel.setStyle("-fx-text-fill: #FF9F0A;");
-                    });
-                    return;
-                }
-
-                int matchCount = 0;
-                String[] queriesToTry = {
-                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2025 { red { majorsCommitted minorsCommitted } blue { majorsCommitted minorsCommitted } } } } } }\"}",
-                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2024 { red { majorsCommitted minorsCommitted } blue { majorsCommitted minorsCommitted } } } } } }\"}"
-                };
-
-                for (String qFormat : queriesToTry) {
-                    String query = String.format(qFormat, season, eventCode);
-                    HttpRequest dataReq = HttpRequest.newBuilder()
-                            .uri(URI.create(gqlUrl))
-                            .header("Content-Type", "application/json")
-                            .POST(HttpRequest.BodyPublishers.ofString(query))
-                            .build();
-
-                    HttpResponse<String> dataRes = client.send(dataReq, HttpResponse.BodyHandlers.ofString());
-
-                    if (dataRes.statusCode() == 200 && !dataRes.body().contains("\"errors\"")) {
-                        matchCount = parseMatchData(dataRes.body());
-                        if (matchCount > 0) break;
-                    }
-                }
-
-                final int finalCount = matchCount;
-
+            @Override
+            public void onSuccess(String eventName, int syncedMatchCount) {
                 Platform.runLater(() -> {
-                    boundEventNameLabel.setText("Bound Event: " + finalEventName);
-
-                    this.officialEventName = finalEventName;
-                    NetworkService.getInstance().setOfficialEventName(finalEventName);
+                    officialEventName = eventName;
+                    NetworkService.getInstance().setOfficialEventName(eventName);
 
                     currentCompetition.setEventSeason(season);
                     currentCompetition.setEventCode(eventCode);
-                    currentCompetition.setOfficialEventName(finalEventName);
+                    currentCompetition.setOfficialEventName(eventName);
 
-                    competitionRepository.updateEventInfo(currentCompetition.getName(), season, eventCode, finalEventName);
+                    competitionRepository.updateEventInfo(currentCompetition.getName(), season, eventCode, eventName);
                     updateTopLabel();
 
                     refreshAllDataFromDatabase();
                     broadcastUpdate();
-                    if (finalCount > 0) {
-                        autoFetchStatusLabel.setText("Success! Synced penalties for " + finalCount + " matches.");
+
+                    if (syncedMatchCount > 0) {
+                        autoFetchStatusLabel.setText("Success! Synced penalties for " + syncedMatchCount + " matches.");
                         autoFetchStatusLabel.setStyle("-fx-text-fill: #32D74B;");
                     } else {
                         autoFetchStatusLabel.setText("Event Linked. No matches found yet.");
                         autoFetchStatusLabel.setStyle("-fx-text-fill: #FF9F0A;");
                     }
                 });
+            }
 
-            } catch (Exception e) {
+            @Override
+            public void onError(String errorMessage) {
                 Platform.runLater(() -> {
-                    boundEventNameLabel.setText("Event: Connection Failed");
-                    autoFetchStatusLabel.setText("Failed: " + e.getMessage());
+                    boundEventNameLabel.setText("Event: Error/Not Found");
+                    autoFetchStatusLabel.setText(errorMessage);
                     autoFetchStatusLabel.setStyle("-fx-text-fill: #FF453A;");
                 });
             }
-        }).start();
-    }
-
-    private int parseMatchData(String json) {
-        int count = 0;
-        int startIdx = json.indexOf("\"matches\"");
-        if (startIdx == -1) return 0;
-        String content = json.substring(startIdx);
-
-        String[] matchBlocks = content.split("\"matchNum\"\\s*:");
-
-        for (int i = 1; i < matchBlocks.length; i++) {
-            String block = matchBlocks[i];
-
-            Matcher mNum = Pattern.compile("^\\s*(\\d+)").matcher(block);
-            if (!mNum.find()) continue;
-            int matchNum = Integer.parseInt(mNum.group(1));
-
-            String lowerBlock = block.toLowerCase();
-
-            int redIdx = lowerBlock.indexOf("\"red\"");
-            int blueIdx = lowerBlock.indexOf("\"blue\"");
-
-            if (redIdx != -1 && blueIdx != -1) {
-                String redPart, bluePart;
-                if (redIdx < blueIdx) {
-                    redPart = lowerBlock.substring(redIdx, blueIdx);
-                    bluePart = lowerBlock.substring(blueIdx, Math.min(lowerBlock.length(), blueIdx + 300));
-                } else {
-                    bluePart = lowerBlock.substring(blueIdx, redIdx);
-                    redPart = lowerBlock.substring(redIdx, Math.min(lowerBlock.length(), redIdx + 300));
-                }
-
-                int rMin = extractPenalty(redPart, "minorscommitted");
-                int rMaj = extractPenalty(redPart, "majorscommitted");
-                int bMin = extractPenalty(bluePart, "minorscommitted");
-                int bMaj = extractPenalty(bluePart, "majorscommitted");
-
-                if (rMaj > 0 || rMin > 0) {
-                    matchDataService.submitPenalty(currentCompetition.getName(), new PenaltyEntry(matchNum, "RED", rMaj, rMin));
-                }
-                if (bMaj > 0 || bMin > 0) {
-                    matchDataService.submitPenalty(currentCompetition.getName(), new PenaltyEntry(matchNum, "BLUE", bMaj, bMin));
-                }
-                count++;
-            }
-        }
-        return count;
-    }
-
-    private int extractPenalty(String jsonPart, String keyNameLowerCase) {
-        Pattern p = Pattern.compile("\"" + keyNameLowerCase + "\"\\s*:\\s*(\\d+)");
-        Matcher m = p.matcher(jsonPart);
-        if (m.find()) {
-            return Integer.parseInt(m.group(1));
-        }
-        return 0;
+        });
     }
 
     @FXML

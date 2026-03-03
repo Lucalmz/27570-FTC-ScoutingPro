@@ -2,11 +2,12 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.web.WebView?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <SplitPane dividerPositions="0.60" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.AllianceAnalysisController" prefHeight="700" prefWidth="1200">
 
-    <!-- 左侧：原有分析面板 -->
+    <!-- 左侧：原有分析面板 (保持不变) -->
     <VBox spacing="20" styleClass="mac-card">
         <padding><Insets top="30" right="30" bottom="30" left="30"/></padding>
 
@@ -32,27 +33,37 @@
         </TableView>
     </VBox>
 
-    <!-- 右侧：Gemini AI 聊天区域 -->
+    <!-- 右侧：Gemini AI 聊天区域 (深度进化) -->
     <VBox spacing="15" styleClass="mac-card">
         <padding><Insets top="30" right="30" bottom="30" left="30"/></padding>
-        <Label text="AI Assistant (Gemini)" styleClass="title-3"/>
-        <Label text="Chat with your local match data." styleClass="text-muted"/>
+        <Label text="AI Studio Assistant" styleClass="title-3"/>
+        <Label text="Markdown supported. Press Enter to send, Shift+Enter for new line." styleClass="text-muted"/>
 
-        <!-- API Key 配置栏 -->
+        <!-- 第一行：API Key 与 模型选择 -->
         <HBox spacing="10" alignment="CENTER_LEFT">
             <PasswordField fx:id="apiKeyField" promptText="Enter Gemini API Key..." HBox.hgrow="ALWAYS" prefHeight="38"/>
+            <ComboBox fx:id="modelComboBox" prefWidth="180" prefHeight="38"/>
             <Button text="Save Key" onAction="#handleSaveApiKey" styleClass="accent" prefHeight="38">
                 <graphic><FontIcon iconLiteral="fth-key" iconSize="16" iconColor="white"/></graphic>
             </Button>
         </HBox>
 
-        <!-- 聊天信息面板 -->
-        <TextArea fx:id="chatArea" VBox.vgrow="ALWAYS" editable="false" wrapText="true" styleClass="panel-inner" style="-fx-font-size: 14px;"/>
+        <!-- 第二行：代理设置与测试连接 -->
+        <HBox spacing="10" alignment="CENTER_LEFT" styleClass="panel-inner" style="-fx-padding: 8; -fx-background-color: transparent;">
+            <CheckBox fx:id="useProxyCheck" text="Manual HTTP Proxy" style="-fx-text-fill: #555;"/>
+            <TextField fx:id="proxyHostField" promptText="Host (e.g., 127.0.0.1)" prefWidth="140" prefHeight="30"/>
+            <TextField fx:id="proxyPortField" promptText="Port" prefWidth="80" prefHeight="30"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button text="Check Connection" onAction="#handleCheckConnection" styleClass="button-small" prefHeight="30"/>
+        </HBox>
 
-        <!-- 发送指令输入 -->
-        <HBox spacing="10" alignment="CENTER_LEFT">
-            <TextField fx:id="chatInputField" promptText="Ask Gemini about the data..." onAction="#handleSendChat" HBox.hgrow="ALWAYS" prefHeight="45"/>
-            <Button text="Send" onAction="#handleSendChat" styleClass="success" prefHeight="45" prefWidth="80">
+        <!-- ★ 革命性升级：Markdown 渲染容器 -->
+        <WebView fx:id="chatWebView" VBox.vgrow="ALWAYS" prefHeight="400" />
+
+        <!-- ★ 输入体验升级：多行输入框支持 Shift+Enter -->
+        <HBox spacing="10" alignment="BOTTOM_LEFT">
+            <TextArea fx:id="chatInputField" promptText="Ask Gemini about the data..." wrapText="true" prefRowCount="2" HBox.hgrow="ALWAYS"/>
+            <Button text="Send" onAction="#handleSendChat" styleClass="success" prefHeight="48" prefWidth="80">
                 <graphic><FontIcon iconLiteral="fth-send" iconSize="16" iconColor="white"/></graphic>
             </Button>
         </HBox>

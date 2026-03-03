@@ -7,20 +7,29 @@ import com.bear27570.ftc.scouting.models.TeamRanking;
 import com.bear27570.ftc.scouting.services.domain.MatchDataService;
 import com.bear27570.ftc.scouting.services.domain.RankingService;
 import com.bear27570.ftc.scouting.services.domain.UserService;
+import com.bear27570.ftc.scouting.services.network.GeminiApiClient;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.concurrent.Worker; // 必须导入这个
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.web.WebEngine;
+import javafx.scene.web.WebView;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.stream.Collectors;
 
 public class AllianceAnalysisController {
@@ -34,10 +43,18 @@ public class AllianceAnalysisController {
     @FXML private TableColumn<AnalysisResult, Double> stabilityCol;
     @FXML private TableColumn<AnalysisResult, String> styleCol;
 
-    // AI 相关控件
     @FXML private PasswordField apiKeyField;
-    @FXML private TextArea chatArea;
-    @FXML private TextField chatInputField;
+    @FXML private WebView chatWebView;
+    @FXML private TextArea chatInputField;
+
+    @FXML private ComboBox<String> modelComboBox;
+    @FXML private CheckBox useProxyCheck;
+    @FXML private TextField proxyHostField;
+    @FXML private TextField proxyPortField;
+
+    private WebEngine webEngine;
+    // ★ 修复核心：JS 指令缓冲队列
+    private final Queue<String> jsQueue = new LinkedList<>();
 
     private Competition competition;
     private Stage dialogStage;
@@ -47,7 +64,8 @@ public class AllianceAnalysisController {
     private String currentUsername;
     private static final double ZONE_DIVIDER_Y = 400.0;
 
-    // --- 核心注入方法 ---
+    private GeminiApiClient geminiApiClient;
+
     public void setDependencies(Stage dialogStage, Competition competition, RankingService rankingService, MatchDataService matchDataService, UserService userService, String currentUsername) {
         this.dialogStage = dialogStage;
         this.competition = competition;
@@ -56,14 +74,177 @@ public class AllianceAnalysisController {
         this.userService = userService;
         this.currentUsername = currentUsername;
 
-        // 加载已绑定的 API Key
+        this.geminiApiClient = new GeminiApiClient();
+
         String savedKey = userService.getApiKey(currentUsername);
         if (savedKey != null && !savedKey.isEmpty()) {
             apiKeyField.setText(savedKey);
-            chatArea.appendText("System: Gemini API Key loaded from your profile.\n\n");
+            appendSystemMessage("✅ Gemini API Key loaded from your profile.");
         } else {
-            chatArea.appendText("System: Please link a Gemini API Key to use the AI Assistant.\n\n");
+            appendSystemMessage("⚠️ Please link a Gemini API Key to use the AI Assistant.");
         }
+    }
+
+    @FXML public void initialize() {
+        webEngine = chatWebView.getEngine();
+
+        // ★ 修复核心：监听加载状态，加载完成后才执行队列里的 JS
+        webEngine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
+            if (newState == Worker.State.SUCCEEDED) {
+                // 页面加载完成，清空队列
+                while (!jsQueue.isEmpty()) {
+                    webEngine.executeScript(jsQueue.poll());
+                }
+            }
+        });
+
+        initializeChatHtml();
+
+        chatInputField.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                if (event.isShiftDown()) {
+                    // new line
+                } else {
+                    event.consume();
+                    handleSendChat();
+                }
+            }
+        });
+
+        setupTable();
+
+        modelComboBox.setItems(FXCollections.observableArrayList(
+                "gemini-2.0-flash",
+                "gemini-1.5-flash",
+                "gemini-1.5-pro"
+        ));
+        modelComboBox.getSelectionModel().select("gemini-2.0-flash");
+
+        proxyHostField.setText("127.0.0.1");
+        proxyPortField.setText("7890");
+        proxyHostField.disableProperty().bind(useProxyCheck.selectedProperty().not());
+        proxyPortField.disableProperty().bind(useProxyCheck.selectedProperty().not());
+    }
+
+    // ★ 修复核心：安全的 JS 执行方法
+    private void safeExecuteScript(String script) {
+        Platform.runLater(() -> {
+            if (webEngine.getLoadWorker().getState() == Worker.State.SUCCEEDED) {
+                // 页面已就绪，直接执行
+                webEngine.executeScript(script);
+            } else {
+                // 页面未就绪，加入队列等待
+                jsQueue.add(script);
+            }
+        });
+    }
+
+    private void setupTable() {
+        partnerCol.setCellValueFactory(new PropertyValueFactory<>("partnerTeam"));
+        partnerCol.setStyle("-fx-alignment: CENTER;");
+        totalEffCol.setCellValueFactory(new PropertyValueFactory<>("totalEfficiency"));
+        totalEffCol.setCellFactory(tc -> new TableCell<>() {
+            @Override protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : String.format("%.1f", item));
+            }
+        });
+        totalEffCol.setStyle("-fx-alignment: CENTER;");
+        combinedAccCol.setCellValueFactory(new PropertyValueFactory<>("combinedAccuracy"));
+        combinedAccCol.setCellFactory(tc -> new TableCell<>() {
+            @Override protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : String.format("%.1f%%", item));
+            }
+        });
+        combinedAccCol.setStyle("-fx-alignment: CENTER;");
+        stabilityCol.setCellValueFactory(new PropertyValueFactory<>("stability"));
+        stabilityCol.setCellFactory(tc -> new TableCell<>() {
+            @Override protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : String.format("±%.1f", item));
+            }
+        });
+        stabilityCol.setStyle("-fx-alignment: CENTER;");
+        styleCol.setCellValueFactory(new PropertyValueFactory<>("styleDesc"));
+        styleCol.setStyle("-fx-alignment: CENTER_LEFT;");
+    }
+
+    private void initializeChatHtml() {
+        String htmlTemplate = "<!DOCTYPE html><html><head><meta charset='UTF-8'>"
+                + "<script src='https://cdn.jsdelivr.net/npm/marked/marked.min.js'></script>"
+                + "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css'>"
+                + "<script src='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js'></script>"
+                + "<style>"
+                + "body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #131314; color: #e3e3e3; margin: 0; padding: 15px; font-size: 14px; line-height: 1.6; }"
+                + ".msg-container { margin-bottom: 24px; display: flex; flex-direction: column; }"
+                + ".user-msg { align-items: flex-end; }"
+                + ".user-bubble { background-color: #3b3b3b; color: white; padding: 12px 18px; border-radius: 18px 18px 4px 18px; max-width: 80%; word-wrap: break-word; white-space: pre-wrap; font-size: 15px; }"
+                + ".ai-msg { align-items: flex-start; max-width: 95%; }"
+                + ".ai-header { font-weight: 600; color: #a8c7fa; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }"
+                + ".sys-msg { text-align: center; color: #8ab4f8; font-size: 13px; margin: 10px 0; background: #1e1e1e; padding: 8px; border-radius: 8px; }"
+                + ".thinking { color: #9aa0a6; font-style: italic; animation: pulse 1.5s infinite; }"
+                + "pre { background-color: #1e1e1e; padding: 12px; border-radius: 8px; overflow-x: auto; border: 1px solid #333; }"
+                + "code { font-family: 'Consolas', monospace; font-size: 13px; }"
+                + "table { border-collapse: collapse; width: 100%; margin: 10px 0; }"
+                + "th, td { border: 1px solid #444; padding: 8px; text-align: left; }"
+                + "th { background-color: #2b2b2b; }"
+                + "a { color: #8ab4f8; text-decoration: none; }"
+                + "@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }"
+                + "</style></head><body>"
+                + "<div id='chat-box'></div>"
+                + "<script>"
+                + "function addSysMsg(text) { "
+                + "  const div = document.createElement('div'); div.className='sys-msg'; div.innerText=text; document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); "
+                + "}"
+                + "function addUserMsg(text) { "
+                + "  const div = document.createElement('div'); div.className='msg-container user-msg'; "
+                + "  const bubble = document.createElement('div'); bubble.className='user-bubble'; bubble.innerText=text; "
+                + "  div.appendChild(bubble); document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); "
+                + "}"
+                + "function addAiMsg(mdText, isError) { "
+                + "  const div = document.createElement('div'); div.className='msg-container ai-msg'; "
+                + "  const header = document.createElement('div'); header.className='ai-header'; header.innerHTML='✨ Gemini'; "
+                + "  const content = document.createElement('div'); "
+                + "  if(isError) { content.style.color = '#ff6b6b'; content.innerText = mdText; } "
+                + "  else { "
+                + "      if(typeof marked !== 'undefined') { content.innerHTML = marked.parse(mdText); content.querySelectorAll('pre code').forEach((el) => hljs.highlightElement(el)); } "
+                + "      else { content.innerText = mdText; } "
+                + "  } "
+                + "  div.appendChild(header); div.appendChild(content); document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); "
+                + "}"
+                + "function showThinking() { "
+                + "  const div = document.createElement('div'); div.id='thinking-flag'; div.className='msg-container ai-msg thinking'; "
+                + "  div.innerHTML='<div class=\"ai-header\">✨ Gemini</div><div>Thinking & analyzing data...</div>'; "
+                + "  document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); "
+                + "}"
+                + "function removeThinking() { const el = document.getElementById('thinking-flag'); if(el) el.remove(); }"
+                + "</script></body></html>";
+        webEngine.loadContent(htmlTemplate);
+    }
+
+    private String escapeJsString(String text) {
+        if (text == null) return "";
+        return text.replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+    }
+
+    private void appendSystemMessage(String text) {
+        safeExecuteScript("addSysMsg('" + escapeJsString(text) + "');");
+    }
+
+    private void appendUserMessage(String text) {
+        safeExecuteScript("addUserMsg('" + escapeJsString(text) + "');");
+    }
+
+    private void appendAiMessage(String text, boolean isError) {
+        Platform.runLater(() -> {
+            safeExecuteScript("removeThinking();");
+            safeExecuteScript("addAiMsg('" + escapeJsString(text) + "', " + isError + ");");
+        });
+    }
+
+    private void showThinkingIndicator() {
+        safeExecuteScript("showThinking();");
     }
 
     // ========== API Chat 功能区 ==========
@@ -73,8 +254,57 @@ public class AllianceAnalysisController {
         String key = apiKeyField.getText();
         if (key != null && !key.isEmpty()) {
             userService.updateApiKey(currentUsername, key);
-            chatArea.appendText("System: API Key saved successfully to your account!\n\n");
+            appendSystemMessage("✅ API Key saved successfully to your account!");
         }
+    }
+
+    @FXML
+    private void handleCheckConnection() {
+        Stage testDialog = new Stage();
+        testDialog.initModality(Modality.APPLICATION_MODAL);
+        testDialog.setTitle("Test Proxy Connection");
+
+        VBox vbox = new VBox(15);
+        vbox.setPadding(new Insets(20));
+        vbox.setStyle("-fx-background-color: #2b2b2b; -fx-text-fill: white;");
+
+        Label label = new Label("Enter URL to test proxy connection:");
+        label.setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
+
+        HBox inputRow = new HBox(10);
+        TextField urlField = new TextField("https://www.youtube.com");
+        urlField.setPrefWidth(250);
+        Button testBtn = new Button("Test");
+        inputRow.getChildren().addAll(urlField, testBtn);
+
+        TextArea resultArea = new TextArea();
+        resultArea.setEditable(false);
+        resultArea.setPrefHeight(120);
+        resultArea.setStyle("-fx-control-inner-background: #1e1e1e; -fx-text-fill: #a9b7c6;");
+
+        testBtn.setOnAction(e -> {
+            String targetUrl = urlField.getText();
+            boolean useProxy = useProxyCheck.isSelected();
+            String host = proxyHostField.getText();
+            int port = parseProxyPort(proxyPortField.getText());
+
+            resultArea.setText("Testing connection to " + targetUrl + "...\n");
+
+            geminiApiClient.testGenericNetworkAsync(targetUrl, useProxy, host, port, new GeminiApiClient.GeminiCallback() {
+                @Override
+                public void onSuccess(String response) {
+                    Platform.runLater(() -> resultArea.appendText("✅ " + response + "\n"));
+                }
+                @Override
+                public void onError(String errorMessage) {
+                    Platform.runLater(() -> resultArea.appendText("❌ Failed:\n" + errorMessage + "\n"));
+                }
+            });
+        });
+
+        vbox.getChildren().addAll(label, inputRow, resultArea);
+        testDialog.setScene(new Scene(vbox, 400, 250));
+        testDialog.show();
     }
 
     @FXML
@@ -84,125 +314,44 @@ public class AllianceAnalysisController {
 
         if (prompt == null || prompt.trim().isEmpty()) return;
         if (apiKey == null || apiKey.trim().isEmpty()) {
-            chatArea.appendText("System: Error - Please configure and save your Gemini API Key first.\n\n");
+            appendSystemMessage("⚠️ Error: Please configure and save your Gemini API Key first.");
             return;
         }
 
-        chatArea.appendText("You: " + prompt + "\n");
+        appendUserMessage(prompt);
         chatInputField.clear();
 
-        // 将左侧表格生成的数据构建成语境上下文传入 Prompt 中
-        StringBuilder context = new StringBuilder("Data Context (Alliance Analysis for Main Team: " + mainTeamField.getText() + "):\n");
+        StringBuilder context = new StringBuilder("FTC Alliance Analysis for Main Team: " + mainTeamField.getText() + ":\n");
         if (analysisTable.getItems().isEmpty()) {
-            context.append("No active analysis data currently. You can answer generic questions.\n");
+            context.append("No active analysis data currently. Answer general FTC questions.\n");
         } else {
             for (AnalysisResult res : analysisTable.getItems()) {
-                context.append(String.format("- Potential Partner %d: Projected Score %.1f, Combined Accuracy %.1f%%, Stability Deviation ±%.1f, Synergy Note: %s\n",
+                context.append(String.format("- Partner Team %d: Proj. Total Score %.1f, Comb. Accuracy %.1f%%, Stability ±%.1f, Note: %s\n",
                         res.getPartnerTeam(), res.getTotalEfficiency(), res.getCombinedAccuracy(), res.getStability(), res.getStyleDesc()));
             }
         }
 
-        chatArea.appendText("Gemini: Thinking...\n");
+        showThinkingIndicator();
 
-        new Thread(() -> {
-            String response = callGeminiApi(apiKey, context.toString(), prompt);
-            Platform.runLater(() -> {
-                // 移除原有的 "Thinking..."
-                String currentText = chatArea.getText();
-                if (currentText.endsWith("Gemini: Thinking...\n")) {
-                    chatArea.setText(currentText.substring(0, currentText.length() - "Gemini: Thinking...\n".length()));
-                }
-                chatArea.appendText("Gemini: " + response + "\n\n");
-            });
-        }).start();
-    }
+        String model = modelComboBox.getValue();
+        boolean useProxy = useProxyCheck.isSelected();
+        String host = proxyHostField.getText();
+        int port = parseProxyPort(proxyPortField.getText());
 
-    // File: AllianceAnalysisController.java
-
-    private String callGeminiApi(String apiKey, String context, String userPrompt) {
-        try {
-            // 1. 设置 HttpClient 的连接超时时间 (10秒)
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(java.time.Duration.ofSeconds(10))
-                    .build();
-
-            // 2. 清除 API Key 前后可能带入的空格或换行符
-            String cleanApiKey = apiKey.trim();
-            String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + cleanApiKey;
-
-            String safeContext = escapeJson(context);
-            String safePrompt = escapeJson(userPrompt);
-
-            // 构造严格 JSON
-            String payload = String.format("{\"contents\": [{\"parts\":[{\"text\": \"System: You are an FTC Robotics Scouting AI Assistant. Help the user analyze their team data. Base your insights strictly on the context below if applicable.\\n\\n%s\\n\\nUser: %s\"}]}]}", safeContext, safePrompt);
-
-            // 3. 设置单次请求的响应超时时间 (30秒)
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(java.time.Duration.ofSeconds(30))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(payload))
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            // 4. 重点强化反馈：如果 API 拒绝请求，把谷歌原生的报错正文返回给 UI 界面！
-            if (response.statusCode() != 200) {
-                return "API Error (" + response.statusCode() + "). Details: \n" + response.body();
+        geminiApiClient.sendChatRequestAsync(apiKey, model, context.toString(), prompt, useProxy, host, port, new GeminiApiClient.GeminiCallback() {
+            @Override
+            public void onSuccess(String response) {
+                appendAiMessage(response, false);
             }
-
-            return parseGeminiResponseText(response.body());
-
-        } catch (java.net.ConnectException e) {
-            e.printStackTrace();
-            return "Connection Failed: Unable to connect to Google API. Are you behind a strict firewall or do you need a proxy? \nError: " + e.toString();
-        } catch (java.net.http.HttpTimeoutException e) {
-            e.printStackTrace();
-            return "Request Timed Out: The server took too long to respond. Please check your network.";
-        } catch (Exception e) {
-            e.printStackTrace(); // 将详细堆栈打印到开发环境的控制台
-            // 5. 使用 e.toString() 代替 e.getMessage()，以防 NullPointerException 没有 Message
-            return "Local Request failed: " + e.toString();
-        }
-    }
-
-    private String escapeJson(String str) {
-        if (str == null) return "";
-        return str.replace("\\", "\\\\").replace("\"", "\\\"")
-                .replace("\b", "\\b").replace("\f", "\\f")
-                .replace("\n", "\\n").replace("\r", "\\r")
-                .replace("\t", "\\t");
-    }
-
-    private String parseGeminiResponseText(String jsonBody) {
-        int partsIdx = jsonBody.indexOf("\"parts\"");
-        if (partsIdx != -1) {
-            int textIdx = jsonBody.indexOf("\"text\"", partsIdx);
-            if (textIdx != -1) {
-                int startQuote = jsonBody.indexOf("\"", textIdx + 6);
-                startQuote = jsonBody.indexOf("\"", startQuote + 1);
-                if (startQuote != -1) {
-                    StringBuilder sb = new StringBuilder();
-                    boolean escaped = false;
-                    for (int i = startQuote + 1; i < jsonBody.length(); i++) {
-                        char c = jsonBody.charAt(i);
-                        if (escaped) {
-                            if (c == 'n') sb.append('\n');
-                            else if (c == 'r') sb.append('\r');
-                            else if (c == 't') sb.append('\t');
-                            else sb.append(c);
-                            escaped = false;
-                        } else {
-                            if (c == '\\') escaped = true;
-                            else if (c == '"') break;
-                            else sb.append(c);
-                        }
-                    }
-                    return sb.toString();
-                }
+            @Override
+            public void onError(String errorMessage) {
+                appendAiMessage(errorMessage, true);
             }
-        }
-        return "Failed to parse API response structure.";
+        });
+    }
+
+    private int parseProxyPort(String portStr) {
+        try { return Integer.parseInt(portStr.trim()); } catch (NumberFormatException e) { return 7890; }
     }
 
     // ========== 原有分析逻辑保留 ==========
@@ -345,37 +494,6 @@ public class AllianceAnalysisController {
         if (data == null || data.size() < 2) return 0.0;
         double mean = data.stream().mapToDouble(d -> d).average().orElse(0.0);
         return Math.sqrt(data.stream().mapToDouble(d -> Math.pow(d - mean, 2)).sum() / (data.size() - 1));
-    }
-
-    @FXML public void initialize() {
-        partnerCol.setCellValueFactory(new PropertyValueFactory<>("partnerTeam"));
-        partnerCol.setStyle("-fx-alignment: CENTER;");
-        totalEffCol.setCellValueFactory(new PropertyValueFactory<>("totalEfficiency"));
-        totalEffCol.setCellFactory(tc -> new TableCell<>() {
-            @Override protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : String.format("%.1f", item));
-            }
-        });
-        totalEffCol.setStyle("-fx-alignment: CENTER;");
-        combinedAccCol.setCellValueFactory(new PropertyValueFactory<>("combinedAccuracy"));
-        combinedAccCol.setCellFactory(tc -> new TableCell<>() {
-            @Override protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : String.format("%.1f%%", item));
-            }
-        });
-        combinedAccCol.setStyle("-fx-alignment: CENTER;");
-        stabilityCol.setCellValueFactory(new PropertyValueFactory<>("stability"));
-        stabilityCol.setCellFactory(tc -> new TableCell<>() {
-            @Override protected void updateItem(Double item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item == null ? null : String.format("±%.1f", item));
-            }
-        });
-        stabilityCol.setStyle("-fx-alignment: CENTER;");
-        styleCol.setCellValueFactory(new PropertyValueFactory<>("styleDesc"));
-        styleCol.setStyle("-fx-alignment: CENTER_LEFT;");
     }
 
     public static class AnalysisResult {
