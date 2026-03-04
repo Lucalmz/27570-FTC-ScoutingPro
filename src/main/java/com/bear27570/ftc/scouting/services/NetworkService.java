@@ -320,16 +320,26 @@ public class NetworkService {
         for (ClientHandler handler : connectedClients) handler.sendPacket(updatePacket);
     }
 
-    public void sendScoreToServer(ScoreEntry scoreEntry) {
+    // File: NetworkService.java
+// ... 保留其他不变的代码 ...
+
+    public boolean sendScoreToServer(ScoreEntry scoreEntry) {
         if (outToServer != null) {
             try {
                 outToServer.writeObject(new NetworkPacket(scoreEntry));
                 outToServer.flush();
                 outToServer.reset();
                 System.out.println("[网络调试] 从机已发送成绩数据");
-            } catch (IOException e) { e.printStackTrace(); }
+                return true; // 发送成功返回 true
+            } catch (IOException e) {
+                System.err.println("[网络调试] 发送成绩数据失败: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
+        return false; // 发送失败或未连接返回 false
     }
+
+// ... 保留其他不变的代码 ...
 
     public synchronized void stop() {
         this.running = false;

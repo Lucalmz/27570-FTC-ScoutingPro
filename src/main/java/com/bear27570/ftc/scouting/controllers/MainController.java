@@ -361,10 +361,6 @@ public class MainController {
             if (selectedToggle == null) throw new IllegalArgumentException("Select an alliance.");
             String alliance = selectedToggle.getText().contains("Red") ? "RED" : "BLUE";
             boolean isSingle = singleModeRadio.isSelected();
-
-            ScoreEntry.SyncStatus targetStatus = isHost ? ScoreEntry.SyncStatus.SYNCED :
-                    (editingOriginalSyncStatus != null ? editingOriginalSyncStatus : ScoreEntry.SyncStatus.UNSYNCED);
-
             ScoreEntry entry;
             if (editingScoreId != -1) {
                 entry = new ScoreEntry(
@@ -376,7 +372,7 @@ public class MainController {
                         team1L2ClimbCheck.isSelected(), isSingle ? false : team2L2ClimbCheck.isSelected(),
                         team1IgnoreCheck.isSelected(), isSingle ? false : team2IgnoreCheck.isSelected(),
                         team1BrokenCheck.isSelected(), isSingle ? false : team2BrokenCheck.isSelected(),
-                        currentClickLocations, currentUsername, editingOriginalTime, targetStatus
+                        currentClickLocations, currentUsername, editingOriginalTime, ScoreEntry.SyncStatus.UNSYNCED
                 );
             } else {
                 entry = new ScoreEntry(
@@ -389,18 +385,26 @@ public class MainController {
                         team1IgnoreCheck.isSelected(), isSingle ? false : team2IgnoreCheck.isSelected(),
                         team1BrokenCheck.isSelected(), isSingle ? false : team2BrokenCheck.isSelected(),
                         currentClickLocations, currentUsername);
-                entry.setSyncStatus(targetStatus);
+                entry.setSyncStatus(ScoreEntry.SyncStatus.UNSYNCED);
             }
-
-            matchDataService.submitScore(currentCompetition.getName(), entry);
-
             if (isHost) {
+                entry.setSyncStatus(ScoreEntry.SyncStatus.SYNCED);
+                matchDataService.submitScore(currentCompetition.getName(), entry);
                 broadcastUpdate();
+                refreshAllDataFromDatabase();
+                errorLabel.setText("Score saved and broadcasted!");
             } else {
-                NetworkService.getInstance().sendScoreToServer(entry);
+                // ★ 修复点：在线时直接发送，不再保存本地。只有在离线（发送失败）时才保存为本地 UNSYNCED 缓存。
+                boolean sent = NetworkService.getInstance().sendScoreToServer(entry);
+                if (sent) {
+                    errorLabel.setText("Score sent to host!");
+                } else {
+                    entry.setSyncStatus(ScoreEntry.SyncStatus.UNSYNCED);
+                    matchDataService.submitScore(currentCompetition.getName(), entry);
+                    refreshAllDataFromDatabase();
+                    errorLabel.setText("Score saved locally (Offline mode).");
+                }
             }
-            refreshAllDataFromDatabase();
-            errorLabel.setText("Score saved locally!");
             resetFormState();
         } catch (Exception e) { errorLabel.setText("Error: " + e.getMessage()); }
     }
@@ -460,26 +464,34 @@ public class MainController {
     private void handleUpdateReceivedFromHost(NetworkPacket packet) {
         Platform.runLater(() -> {
             if (packet.getType() == NetworkPacket.PacketType.UPDATE_DATA) {
-
-                // ★ 修复点：确保把主机的事件名称也更新到从机本地
                 if (packet.getOfficialEventName() != null && !packet.getOfficialEventName().isEmpty()) {
                     this.officialEventName = packet.getOfficialEventName();
                     currentCompetition.setOfficialEventName(this.officialEventName);
                     competitionRepository.updateEventInfo(currentCompetition.getName(), currentCompetition.getEventSeason(), currentCompetition.getEventCode(), this.officialEventName);
                     updateTopLabel();
                 }
-
                 matchDataService.syncWithHostData(currentCompetition.getName(), packet.getScoreHistory());
-                refreshAllDataFromDatabase();
-                statusLabel.setText("Connected & Synced.");
-
                 List<ScoreEntry> pending = matchDataService.getPendingExports(currentCompetition.getName());
                 if (!pending.isEmpty()) {
+                    int syncCount = 0;
                     for (ScoreEntry s : pending) {
-                        NetworkService.getInstance().sendScoreToServer(s);
+                        int localId = s.getId();
+                        s.setId(0); // ★ 修复点：强制设为 0 以作为新记录插入主机，避免离线产生的本地ID覆盖主机已有的不同数据
+
+                        if (NetworkService.getInstance().sendScoreToServer(s)) {
+                            // ★ 修复点：发送成功后立即删除本地离线缓存副本！彻底打断死循环并防止记录重复。
+                            // 删除后不用担心数据丢失，因为主机收到后在十几毫秒内就会广播回包含该数据的 UPDATE_DATA
+                            matchDataService.deleteScore(localId);
+                            syncCount++;
+                        }
                     }
-                    statusLabel.setText("Auto-synced " + pending.size() + " local records to host.");
+                    if (syncCount > 0) {
+                        statusLabel.setText("Auto-synced " + syncCount + " local records to host.");
+                    }
+                } else {
+                    statusLabel.setText("Connected & Synced.");
                 }
+                refreshAllDataFromDatabase();
             }
         });
     }
