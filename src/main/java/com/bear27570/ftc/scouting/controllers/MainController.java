@@ -8,7 +8,7 @@ import com.bear27570.ftc.scouting.services.NetworkService;
 import com.bear27570.ftc.scouting.services.domain.MatchDataService;
 import com.bear27570.ftc.scouting.services.domain.RankingService;
 import com.bear27570.ftc.scouting.services.domain.UserService;
-import com.bear27570.ftc.scouting.services.network.FtcScoutApiClient; // 新引入的 API 客户端
+import com.bear27570.ftc.scouting.services.network.FtcScoutApiClient;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
@@ -116,6 +116,15 @@ public class MainController {
         this.competitionRepository = competitionRepository;
         this.userService = userService;
 
+        // ★ [核心修复] 从本地数据库补全赛事信息 (尤其是 officialEventName)
+        // 确保从机一进页面就显示完整的 FTCScout 比赛名，而不是等待网络同步
+        Competition localComp = competitionRepository.findByName(competition.getName());
+        if (localComp != null && localComp.getOfficialEventName() != null && !localComp.getOfficialEventName().trim().isEmpty()) {
+            this.currentCompetition.setOfficialEventName(localComp.getOfficialEventName());
+            this.currentCompetition.setEventSeason(localComp.getEventSeason());
+            this.currentCompetition.setEventCode(localComp.getEventCode());
+        }
+
         // 实例化专门负责 FTC Scout API 的客户端
         this.ftcScoutApiClient = new FtcScoutApiClient(matchDataService);
 
@@ -155,8 +164,42 @@ public class MainController {
 
             manageMembersBtn.setVisible(false);
             manageMembersBtn.setManaged(false);
+
+            // ★ [核心要求] 让 Client 端不显示 FTCScout 编辑页面 (自动找出其所在的 Tab 并移除)
+            Platform.runLater(() -> {
+                if (ftcScoutSeasonField != null) {
+                    javafx.scene.Node current = ftcScoutSeasonField;
+                    TabPane foundTabPane = null;
+                    while (current != null) {
+                        if (current instanceof TabPane) {
+                            foundTabPane = (TabPane) current;
+                            break;
+                        }
+                        current = current.getParent();
+                    }
+                    if (foundTabPane != null) {
+                        foundTabPane.getTabs().removeIf(tab -> tab.getContent() != null && isDescendant(ftcScoutSeasonField, tab.getContent()));
+                    } else {
+                        // 降级方案：如果不在 TabPane 中，则直接隐藏它所在的父容器
+                        if (ftcScoutSeasonField.getParent() != null) {
+                            ftcScoutSeasonField.getParent().setVisible(false);
+                            ftcScoutSeasonField.getParent().setManaged(false);
+                        }
+                    }
+                }
+            });
+
             startAsClient();
         }
+    }
+
+    // 辅助方法：用于判断某个节点是否包含在父节点中
+    private boolean isDescendant(javafx.scene.Node node, javafx.scene.Node parent) {
+        while (node != null) {
+            if (node == parent) return true;
+            node = node.getParent();
+        }
+        return false;
     }
 
     private void startAsHost() {
@@ -394,7 +437,6 @@ public class MainController {
                 refreshAllDataFromDatabase();
                 errorLabel.setText("Score saved and broadcasted!");
             } else {
-                // ★ 修复点：在线时直接发送，不再保存本地。只有在离线（发送失败）时才保存为本地 UNSYNCED 缓存。
                 boolean sent = NetworkService.getInstance().sendScoreToServer(entry);
                 if (sent) {
                     errorLabel.setText("Score sent to host!");
@@ -476,11 +518,9 @@ public class MainController {
                     int syncCount = 0;
                     for (ScoreEntry s : pending) {
                         int localId = s.getId();
-                        s.setId(0); // ★ 修复点：强制设为 0 以作为新记录插入主机，避免离线产生的本地ID覆盖主机已有的不同数据
+                        s.setId(0);
 
                         if (NetworkService.getInstance().sendScoreToServer(s)) {
-                            // ★ 修复点：发送成功后立即删除本地离线缓存副本！彻底打断死循环并防止记录重复。
-                            // 删除后不用担心数据丢失，因为主机收到后在十几毫秒内就会广播回包含该数据的 UPDATE_DATA
                             matchDataService.deleteScore(localId);
                             syncCount++;
                         }
@@ -531,7 +571,6 @@ public class MainController {
                 }
             }
         });
-
 
         histActionsCol.setCellFactory(param -> new TableCell<>() {
             private final Button editBtn = new Button("Edit");
