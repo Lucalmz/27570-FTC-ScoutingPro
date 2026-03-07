@@ -1,3 +1,4 @@
+// File: NetworkService.java
 package com.bear27570.ftc.scouting.services;
 
 import com.bear27570.ftc.scouting.models.Competition;
@@ -16,7 +17,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.WebSocket;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Enumeration;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -30,21 +33,22 @@ public class NetworkService {
         return instance;
     }
 
-    public static final int HTTP_PORT = 54321; // 复用原TCP端口用于HTTP/WS
+    public static final int HTTP_PORT = 54321;
     public static final int UDP_PORT = 54322;
+    // 使用 239.0.0.0/8 本地管理范围内的多播地址，27570 是你们的车号彩蛋
+    public static final String MULTICAST_IP = "239.255.27.57";
 
     // === 主机端 (Host) 组件 ===
     private Javalin hostServer;
-    // 使用泛型 WsContext 存储所有连接
     private final CopyOnWriteArrayList<WsContext> connectedWsClients = new CopyOnWriteArrayList<>();
 
     // === 从机端 (Client) 组件 ===
     private HttpClient httpClient;
     private WebSocket webSocketClient;
-    private String currentHostIp; // 记录当前连接的主机IP，用于后续提交成绩
+    private String currentHostIp;
 
     // === 共享/网络发现组件 ===
-    private DatagramSocket udpSocket;
+    private MulticastSocket multicastSocket; // 改用 MulticastSocket
     private volatile boolean running = false;
     private String hostingCompetitionName;
     private Runnable onMemberJoinCallback;
@@ -76,23 +80,15 @@ public class NetworkService {
         this.hostingCompetitionName = competition.getName();
 
         if (running && hostServer != null) {
-            return; // 已经启动
+            return;
         }
 
         stop();
         this.running = true;
 
-        // 1. 启动 Javalin HTTP/WebSocket 服务器 (Javalin 7 写法)
         hostServer = Javalin.create(config -> {
-            // [适配 Javalin 7] Banner 配置位置变更
             config.startup.showJavalinBanner = false;
 
-            // [适配 Javalin 7] 修改 WebSocket 消息大小限制 (如果需要可以取消注释)
-            // config.jetty.modifyWebSocketServletFactory(factory -> factory.setMaxTextMessageSize(5 * 1024 * 1024));
-
-            //[适配 Javalin 7 核心变更] 路由必须在 create 阶段直接通过 config.routes 注册，不再使用 config.router.mount
-
-            // 接口1：处理从机申请加入房间 (POST /api/join)
             config.routes.post("/api/join", ctx -> {
                 try {
                     NetworkPacket req = gson.fromJson(ctx.body(), NetworkPacket.class);
@@ -124,7 +120,6 @@ public class NetworkService {
                 }
             });
 
-            // 接口2：接收从机提交的比赛成绩 (POST /api/score)
             config.routes.post("/api/score", ctx -> {
                 try {
                     NetworkPacket req = gson.fromJson(ctx.body(), NetworkPacket.class);
@@ -141,13 +136,11 @@ public class NetworkService {
                 }
             });
 
-            // 接口3：WebSocket 全局数据广播通道 (WS /ws/updates)
             config.routes.ws("/ws/updates", ws -> {
                 ws.onConnect(ctx -> {
                     connectedWsClients.add(ctx);
                     System.out.println("[网络调试] 从机 WebSocket 已建立连接: " + ctx.sessionId());
 
-                    // 客户端连接成功后，主动推一次全量数据
                     if (dataHandler != null) {
                         NetworkPacket initialData = new NetworkPacket(
                                 new java.util.ArrayList<>(dataHandler.getScores(hostingCompetitionName)),
@@ -158,7 +151,6 @@ public class NetworkService {
                 });
 
                 ws.onClose(ctx -> {
-                    // onClose 的 ctx 对象与 onConnect 的不同，必须用 sessionId 匹配移除
                     connectedWsClients.removeIf(c -> c.sessionId().equals(ctx.sessionId()));
                     System.out.println("[网络调试] 从机 WebSocket 已断开连接: " + ctx.sessionId());
                 });
@@ -173,8 +165,8 @@ public class NetworkService {
 
         System.out.println("[网络调试] Javalin HTTP/WS 主机已启动，端口: " + HTTP_PORT);
 
-        // 2. 启动 UDP 广播
-        startUdpBeacon(competition);
+        // 启动优雅的多播组发现
+        startMulticastBeacon(competition);
     }
 
     public void approveClient(String username) {
@@ -189,41 +181,57 @@ public class NetworkService {
 
     public void broadcastUpdateToClients(NetworkPacket updatePacket) {
         String jsonPayload = gson.toJson(updatePacket);
-
-        // [修改建议] 避免调用 ctx.session().isOpen()，由于底层实现变化容易报错。
-        // 最稳健的方式是直接 ctx.send() 并捕获异常，抛出异常说明连接已失效。
         connectedWsClients.removeIf(ctx -> {
             try {
                 ctx.send(jsonPayload);
-                return false; // 发送成功，保留连接
+                return false;
             } catch (Exception e) {
-                return true;  // 发送异常（连接已断开），从此列表中移除
+                return true;
             }
         });
     }
 
-    private void startUdpBeacon(Competition comp) {
+    /**
+     * 【核心改动：发送端多播穿透】
+     * 遍历所有物理网卡，挨个向多播组发包，无视 Windows 默认路由表的限制
+     */
+    private void startMulticastBeacon(Competition comp) {
         new Thread(() -> {
-            try (DatagramSocket beacon = new DatagramSocket()) {
-                beacon.setBroadcast(true);
+            try (MulticastSocket beacon = new MulticastSocket()) {
+                // TTL=1 意味着包绝对不会越过路由器，仅限本地物理线缆和当前交换机 (极其克制文明)
+                beacon.setTimeToLive(1);
+                InetAddress group = InetAddress.getByName(MULTICAST_IP);
                 String msg = "FTC_SCOUTER;" + comp.getName() + ";" + comp.getCreatorUsername();
-                byte[] buf = msg.getBytes();
-                InetAddress broadcastAddr = InetAddress.getByName("255.255.255.255");
-                DatagramPacket packet = new DatagramPacket(buf, buf.length, broadcastAddr, UDP_PORT);
+                byte[] buf = msg.getBytes(StandardCharsets.UTF_8);
 
-                System.out.println("[网络调试] 主机 UDP 广播已启动...");
+                System.out.println("[网络调试] 主机 Multicast 多播引擎已启动 (智能多网卡穿透模式)...");
+
                 while (running && !beacon.isClosed()) {
                     try {
-                        beacon.send(packet);
-                        Thread.sleep(2000);
+                        Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                        while (interfaces.hasMoreElements()) {
+                            NetworkInterface ni = interfaces.nextElement();
+                            // 过滤条件：排除回环地址(127.0.0.1)、未启用的网卡、不支持多播的网卡
+                            if (ni.isLoopback() || !ni.isUp() || !ni.supportsMulticast()) continue;
+
+                            try {
+                                // 强行指定此包从特定的网卡（如对拷线生成的虚拟以太网卡）发出去
+                                beacon.setNetworkInterface(ni);
+                                DatagramPacket packet = new DatagramPacket(buf, buf.length, group, UDP_PORT);
+                                beacon.send(packet);
+                            } catch (Exception ignored) {
+                                // 有些虚拟网卡可能没有 IPv4 地址，忽略报错继续下一个
+                            }
+                        }
+                        Thread.sleep(2000); // 依然保持 2 秒的心跳
                     } catch (Exception e) {
                         if (running) e.printStackTrace();
                     }
                 }
             } catch (Exception e) {
-                System.err.println("UDP Beacon failed to start: " + e.getMessage());
+                System.err.println("Multicast Beacon failed to start: " + e.getMessage());
             }
-        }, "UDP-Beacon-Thread").start();
+        }, "Multicast-Beacon-Thread").start();
     }
 
 
@@ -231,23 +239,49 @@ public class NetworkService {
     //                               从机逻辑 (CLIENT)
     // =================================================================================
 
+    /**
+     * 【核心改动：接收端多网卡订阅】
+     * 让电脑上所有的网卡都加入多播组，确保不管网线插在哪，都能收到包
+     */
     public synchronized void startDiscovery(ObservableList<Competition> discoveredCompetitions) {
         this.running = true;
         new Thread(() -> {
+            MulticastSocket socket = null;
             try {
-                if (udpSocket != null && !udpSocket.isClosed()) {
-                    udpSocket.close();
+                if (multicastSocket != null && !multicastSocket.isClosed()) {
+                    multicastSocket.close();
                 }
-                DatagramSocket currentUdpSocket = new DatagramSocket(UDP_PORT);
-                currentUdpSocket.setSoTimeout(2000);
-                udpSocket = currentUdpSocket;
+
+                socket = new MulticastSocket(UDP_PORT);
+                socket.setSoTimeout(2000);
+
+                InetAddress group = InetAddress.getByName(MULTICAST_IP);
+                SocketAddress groupAddress = new InetSocketAddress(group, UDP_PORT);
+
+                System.out.println("[网络调试] 从机 Multicast 侦听器正在绑定网卡...");
+
+                // 遍历所有网卡，让每一个物理网卡都向交换机声明“我要加入 239.255.27.57 组”
+                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                while (interfaces.hasMoreElements()) {
+                    NetworkInterface ni = interfaces.nextElement();
+                    if (ni.isLoopback() || !ni.isUp() || !ni.supportsMulticast()) continue;
+                    try {
+                        // 使用 Java 14+ 推荐的现代 API 加入多播组
+                        socket.joinGroup(groupAddress, ni);
+                        System.out.println(" - 成功绑定监听网卡: " + ni.getDisplayName());
+                    } catch (Exception e) {
+                        // 忽略不能绑定多播的特定网卡（如某些 VPN 虚拟网卡）
+                    }
+                }
+
+                this.multicastSocket = socket;
                 byte[] buffer = new byte[1024];
 
-                while (running && !currentUdpSocket.isClosed()) {
+                while (running && !socket.isClosed()) {
                     try {
                         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                        currentUdpSocket.receive(packet);
-                        String msg = new String(packet.getData(), 0, packet.getLength());
+                        socket.receive(packet);
+                        String msg = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
 
                         if (msg.startsWith("FTC_SCOUTER;")) {
                             String[] parts = msg.split(";");
@@ -270,11 +304,15 @@ public class NetworkService {
                     }
                 }
             } catch (BindException e) {
-                System.err.println("UDP Discovery Port occupied.");
-            } catch (IOException e) {
+                System.err.println("Multicast Discovery Port occupied.");
+            } catch (Exception e) {
                 e.printStackTrace();
+            } finally {
+                if (socket != null && !socket.isClosed()) {
+                    socket.close(); // 关闭 socket 会自动让底层网卡退出多播组，保持整洁
+                }
             }
-        }, "UDP-Discovery-Thread").start();
+        }, "Multicast-Discovery-Thread").start();
     }
 
     public synchronized void connectToHost(String hostAddress, String myUsername, Consumer<NetworkPacket> onPacketReceived) throws IOException {
@@ -403,9 +441,9 @@ public class NetworkService {
             hostServer = null;
         }
 
-        if (udpSocket != null) {
-            udpSocket.close();
-            udpSocket = null;
+        if (multicastSocket != null) {
+            multicastSocket.close();
+            multicastSocket = null;
         }
 
         if (webSocketClient != null) {
