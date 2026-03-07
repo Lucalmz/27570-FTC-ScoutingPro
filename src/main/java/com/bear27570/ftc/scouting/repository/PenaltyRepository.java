@@ -9,11 +9,16 @@ public interface PenaltyRepository {
 
     class FullPenaltyRow {
         public int rMaj, rMin, bMaj, bMin;
-        public FullPenaltyRow(int rMaj, int rMin, int bMaj, int bMin) {
+        // ★ 新增：红蓝官方总分
+        public int rScore, bScore;
+
+        public FullPenaltyRow(int rMaj, int rMin, int bMaj, int bMin, int rScore, int bScore) {
             this.rMaj = rMaj;
             this.rMin = rMin;
             this.bMaj = bMaj;
             this.bMin = bMin;
+            this.rScore = rScore;
+            this.bScore = bScore;
         }
     }
 }

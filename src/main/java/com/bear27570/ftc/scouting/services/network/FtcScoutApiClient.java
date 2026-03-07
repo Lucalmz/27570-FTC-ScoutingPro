@@ -1,4 +1,3 @@
-// File: FtcScoutApiClient.java
 package com.bear27570.ftc.scouting.services.network;
 
 import com.bear27570.ftc.scouting.models.PenaltyEntry;
@@ -67,11 +66,11 @@ public class FtcScoutApiClient {
                     return;
                 }
 
-                // 2. 获取具体比赛罚分数据 (尝试 2025 和 2024 的 Schema)
+                // 2. 获取具体比赛数据 (★ 修改点：加入了 totalPoints 字段请求)
                 int matchCount = 0;
                 String[] queriesToTry = {
-                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2025 { red { majorsCommitted minorsCommitted } blue { majorsCommitted minorsCommitted } } } } } }\"}",
-                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2024 { red { majorsCommitted minorsCommitted } blue { majorsCommitted minorsCommitted } } } } } }\"}"
+                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2025 { red { totalPoints majorsCommitted minorsCommitted } blue { totalPoints majorsCommitted minorsCommitted } } } } } }\"}",
+                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2024 { red { totalPoints majorsCommitted minorsCommitted } blue { totalPoints majorsCommitted minorsCommitted } } } } } }\"}"
                 };
 
                 for (String qFormat : queriesToTry) {
@@ -106,8 +105,6 @@ public class FtcScoutApiClient {
 
         String[] matchBlocks = content.split("\"matchNum\"\\s*:");
 
-        // ★ 核心修复：使用 HashSet 记录已经处理过的【场次+联盟】
-        // 因为 API 返回数据中，前面的都是资格赛，后面的 Playoffs 会重复使用 Match 1, Match 2...
         Set<String> processedMatches = new HashSet<>();
 
         for (int i = 1; i < matchBlocks.length; i++) {
@@ -131,34 +128,35 @@ public class FtcScoutApiClient {
                     redPart = lowerBlock.substring(redIdx, Math.min(lowerBlock.length(), redIdx + 300));
                 }
 
-                int rMin = extractPenalty(redPart, "minorscommitted");
-                int rMaj = extractPenalty(redPart, "majorscommitted");
-                int bMin = extractPenalty(bluePart, "minorscommitted");
-                int bMaj = extractPenalty(bluePart, "majorscommitted");
+                int rMin = extractValue(redPart, "minorscommitted");
+                int rMaj = extractValue(redPart, "majorscommitted");
+                int rScore = extractValue(redPart, "totalpoints"); // ★ 解析红方总分
+
+                int bMin = extractValue(bluePart, "minorscommitted");
+                int bMaj = extractValue(bluePart, "majorscommitted");
+                int bScore = extractValue(bluePart, "totalpoints"); // ★ 解析蓝方总分
 
                 boolean isNewMatch = false;
 
-                // ★ 只有当该场次红方未被记录时，才录入数据库（忽略后面的 Playoff）
                 String redKey = matchNum + "_RED";
                 if (!processedMatches.contains(redKey)) {
                     processedMatches.add(redKey);
                     isNewMatch = true;
-                    if (rMaj > 0 || rMin > 0) {
-                        matchDataService.submitPenalty(competitionName, new PenaltyEntry(matchNum, "RED", rMaj, rMin));
+                    // 如果有任意数据，就存入数据库
+                    if (rMaj > 0 || rMin > 0 || rScore > 0) {
+                        matchDataService.submitPenalty(competitionName, new PenaltyEntry(matchNum, "RED", rMaj, rMin, rScore));
                     }
                 }
 
-                // ★ 只有当该场次蓝方未被记录时，才录入数据库（忽略后面的 Playoff）
                 String blueKey = matchNum + "_BLUE";
                 if (!processedMatches.contains(blueKey)) {
                     processedMatches.add(blueKey);
                     isNewMatch = true;
-                    if (bMaj > 0 || bMin > 0) {
-                        matchDataService.submitPenalty(competitionName, new PenaltyEntry(matchNum, "BLUE", bMaj, bMin));
+                    if (bMaj > 0 || bMin > 0 || bScore > 0) {
+                        matchDataService.submitPenalty(competitionName, new PenaltyEntry(matchNum, "BLUE", bMaj, bMin, bScore));
                     }
                 }
 
-                // 只有当这是第一次遇到这个 Match 时，总解析场数才 +1
                 if (isNewMatch) {
                     count++;
                 }
@@ -167,7 +165,8 @@ public class FtcScoutApiClient {
         return count;
     }
 
-    private int extractPenalty(String jsonPart, String keyNameLowerCase) {
+    // 重命名方法，更通用
+    private int extractValue(String jsonPart, String keyNameLowerCase) {
         Pattern p = Pattern.compile("\"" + keyNameLowerCase + "\"\\s*:\\s*(\\d+)");
         Matcher m = p.matcher(jsonPart);
         if (m.find()) {

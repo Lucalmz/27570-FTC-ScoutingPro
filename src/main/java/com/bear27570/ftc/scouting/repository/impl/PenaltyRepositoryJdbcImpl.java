@@ -3,7 +3,6 @@ package com.bear27570.ftc.scouting.repository.impl;
 import com.bear27570.ftc.scouting.models.PenaltyEntry;
 import com.bear27570.ftc.scouting.repository.DatabaseManager;
 import com.bear27570.ftc.scouting.repository.PenaltyRepository;
-import org.intellij.lang.annotations.Language;
 
 import java.sql.*;
 import java.util.HashMap;
@@ -15,14 +14,20 @@ public class PenaltyRepositoryJdbcImpl implements PenaltyRepository {
 
     public PenaltyRepositoryJdbcImpl(String dbUrl) {
         this.dbUrl = dbUrl;
+        // ★ 核心逻辑：初始化时检查并在旧数据库中无缝添加新列，防止报错
+        try (Connection conn = DatabaseManager.getConnection(); Statement stmt = conn.createStatement()) {
+            // H2 数据库语法: 如果列不存在则添加
+            stmt.execute("ALTER TABLE penalties ADD COLUMN IF NOT EXISTS redScore INT DEFAULT 0");
+            stmt.execute("ALTER TABLE penalties ADD COLUMN IF NOT EXISTS blueScore INT DEFAULT 0");
+        } catch (SQLException e) {
+            System.err.println("Database Update Warning: Could not alter penalties table (Columns might exist). " + e.getMessage());
+        }
     }
 
     @Override
     public void savePenaltyEntry(String competitionName, PenaltyEntry entry) {
-        // 修复：利用 H2 的事务机制和原子判断，防止网络高并发提交下发生的数据竞争和相互覆盖
         try (Connection conn = DatabaseManager.getConnection()) {
-            // 设置手动提交以保证事务安全
-            conn.setAutoCommit(false);
+            conn.setAutoCommit(false); // 开启事务
 
             boolean exists = false;
             try (PreparedStatement checkStmt = conn.prepareStatement("SELECT 1 FROM penalties WHERE competitionName=? AND matchNumber=?")) {
@@ -35,12 +40,14 @@ public class PenaltyRepositoryJdbcImpl implements PenaltyRepository {
 
             String sql;
             if (!exists) {
-                sql = "INSERT INTO penalties (competitionName, matchNumber, redMajor, redMinor, blueMajor, blueMinor) VALUES (?, ?, ?, ?, ?, ?)";
+                // 插入新记录
+                sql = "INSERT INTO penalties (competitionName, matchNumber, redMajor, redMinor, blueMajor, blueMinor, redScore, blueScore) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             } else {
+                // 更新现有记录：只更新当前联盟的数据
                 if (entry.getAlliance().equalsIgnoreCase("RED")) {
-                    sql = "UPDATE penalties SET redMajor=?, redMinor=? WHERE competitionName=? AND matchNumber=?";
+                    sql = "UPDATE penalties SET redMajor=?, redMinor=?, redScore=? WHERE competitionName=? AND matchNumber=?";
                 } else {
-                    sql = "UPDATE penalties SET blueMajor=?, blueMinor=? WHERE competitionName=? AND matchNumber=?";
+                    sql = "UPDATE penalties SET blueMajor=?, blueMinor=?, blueScore=? WHERE competitionName=? AND matchNumber=?";
                 }
             }
 
@@ -53,22 +60,27 @@ public class PenaltyRepositoryJdbcImpl implements PenaltyRepository {
                         pstmt.setInt(4, entry.getMinorCount());
                         pstmt.setInt(5, 0);
                         pstmt.setInt(6, 0);
+                        pstmt.setInt(7, entry.getOfficialScore()); // redScore
+                        pstmt.setInt(8, 0);                        // blueScore
                     } else {
                         pstmt.setInt(3, 0);
                         pstmt.setInt(4, 0);
                         pstmt.setInt(5, entry.getMajorCount());
                         pstmt.setInt(6, entry.getMinorCount());
+                        pstmt.setInt(7, 0);                        // redScore
+                        pstmt.setInt(8, entry.getOfficialScore()); // blueScore
                     }
                 } else {
+                    // Update 逻辑
                     pstmt.setInt(1, entry.getMajorCount());
                     pstmt.setInt(2, entry.getMinorCount());
-                    pstmt.setString(3, competitionName);
-                    pstmt.setInt(4, entry.getMatchNumber());
+                    pstmt.setInt(3, entry.getOfficialScore());
+                    pstmt.setString(4, competitionName);
+                    pstmt.setInt(5, entry.getMatchNumber());
                 }
                 pstmt.executeUpdate();
             }
-            // 提交事务
-            conn.commit();
+            conn.commit(); // 提交事务
         } catch (SQLException e) {
             System.err.println("Database Error saving penalty: " + e.getMessage());
             e.printStackTrace();
@@ -85,7 +97,8 @@ public class PenaltyRepositoryJdbcImpl implements PenaltyRepository {
                 while (rs.next()) {
                     map.put(rs.getInt("matchNumber"), new FullPenaltyRow(
                             rs.getInt("redMajor"), rs.getInt("redMinor"),
-                            rs.getInt("blueMajor"), rs.getInt("blueMinor")
+                            rs.getInt("blueMajor"), rs.getInt("blueMinor"),
+                            rs.getInt("redScore"), rs.getInt("blueScore") // ★ 读取分数
                     ));
                 }
             }

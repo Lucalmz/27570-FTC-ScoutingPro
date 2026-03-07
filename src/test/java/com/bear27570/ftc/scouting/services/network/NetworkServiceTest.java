@@ -5,6 +5,7 @@ import com.bear27570.ftc.scouting.models.Competition;
 import com.bear27570.ftc.scouting.models.NetworkPacket;
 import com.bear27570.ftc.scouting.models.PenaltyEntry;
 import com.bear27570.ftc.scouting.models.ScoreEntry;
+import com.bear27570.ftc.scouting.repository.PenaltyRepository;
 import com.bear27570.ftc.scouting.services.NetworkService;
 import com.bear27570.ftc.scouting.services.domain.MatchDataService;
 import javafx.application.Platform;
@@ -17,6 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -181,60 +184,113 @@ class NetworkServiceTest {
 
         assertTrue(broadcastLatch.await(3, TimeUnit.SECONDS), "客户端未能收到 WebSocket 全局广播");
     }
-
     // ==========================================
-    // 5. 测试 FTCScout API 连通与判罚解析
+    // 5. 诊断工具：FTCScout API 连通与侦察员信誉度解析
     // ==========================================
     @Test
-    void testFtcScoutCommunication() throws Exception {
-        // ========================================================
-        // 💡 提示：你可以在这里修改赛季和赛事编号来测试任何其他比赛
-        int testSeason = 2025;
-        String testEventCode = "CNCMPLB"; // 鲁班赛区 (China Championship Luban)
-        // ========================================================
+    void testScouterReliabilityDiagnostic() throws Exception {
+        int testSeason = 2025; // 或者 2025
+        String testEventCode = "CNCMPLB"; // 鲁班赛区
 
-        System.out.println("\n--- 开始测试 FTCScout 连通性: " + testSeason + " " + testEventCode + " ---");
+        System.out.println("\n=== 🕵️ 侦察员信誉度系统诊断测试 ===");
 
-        // Mock 数据库服务，拦截“保存判罚”动作，我们不存数据库，直接打印到控制台
+        // 模拟数据库，用于临时存储 API 抓取的数据
+        Map<Integer, PenaltyRepository.FullPenaltyRow> dbMock = new ConcurrentHashMap<Integer, PenaltyRepository.FullPenaltyRow>();
+
+        // 1. 拦截保存方法，将数据写入我们的 Mock DB
         MatchDataService mockMatchService = Mockito.mock(MatchDataService.class);
         Mockito.doAnswer(invocation -> {
-            PenaltyEntry penalty = invocation.getArgument(1);
-
-            // 按大判 15，小判 5 的 Into The Deep / Centerstage 规则计算“犯规送给对面的分”
-            int commPts = (penalty.getMajorCount() * 15) + (penalty.getMinorCount() * 5);
-
-            // 输出格式美化
-            System.out.printf("🔹 比赛场次: Match %-3d | 犯规联盟: %-4s | 犯规送出分数: -%-3d (大判: %d, 小判: %d)\n",
-                    penalty.getMatchNumber(), penalty.getAlliance(), commPts, penalty.getMajorCount(), penalty.getMinorCount());
-
+            PenaltyEntry p = invocation.getArgument(1);
+            dbMock.compute(p.getMatchNumber(), (k, v) -> {
+                if (v == null) v = new PenaltyRepository.FullPenaltyRow(0, 0, 0, 0, 0, 0);
+                if (p.getAlliance().equalsIgnoreCase("RED")) {
+                    v.rMaj = p.getMajorCount(); v.rMin = p.getMinorCount(); v.rScore = p.getOfficialScore();
+                } else {
+                    v.bMaj = p.getMajorCount(); v.bMin = p.getMinorCount(); v.bScore = p.getOfficialScore();
+                }
+                return v;
+            });
             return null;
         }).when(mockMatchService).submitPenalty(Mockito.anyString(), Mockito.any(PenaltyEntry.class));
 
         FtcScoutApiClient apiClient = new FtcScoutApiClient(mockMatchService);
         CountDownLatch latch = new CountDownLatch(1);
 
+        // 2. 触发 API 拉取
+        System.out.println("📡 正在连接 FTCScout 获取 " + testEventCode + " 数据...");
         apiClient.fetchAndSyncEventDataAsync(testSeason, testEventCode, "TestComp", new FtcScoutApiClient.ApiCallback() {
-            @Override
-            public void onEventFound(String eventName, boolean hasMatches) {
-                System.out.println("✅ 成功绑定赛事: " + eventName + " | 是否已开始比赛: " + hasMatches);
-            }
-
-            @Override
-            public void onSuccess(String eventName, int syncedMatchCount) {
-                System.out.println("✅ 拉取完毕! 本次共抓取了 " + syncedMatchCount + " 场带有犯规数据的比赛。");
+            @Override public void onEventFound(String name, boolean hasMatches) {}
+            @Override public void onError(String error) { latch.countDown(); }
+            @Override public void onSuccess(String name, int count) {
+                System.out.println("✅ API 拉取完毕，共解析 " + count + " 场比赛。\n");
                 latch.countDown();
-            }
-
-            @Override
-            public void onError(String errorMessage) {
-                System.err.println("❌ API 抓取失败: " + errorMessage);
-                latch.countDown(); // 出错也释放锁，防止测试卡死
             }
         });
 
-        // 给予网络请求最多 15 秒的时间
-        boolean finished = latch.await(15, TimeUnit.SECONDS);
-        System.out.println("----------------------------------------------------------\n");
-        assertTrue(finished, "FTCScout API 请求超时，请检查网络或代理设置！");
+        assertTrue(latch.await(15, TimeUnit.SECONDS), "API 请求超时！");
+
+        // 3. 寻找一场包含分数的有效比赛
+        Integer targetMatchNum = dbMock.keySet().stream().filter(k -> dbMock.get(k).rScore > 0).findFirst().orElse(null);
+        if (targetMatchNum == null) {
+            System.err.println("❌ 致命错误：API 抓取成功，但所有比赛的分数(officialScore)都是 0！");
+            System.err.println("👉 请检查 FtcScoutApiClient 里的 extractPenalty(..., \"totalpoints\") 正则表达式是否失效！");
+            return;
+        }
+
+        PenaltyRepository.FullPenaltyRow officialData = dbMock.get(targetMatchNum);
+        System.out.println("📊 选中测试场次: Match " + targetMatchNum);
+        System.out.println("   -> 官方红方总分: " + officialData.rScore);
+        System.out.println("   -> 官方蓝方总分: " + officialData.bScore);
+
+        // 4. 模拟一个糟糕的侦察员，记了 0 分
+        System.out.println("\n🚶 模拟侦察员 'BadScouter' 提交 Match " + targetMatchNum + " (红方) 得分为 0...");
+        ScoreEntry fakeZeroScore = new ScoreEntry(
+                ScoreEntry.Type.ALLIANCE, targetMatchNum, "RED",
+                1111, 2222, 0, 0, // 0 自动，0 手动
+                false, false, false, false, false, false, false, false,
+                "", "BadScouter"
+        );
+
+        // =====================================
+        // 5. 模拟 RankingService 的核心评估逻辑
+        // =====================================
+        System.out.println("\n--- 🧠 核心评估逻辑 Trace ---");
+
+        if (fakeZeroScore.getScoreType() != ScoreEntry.Type.ALLIANCE) {
+            System.out.println("🛑 判定跳过：模式为 SINGLE 单队模式，无法与官方联盟总分对比。");
+            return;
+        }
+        System.out.println("✅ 模式校验：ALLIANCE 模式 (通过)");
+
+        if (officialData == null) {
+            System.out.println("🛑 判定跳过：未找到该场次的官方数据 (本地数据库缺少记录)。");
+            return;
+        }
+        System.out.println("✅ 官方数据校验：记录存在 (通过)");
+
+        boolean isRed = fakeZeroScore.getAlliance().equalsIgnoreCase("RED");
+        int officialTotal = isRed ? officialData.rScore : officialData.bScore;
+
+        if (officialTotal <= 0) {
+            System.out.println("🛑 判定跳过：官方总分为 " + officialTotal + "，视为比赛未出分。");
+            return;
+        }
+        System.out.println("✅ 官方分数校验：" + officialTotal + " 分 (通过)");
+
+        // 侦察员算出的是纯机器得分，官方总分包含对面送的犯规分，需要补偿计算
+        int penaltyGained = isRed ? (officialData.bMaj * 15 + officialData.bMin * 5) : (officialData.rMaj * 15 + officialData.rMin * 5);
+        int scoutPredictedTotal = fakeZeroScore.getTotalScore() + penaltyGained;
+
+        System.out.println("🧮 侦察员总分 (含犯规补偿) = " + fakeZeroScore.getTotalScore() + " + " + penaltyGained + " = " + scoutPredictedTotal);
+
+        double error = Math.abs(scoutPredictedTotal - officialTotal) / (double) officialTotal;
+        System.out.printf("⚖️ 误差率计算: |%d - %d| / %d = %.2f%%\n", scoutPredictedTotal, officialTotal, officialTotal, error * 100);
+
+        if (error > 0.20) {
+            System.out.println("🎯 结论：误差大于 20%，该侦察员将被打上 [⚠️ Low Rel] 标签，权重降为 0.5！");
+        } else {
+            System.out.println("🎯 结论：误差在允许范围内，侦察员可信。");
+        }
+        System.out.println("----------------------------------------\n");
     }
 }

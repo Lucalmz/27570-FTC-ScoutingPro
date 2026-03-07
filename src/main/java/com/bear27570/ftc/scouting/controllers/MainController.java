@@ -25,9 +25,11 @@ import javafx.scene.shape.Circle;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Callback;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.io.*;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class MainController {
@@ -93,6 +95,8 @@ public class MainController {
     private String editingOriginalTime = null;
     private ScoreEntry.SyncStatus editingOriginalSyncStatus = null;
     private String officialEventName = null;
+
+    private Map<String, Double> submitterReliabilityMap = new java.util.HashMap<>();
 
     private void updateTopLabel() {
         String role = isHost ? " [HOST]" : " [CLIENT]";
@@ -471,6 +475,7 @@ public class MainController {
     }
 
     private void updateUIAfterDataChange(List<ScoreEntry> history, List<TeamRanking> rankings) {
+        submitterReliabilityMap = rankingService.getSubmitterReliabilities(currentCompetition.getName());
         Platform.runLater(() -> {
             rankingsTableView.setItems(FXCollections.observableArrayList(rankings));
             scoreHistoryList.setAll(history);
@@ -552,7 +557,39 @@ public class MainController {
         histAllianceCol.setCellValueFactory(new PropertyValueFactory<>("alliance"));
         histTeamsCol.setCellValueFactory(new PropertyValueFactory<>("teams"));
         histTotalCol.setCellValueFactory(new PropertyValueFactory<>("totalScore"));
+
         histSubmitterCol.setCellValueFactory(new PropertyValueFactory<>("submitter"));
+
+        // ★ 自定义 CellFactory：使用 Ikonli 图标与红色文字高亮
+        histSubmitterCol.setCellFactory(column -> new TableCell<ScoreEntry, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                    setStyle("");
+                } else {
+                    Double weight = submitterReliabilityMap.getOrDefault(item, 1.0);
+                    if (weight < 1.0) {
+                        setText(item + " (Low Rel)");
+                        // 设置文字为红色粗体
+                        setStyle("-fx-text-fill: #F87171 !important; -fx-font-weight: bold;");
+
+                        // 使用 Feather 图标包的警告三角形
+                        FontIcon warningIcon = new FontIcon("fth-alert-triangle");
+                        warningIcon.setIconSize(14);
+                        warningIcon.setIconColor(Color.web("#F87171")); // 图标也染成红色
+
+                        setGraphic(warningIcon); // 将图标放在文字左侧
+                    } else {
+                        setText(item);
+                        setGraphic(null); // 正常人没有图标
+                        setStyle("");
+                    }
+                }
+            }
+        });
         histTimeCol.setCellValueFactory(new PropertyValueFactory<>("submissionTime"));
 
         histSyncCol.setCellValueFactory(new PropertyValueFactory<>("syncStatus"));
@@ -730,6 +767,7 @@ public class MainController {
             writer.newLine();
         }
     }
+
 
     private void setUIEnabled(boolean e) { scoringFormVBox.setDisable(!e); }
 
