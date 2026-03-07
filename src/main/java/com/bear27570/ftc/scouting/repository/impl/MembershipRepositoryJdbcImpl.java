@@ -1,6 +1,7 @@
 package com.bear27570.ftc.scouting.repository.impl;
 
 import com.bear27570.ftc.scouting.models.Membership;
+import com.bear27570.ftc.scouting.repository.DatabaseManager;
 import com.bear27570.ftc.scouting.repository.MembershipRepository;
 
 import java.sql.Connection;
@@ -22,7 +23,7 @@ public class MembershipRepositoryJdbcImpl implements MembershipRepository {
     @Override
     public void addMembership(String username, String competitionName, Membership.Status status) {
         String checkSql = "SELECT status FROM memberships WHERE username = ? AND competitionName = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
             checkStmt.setString(1, username);
             checkStmt.setString(2, competitionName);
             ResultSet rs = checkStmt.executeQuery();
@@ -37,7 +38,7 @@ public class MembershipRepositoryJdbcImpl implements MembershipRepository {
         }
 
         String sql = "INSERT INTO memberships(username, competitionName, status) VALUES(?, ?, ?)";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, username);
             pstmt.setString(2, competitionName);
             pstmt.setString(3, status.name());
@@ -51,7 +52,7 @@ public class MembershipRepositoryJdbcImpl implements MembershipRepository {
     @Override
     public Membership.Status getMembershipStatus(String username, String competitionName) {
         String sql = "SELECT status FROM memberships WHERE username = ? AND competitionName = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, username);
             pstmt.setString(2, competitionName);
             ResultSet rs = pstmt.executeQuery();
@@ -66,7 +67,7 @@ public class MembershipRepositoryJdbcImpl implements MembershipRepository {
     @Override
     public void removeMembership(String username, String competitionName) {
         String sql = "DELETE FROM memberships WHERE username = ? AND competitionName = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, username);
             pstmt.setString(2, competitionName);
             pstmt.executeUpdate();
@@ -78,7 +79,7 @@ public class MembershipRepositoryJdbcImpl implements MembershipRepository {
     public List<String> getMembersByStatus(String competitionName, Membership.Status status) {
         List<String> users = new ArrayList<>();
         String sql = "SELECT username FROM memberships WHERE competitionName = ? AND status = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, competitionName);
             pstmt.setString(2, status.name());
             ResultSet rs = pstmt.executeQuery();
@@ -93,7 +94,7 @@ public class MembershipRepositoryJdbcImpl implements MembershipRepository {
     @Override
     public void updateMembershipStatus(String username, String competitionName, Membership.Status newStatus) {
         String sql = "UPDATE memberships SET status = ? WHERE username = ? AND competitionName = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, newStatus.name());
             pstmt.setString(2, username);
             pstmt.setString(3, competitionName);

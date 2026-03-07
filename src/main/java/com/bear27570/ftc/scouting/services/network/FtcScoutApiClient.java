@@ -1,3 +1,4 @@
+// File: FtcScoutApiClient.java
 package com.bear27570.ftc.scouting.services.network;
 
 import com.bear27570.ftc.scouting.models.PenaltyEntry;
@@ -7,12 +8,13 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class FtcScoutApiClient {
 
-    // 定义回调接口，用于向 Controller 报告进度和结果
     public interface ApiCallback {
         void onEventFound(String eventName, boolean hasMatches);
         void onSuccess(String eventName, int syncedMatchCount);
@@ -25,9 +27,6 @@ public class FtcScoutApiClient {
         this.matchDataService = matchDataService;
     }
 
-    /**
-     * 异步获取赛事信息并同步罚分数据
-     */
     public void fetchAndSyncEventDataAsync(int season, String eventCode, String competitionName, ApiCallback callback) {
         new Thread(() -> {
             try {
@@ -61,7 +60,6 @@ public class FtcScoutApiClient {
                 Matcher hasMatchesMatcher = Pattern.compile("\"hasMatches\"\\s*:\\s*(true|false)").matcher(infoRes.body());
                 if (hasMatchesMatcher.find()) hasMatches = Boolean.parseBoolean(hasMatchesMatcher.group(1));
 
-                // 通知 Controller 已经找到了赛事
                 callback.onEventFound(eventName, hasMatches);
 
                 if (!hasMatches) {
@@ -108,6 +106,10 @@ public class FtcScoutApiClient {
 
         String[] matchBlocks = content.split("\"matchNum\"\\s*:");
 
+        // ★ 核心修复：使用 HashSet 记录已经处理过的【场次+联盟】
+        // 因为 API 返回数据中，前面的都是资格赛，后面的 Playoffs 会重复使用 Match 1, Match 2...
+        Set<String> processedMatches = new HashSet<>();
+
         for (int i = 1; i < matchBlocks.length; i++) {
             String block = matchBlocks[i];
 
@@ -134,13 +136,32 @@ public class FtcScoutApiClient {
                 int bMin = extractPenalty(bluePart, "minorscommitted");
                 int bMaj = extractPenalty(bluePart, "majorscommitted");
 
-                if (rMaj > 0 || rMin > 0) {
-                    matchDataService.submitPenalty(competitionName, new PenaltyEntry(matchNum, "RED", rMaj, rMin));
+                boolean isNewMatch = false;
+
+                // ★ 只有当该场次红方未被记录时，才录入数据库（忽略后面的 Playoff）
+                String redKey = matchNum + "_RED";
+                if (!processedMatches.contains(redKey)) {
+                    processedMatches.add(redKey);
+                    isNewMatch = true;
+                    if (rMaj > 0 || rMin > 0) {
+                        matchDataService.submitPenalty(competitionName, new PenaltyEntry(matchNum, "RED", rMaj, rMin));
+                    }
                 }
-                if (bMaj > 0 || bMin > 0) {
-                    matchDataService.submitPenalty(competitionName, new PenaltyEntry(matchNum, "BLUE", bMaj, bMin));
+
+                // ★ 只有当该场次蓝方未被记录时，才录入数据库（忽略后面的 Playoff）
+                String blueKey = matchNum + "_BLUE";
+                if (!processedMatches.contains(blueKey)) {
+                    processedMatches.add(blueKey);
+                    isNewMatch = true;
+                    if (bMaj > 0 || bMin > 0) {
+                        matchDataService.submitPenalty(competitionName, new PenaltyEntry(matchNum, "BLUE", bMaj, bMin));
+                    }
                 }
-                count++;
+
+                // 只有当这是第一次遇到这个 Match 时，总解析场数才 +1
+                if (isNewMatch) {
+                    count++;
+                }
             }
         }
         return count;

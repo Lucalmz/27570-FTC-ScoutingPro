@@ -1,9 +1,9 @@
 package com.bear27570.ftc.scouting.repository.impl;
 
+import com.bear27570.ftc.scouting.repository.DatabaseManager;
 import com.bear27570.ftc.scouting.repository.UserRepository;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -19,7 +19,7 @@ public class UserRepositoryJdbcImpl implements UserRepository {
     @Override
     public boolean createUser(String username, String password) {
         String sql = "INSERT INTO users(username, password) VALUES(?, ?)";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, username);
             pstmt.setString(2, password);
             pstmt.executeUpdate();
@@ -35,7 +35,7 @@ public class UserRepositoryJdbcImpl implements UserRepository {
     @Override
     public boolean authenticateUser(String username, String password) {
         String sql = "SELECT password FROM users WHERE username = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, username);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
@@ -58,7 +58,7 @@ public class UserRepositoryJdbcImpl implements UserRepository {
     public void ensureUserExists(String username) {
         String checkSql = "SELECT 1 FROM users WHERE username = ?";
         String insertSql = "INSERT INTO users(username, password) VALUES(?, 'guest_account')";
-        try (Connection conn = DriverManager.getConnection(dbUrl)) {
+        try (Connection conn = DatabaseManager.getConnection()) {
             boolean exists = false;
             try (PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
                 checkStmt.setString(1, username);
@@ -82,7 +82,7 @@ public class UserRepositoryJdbcImpl implements UserRepository {
     @Override
     public void updateApiKey(String username, String apiKey) {
         String sql = "UPDATE users SET geminiApiKey = ? WHERE username = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, apiKey);
             pstmt.setString(2, username);
             pstmt.executeUpdate();
@@ -94,7 +94,7 @@ public class UserRepositoryJdbcImpl implements UserRepository {
     @Override
     public String getApiKey(String username) {
         String sql = "SELECT geminiApiKey FROM users WHERE username = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, username);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {

@@ -2,6 +2,7 @@
 package com.bear27570.ftc.scouting.repository.impl;
 
 import com.bear27570.ftc.scouting.models.ScoreEntry;
+import com.bear27570.ftc.scouting.repository.DatabaseManager;
 import com.bear27570.ftc.scouting.repository.ScoreRepository;
 
 import java.sql.*;
@@ -23,7 +24,7 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
                 "team1Ignored, team2Ignored, team1Broken, team2Broken, " +
                 "totalScore, clickLocations, submitter, submissionTime, syncStatus) " +
                 "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setString(1, competitionName);
             pstmt.setString(2, entry.getScoreType().name());
             pstmt.setInt(3, entry.getMatchNumber());
@@ -63,7 +64,7 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
                 "team1CanSequence=?, team2CanSequence=?, team1L2Climb=?, team2L2Climb=?, " +
                 "team1Ignored=?, team2Ignored=?, team1Broken=?, team2Broken=?, totalScore=?, clickLocations=?, syncStatus=? " +
                 "WHERE id=?";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, entry.getMatchNumber());
             pstmt.setString(2, entry.getAlliance());
             pstmt.setInt(3, entry.getTeam1());
@@ -91,7 +92,7 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
 
     @Override
     public void syncWithHostData(String competitionName, List<ScoreEntry> hostData) {
-        try (Connection conn = DriverManager.getConnection(dbUrl)) {
+        try (Connection conn = DatabaseManager.getConnection()) {
             conn.setAutoCommit(false);
 
             // 1. 获取本地目前所有尚未同步的记录
@@ -129,7 +130,7 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
     public List<ScoreEntry> findPendingExports(String competitionName) {
         List<ScoreEntry> list = new ArrayList<>();
         String sql = "SELECT * FROM scores WHERE competitionName = ? AND syncStatus IN ('UNSYNCED', 'EXPORTED')";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, competitionName);
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
@@ -151,7 +152,7 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
         }
         String placeholders = String.join(",", placeholdersList);
         String sql = "UPDATE scores SET syncStatus = ? WHERE id IN (" + placeholders + ")";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, status.name());
             int idx = 2;
             for (int id : ids) {
@@ -166,7 +167,7 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
     @Override
     public void delete(int id) {
         String sql = "DELETE FROM scores WHERE id = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, id);
             pstmt.executeUpdate();
         } catch (SQLException e) {
@@ -179,7 +180,7 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
     public List<ScoreEntry> findByCompetition(String competitionName) {
         List<ScoreEntry> entries = new ArrayList<>();
         String sql = "SELECT * FROM scores WHERE competitionName = ? ORDER BY matchNumber DESC, id DESC";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, competitionName);
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
@@ -196,7 +197,7 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
     public List<ScoreEntry> findByTeam(String competitionName, int teamNumber) {
         List<ScoreEntry> entries = new ArrayList<>();
         String sql = "SELECT * FROM scores WHERE competitionName = ? AND (team1 = ? OR (scoreType = 'ALLIANCE' AND team2 = ?)) ORDER BY matchNumber DESC, id DESC";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, competitionName);
             pstmt.setInt(2, teamNumber);
             pstmt.setInt(3, teamNumber);

@@ -2,6 +2,7 @@ package com.bear27570.ftc.scouting.repository.impl;
 
 import com.bear27570.ftc.scouting.models.Competition;
 import com.bear27570.ftc.scouting.repository.CompetitionRepository;
+import com.bear27570.ftc.scouting.repository.DatabaseManager;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -19,7 +20,7 @@ public class CompetitionRepositoryJdbcImpl implements CompetitionRepository {
     public List<Competition> findAll() {
         List<Competition> competitions = new ArrayList<>();
         String sql = "SELECT * FROM competitions";
-        try (Connection conn = DriverManager.getConnection(dbUrl); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
                 Competition c = new Competition(rs.getString("name"), rs.getString("creatorUsername"), rs.getString("ratingFormula"));
                 // 新增：从数据库读取官方赛事信息
@@ -42,7 +43,7 @@ public class CompetitionRepositoryJdbcImpl implements CompetitionRepository {
     @Override
     public void updateFormula(String competitionName, String newFormula) {
         String sql = "UPDATE competitions SET ratingFormula = ? WHERE name = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, newFormula);
             pstmt.setString(2, competitionName);
             pstmt.executeUpdate();
@@ -54,7 +55,7 @@ public class CompetitionRepositoryJdbcImpl implements CompetitionRepository {
     public void ensureLocalCompetitionSync(Competition competition) {
         String checkSql = "SELECT COUNT(*) FROM competitions WHERE name = ?";
         boolean exists = false;
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(checkSql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(checkSql)) {
             pstmt.setString(1, competition.getName());
             ResultSet rs = pstmt.executeQuery();
             if (rs.next() && rs.getInt(1) > 0) {
@@ -67,7 +68,7 @@ public class CompetitionRepositoryJdbcImpl implements CompetitionRepository {
         if (!exists) {
             // 1. 本地没有同名比赛，安全插入
             String insertSql = "INSERT INTO competitions(name, creatorUsername, ratingFormula, eventSeason, eventCode, officialEventName) VALUES(?, ?, ?, ?, ?, ?)";
-            try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
+            try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(insertSql)) {
                 pstmt.setString(1, competition.getName());
                 pstmt.setString(2, competition.getCreatorUsername() != null ? competition.getCreatorUsername() : "HOST_SYNC");
                 pstmt.setString(3, competition.getRatingFormula() != null ? competition.getRatingFormula() : "total");
@@ -88,7 +89,7 @@ public class CompetitionRepositoryJdbcImpl implements CompetitionRepository {
     @Override
     public boolean create(String name, String creatorUsername, String ratingFormula) {
         String sql = "INSERT INTO competitions(name, creatorUsername, ratingFormula) VALUES(?, ?, ?)";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, name);
             pstmt.setString(2, creatorUsername);
             pstmt.setString(3, ratingFormula);
@@ -103,7 +104,7 @@ public class CompetitionRepositoryJdbcImpl implements CompetitionRepository {
     @Override
     public void updateEventInfo(String competitionName, int season, String eventCode, String officialName) {
         String sql = "UPDATE competitions SET eventSeason = ?, eventCode = ?, officialEventName = ? WHERE name = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, season);
             pstmt.setString(2, eventCode);
             pstmt.setString(3, officialName);

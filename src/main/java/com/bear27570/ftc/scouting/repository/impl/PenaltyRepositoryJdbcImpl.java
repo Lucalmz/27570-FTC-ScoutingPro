@@ -1,6 +1,7 @@
 package com.bear27570.ftc.scouting.repository.impl;
 
 import com.bear27570.ftc.scouting.models.PenaltyEntry;
+import com.bear27570.ftc.scouting.repository.DatabaseManager;
 import com.bear27570.ftc.scouting.repository.PenaltyRepository;
 import org.intellij.lang.annotations.Language;
 
@@ -19,7 +20,7 @@ public class PenaltyRepositoryJdbcImpl implements PenaltyRepository {
     @Override
     public void savePenaltyEntry(String competitionName, PenaltyEntry entry) {
         // 修复：利用 H2 的事务机制和原子判断，防止网络高并发提交下发生的数据竞争和相互覆盖
-        try (Connection conn = DriverManager.getConnection(dbUrl)) {
+        try (Connection conn = DatabaseManager.getConnection()) {
             // 设置手动提交以保证事务安全
             conn.setAutoCommit(false);
 
@@ -32,7 +33,6 @@ public class PenaltyRepositoryJdbcImpl implements PenaltyRepository {
                 }
             }
 
-            @Language("SQL")
             String sql;
             if (!exists) {
                 sql = "INSERT INTO penalties (competitionName, matchNumber, redMajor, redMinor, blueMajor, blueMinor) VALUES (?, ?, ?, ?, ?, ?)";
@@ -78,9 +78,8 @@ public class PenaltyRepositoryJdbcImpl implements PenaltyRepository {
     @Override
     public Map<Integer, FullPenaltyRow> getFullPenalties(String competitionName) {
         Map<Integer, FullPenaltyRow> map = new HashMap<>();
-        @Language("SQL")
         String sql = "SELECT * FROM penalties WHERE competitionName = ?";
-        try (Connection conn = DriverManager.getConnection(dbUrl); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, competitionName);
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {

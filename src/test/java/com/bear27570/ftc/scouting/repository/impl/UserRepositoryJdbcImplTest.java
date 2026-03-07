@@ -5,7 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
+import com.bear27570.ftc.scouting.repository.DatabaseManager;
 import java.sql.Statement;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -21,7 +21,7 @@ class UserRepositoryJdbcImplTest {
         userRepository = new UserRepositoryJdbcImpl(TEST_DB_URL);
 
         // 每次测试前，在内存中建表
-        try (Connection conn = DriverManager.getConnection(TEST_DB_URL);
+        try (Connection conn = DatabaseManager.getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute("CREATE TABLE users (username VARCHAR(255) PRIMARY KEY, password VARCHAR(255))");
         }
@@ -30,7 +30,7 @@ class UserRepositoryJdbcImplTest {
     @AfterEach
     void tearDown() throws Exception {
         // 每次测试后，销毁内存表，保证测试之间互不干扰
-        try (Connection conn = DriverManager.getConnection(TEST_DB_URL);
+        try (Connection conn = DatabaseManager.getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute("DROP TABLE users");
         }

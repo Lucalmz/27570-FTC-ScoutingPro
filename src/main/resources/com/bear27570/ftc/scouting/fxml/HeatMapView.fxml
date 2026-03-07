@@ -43,12 +43,12 @@
                         <Label text="Play Style" styleClass="text-muted"/>
                         <Label fx:id="playStyleLabel" text="Analyzing..." styleClass="text-accent, text-bold" style="-fx-font-size: 18px;"/>
                     </VBox>
-                    <Separator style="-fx-background-color: #334155;"/>
+                    <Separator/>
                     <VBox spacing="5">
                         <Label text="Efficiency" styleClass="text-muted"/>
                         <Label fx:id="efficiencyLabel" text="0.0 PPS" styleClass="text-warning, text-bold, mono-text" style="-fx-font-size: 24px;"/>
                     </VBox>
-                    <Separator style="-fx-background-color: #334155;"/>
+                    <Separator/>
                     <VBox fx:id="cyclesBox" spacing="5">
                         <Label text="Avg Intake Cycles" styleClass="text-muted"/>
                         <Label fx:id="cyclesLabel" text="0.0" styleClass="text-bold, mono-text" style="-fx-font-size: 20px;"/>
@@ -70,4 +70,26 @@
             </VBox>
         </ScrollPane>
     </right>
+    <!-- 【新增/修改】底部展示比赛详情及判罚列表 -->
+    <bottom>
+        <VBox spacing="10" styleClass="mac-card">
+            <BorderPane.margin>
+                <Insets top="0" right="25" bottom="25" left="25"/>
+            </BorderPane.margin>
+            <padding><Insets top="15" right="20" bottom="15" left="20"/></padding>
+            <Label text="Match Log &amp; Advanced Detail (Inc. Penalties)" styleClass="title-4"/>
+            <TableView fx:id="matchTable" prefHeight="220" styleClass="striped">
+                <columns>
+                    <TableColumn fx:id="colMatchNum" text="Match #" prefWidth="70"/>
+                    <TableColumn fx:id="colAlliance" text="Alliance" prefWidth="80"/>
+                    <TableColumn fx:id="colAuto" text="Auto" prefWidth="70"/>
+                    <TableColumn fx:id="colTeleop" text="TeleOp" prefWidth="70"/>
+                    <TableColumn fx:id="colPenalties" text="Penalties (Comm/Opp)" prefWidth="180"/>
+                    <TableColumn fx:id="colScore" text="Total Score" prefWidth="90"/>
+                    <TableColumn fx:id="colStatus" text="Robot Status" prefWidth="140"/>
+                </columns>
+                <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
+            </TableView>
+        </VBox>
+    </bottom>
 </BorderPane>

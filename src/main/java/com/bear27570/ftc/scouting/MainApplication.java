@@ -4,6 +4,7 @@ package com.bear27570.ftc.scouting;
 import atlantafx.base.theme.CupertinoDark;
 import com.bear27570.ftc.scouting.controllers.*;
 import com.bear27570.ftc.scouting.models.Competition;
+import com.bear27570.ftc.scouting.models.ScoreEntry;
 import com.bear27570.ftc.scouting.repository.*;
 import com.bear27570.ftc.scouting.repository.impl.*;
 import com.bear27570.ftc.scouting.services.NetworkService;
@@ -23,6 +24,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.List;
+import java.util.Map;
 
 public class MainApplication extends Application {
 
@@ -75,7 +78,7 @@ public class MainApplication extends Application {
         new File(dbFolder).mkdirs();
         String dbUrl = "jdbc:h2:" + dbFolder + File.separator + "ftc_scouting_master_db";
 
-        DatabaseInitializer.initializeMasterDatabase(dbUrl);
+        DatabaseManager.initialize(dbUrl);
 
         userRepository = new UserRepositoryJdbcImpl(dbUrl);
         membershipRepository = new MembershipRepositoryJdbcImpl(dbUrl);
@@ -164,13 +167,15 @@ public class MainApplication extends Application {
     public void showHeatmapView(Competition competition, int teamNum) throws IOException {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("fxml/HeatmapView.fxml"));
         Stage stage = new Stage();
+        Map<Integer, PenaltyRepository.FullPenaltyRow> penaltyMap = penaltyRepository.getFullPenalties(competition.getName());
+        List<ScoreEntry> matches = matchDataService.getTeamHistory(competition.getName(), teamNum);
         stage.setTitle("Heatmap - Team " + teamNum);
         setStageIcon(stage);
         Scene scene = new Scene(loader.load());
         applyTheme(scene);
         stage.setScene(scene);
         HeatmapController controller = loader.getController();
-        controller.setData(teamNum, matchDataService.getTeamHistory(competition.getName(), teamNum));
+        controller.setData(teamNum, matches, penaltyMap);
         stage.show();
     }
 
