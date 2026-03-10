@@ -1,23 +1,24 @@
+// File: TeamRanking.java
 package com.bear27570.ftc.scouting.models;
 
 import java.io.Serializable;
 
 public class TeamRanking implements Serializable {
-    private static final long serialVersionUID = 10L; // 更新序列化版本
+    private static final long serialVersionUID = 11L;
 
     private final int teamNumber;
     private int matchesPlayed = 0;
 
-    // ★ 核心改动：引入总权重，用于计算加权平均值
     private double totalWeight = 0;
 
-    // 使用累加值(Sum)而不是动态平均值(Avg)，以支持加权计算
+    // ★ 针对自动得分特殊的权重计算(分母)，以实现 "无得分则跳过该局平均值" 的算法
+    private double autoWeight = 0;
+
     private double sumAutoArtifacts = 0;
     private double sumTeleopArtifacts = 0;
     private double sumPenaltyCommitted = 0;
     private double sumOpponentPenalty = 0;
 
-    // 对外暴露的计算后的平均值
     private double avgAutoArtifacts = 0;
     private double avgTeleopArtifacts = 0;
     private double avgPenaltyCommitted = 0;
@@ -34,38 +35,40 @@ public class TeamRanking implements Serializable {
         this.teamNumber = teamNumber;
     }
 
-    /**
-     * 添加一场比赛数据
-     * @param weight 数据权重 (1.0 = 正常, 0.5 = 低信誉度)
-     */
-    public void addMatchResult(double auto, double teleop, boolean sequence, boolean climb, int hits, int shots,
+    public void addMatchResult(double autoScore, double teleop, boolean sequence, boolean climb, int hits, int shots,
                                int penaltyCommitted, int penaltyFromOpponent, double weight) {
         matchesPlayed++;
-        totalWeight += weight; // 累加权重
+        totalWeight += weight;
 
-        // 核心：各项数据 * 权重 后累加
-        sumAutoArtifacts += auto * weight;
+        // TeleOp 和判罚使用总权重
         sumTeleopArtifacts += teleop * weight;
         sumPenaltyCommitted += penaltyCommitted * weight;
         sumOpponentPenalty += penaltyFromOpponent * weight;
 
-        // 重新计算加权平均值
         if (totalWeight > 0) {
-            avgAutoArtifacts = sumAutoArtifacts / totalWeight;
             avgTeleopArtifacts = sumTeleopArtifacts / totalWeight;
             avgPenaltyCommitted = sumPenaltyCommitted / totalWeight;
             avgOpponentPenalty = sumOpponentPenalty / totalWeight;
         }
 
+        // ★ 智能 Auto 平均分跳过机制：仅在自动得分大于 0 时，才将其计入自动阶段的权重(分母)和总分(分子)
+        if (autoScore > 0) {
+            sumAutoArtifacts += autoScore * weight;
+            autoWeight += weight; // 只增加有有效记录场次的权重分母
+        }
+
+        if (autoWeight > 0) {
+            avgAutoArtifacts = sumAutoArtifacts / autoWeight;
+        } else {
+            avgAutoArtifacts = 0;
+        }
+
         if (sequence) this.canSequence = true;
         if (climb) this.l2Capable = true;
 
-        // 命中率不需要加权，因为它本身就是 totalHits / totalShots
         this.totalHits += hits;
         this.totalShots += shots;
     }
-
-    // --- Getters (保持原有接口兼容) ---
 
     public int getTeamNumber() { return teamNumber; }
     public int getMatchesPlayed() { return matchesPlayed; }

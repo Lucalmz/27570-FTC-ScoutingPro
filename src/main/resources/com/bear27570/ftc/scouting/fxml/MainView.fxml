@@ -32,9 +32,8 @@
     </top>
 
     <center>
-        <TabPane tabClosingPolicy="UNAVAILABLE">
+        <TabPane fx:id="mainTabPane" tabClosingPolicy="UNAVAILABLE">
             <tabs>
-                <!-- TAB 1: SCORING -->
                 <Tab text="Scoring">
                     <content>
                         <ScrollPane fitToWidth="true" styleClass="edge-to-edge">
@@ -92,12 +91,69 @@
 
                                     <Separator />
 
-                                    <GridPane hgap="20" vgap="20">
-                                        <Label text="Auto Artifacts" style="-fx-font-weight: bold;"/>
-                                        <TextField fx:id="autoArtifactsField" text="0" GridPane.columnIndex="1" prefWidth="100" prefHeight="38"/>
+                                    <VBox spacing="15" styleClass="panel-inner">
+                                        <Label text="Auto Scoring Analysis" styleClass="title-4, text-accent"/>
 
-                                        <Label text="TeleOp Hits" style="-fx-font-weight: bold;" GridPane.rowIndex="1" />
-                                        <HBox spacing="20" GridPane.columnIndex="1" GridPane.rowIndex="1" alignment="CENTER_LEFT">
+                                        <HBox spacing="40">
+                                            <VBox spacing="15">
+                                                <Label text="Team 1 Auto" style="-fx-font-weight: bold;"/>
+
+                                                <VBox spacing="5">
+                                                    <Label text="Score" styleClass="text-muted" style="-fx-font-size: 11px;"/>
+                                                    <TextField fx:id="t1AutoScoreField" text="0" prefWidth="80" prefHeight="35"/>
+                                                </VBox>
+
+                                                <HBox spacing="20">
+                                                    <VBox spacing="5" alignment="CENTER">
+                                                        <Label text="Projection" styleClass="text-muted" style="-fx-font-size: 11px;"/>
+                                                        <VBox spacing="4">
+                                                            <ToggleButton fx:id="t1ProjNearBtn" text="Near" styleClass="box-toggle"/>
+                                                            <ToggleButton fx:id="t1ProjFarBtn" text="Far" styleClass="box-toggle"/>
+                                                        </VBox>
+                                                    </VBox>
+                                                    <VBox spacing="5" alignment="CENTER">
+                                                        <Label text="Preset Rows" styleClass="text-muted" style="-fx-font-size: 11px;"/>
+                                                        <VBox spacing="4">
+                                                            <ToggleButton fx:id="t1Row1Btn" text="R1" styleClass="box-toggle"/>
+                                                            <ToggleButton fx:id="t1Row2Btn" text="R2" styleClass="box-toggle"/>
+                                                            <ToggleButton fx:id="t1Row3Btn" text="R3" styleClass="box-toggle"/>
+                                                        </VBox>
+                                                    </VBox>
+                                                </HBox>
+                                            </VBox>
+
+                                            <VBox fx:id="team2AutoBox" spacing="15">
+                                                <Label text="Team 2 Auto" style="-fx-font-weight: bold;"/>
+
+                                                <VBox spacing="5">
+                                                    <Label text="Score" styleClass="text-muted" style="-fx-font-size: 11px;"/>
+                                                    <TextField fx:id="t2AutoScoreField" text="0" prefWidth="80" prefHeight="35"/>
+                                                </VBox>
+
+                                                <HBox spacing="20">
+                                                    <VBox spacing="5" alignment="CENTER">
+                                                        <Label text="Projection" styleClass="text-muted" style="-fx-font-size: 11px;"/>
+                                                        <VBox spacing="4">
+                                                            <ToggleButton fx:id="t2ProjNearBtn" text="Near" styleClass="box-toggle"/>
+                                                            <ToggleButton fx:id="t2ProjFarBtn" text="Far" styleClass="box-toggle"/>
+                                                        </VBox>
+                                                    </VBox>
+                                                    <VBox spacing="5" alignment="CENTER">
+                                                        <Label text="Preset Rows" styleClass="text-muted" style="-fx-font-size: 11px;"/>
+                                                        <VBox spacing="4">
+                                                            <ToggleButton fx:id="t2Row1Btn" text="R1" styleClass="box-toggle"/>
+                                                            <ToggleButton fx:id="t2Row2Btn" text="R2" styleClass="box-toggle"/>
+                                                            <ToggleButton fx:id="t2Row3Btn" text="R3" styleClass="box-toggle"/>
+                                                        </VBox>
+                                                    </VBox>
+                                                </HBox>
+                                            </VBox>
+                                        </HBox>
+                                    </VBox>
+
+                                    <GridPane hgap="20" vgap="20">
+                                        <Label text="TeleOp Hits" style="-fx-font-weight: bold;" />
+                                        <HBox spacing="20" GridPane.columnIndex="1" alignment="CENTER_LEFT">
                                             <TextField fx:id="teleopArtifactsField" text="0" prefWidth="100" prefHeight="38"/>
                                             <Button onAction="#handleOpenFieldInput" text="Draw Map" styleClass="accent" prefHeight="38">
                                                 <graphic><FontIcon iconLiteral="fth-map-pin" iconSize="16" iconColor="white"/></graphic>
@@ -140,7 +196,6 @@
                     </content>
                 </Tab>
 
-                <!-- TAB 2: FTCSCOUT (替代原有的 Penalties) -->
                 <Tab text="FTCScout">
                     <content>
                         <VBox alignment="CENTER" spacing="20">
@@ -167,7 +222,6 @@
                     </content>
                 </Tab>
 
-                <!-- TAB 3: RANKINGS -->
                 <Tab text="Team Rankings">
                     <content>
                         <VBox spacing="15">
@@ -201,7 +255,6 @@
                     </content>
                 </Tab>
 
-                <!-- TAB 4: HISTORY -->
                 <Tab text="History">
                     <content>
                         <VBox spacing="15">

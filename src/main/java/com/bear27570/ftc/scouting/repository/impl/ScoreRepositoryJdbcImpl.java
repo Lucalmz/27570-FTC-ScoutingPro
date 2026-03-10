@@ -15,15 +15,30 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
 
     public ScoreRepositoryJdbcImpl(String dbUrl) {
         this.dbUrl = dbUrl;
+
+        // ★ 核心逻辑：应用启动时自动检测并为旧数据库无缝添加新增的 6 个自动阶段数据列
+        try (Connection conn = DatabaseManager.getConnection(); Statement stmt = conn.createStatement()) {
+            stmt.execute("ALTER TABLE scores ADD COLUMN IF NOT EXISTS team1AutoScore INT DEFAULT 0");
+            stmt.execute("ALTER TABLE scores ADD COLUMN IF NOT EXISTS team2AutoScore INT DEFAULT 0");
+            stmt.execute("ALTER TABLE scores ADD COLUMN IF NOT EXISTS team1AutoProj VARCHAR(20) DEFAULT 'NONE'");
+            stmt.execute("ALTER TABLE scores ADD COLUMN IF NOT EXISTS team2AutoProj VARCHAR(20) DEFAULT 'NONE'");
+            stmt.execute("ALTER TABLE scores ADD COLUMN IF NOT EXISTS team1AutoRow VARCHAR(20) DEFAULT 'NONE'");
+            stmt.execute("ALTER TABLE scores ADD COLUMN IF NOT EXISTS team2AutoRow VARCHAR(20) DEFAULT 'NONE'");
+        } catch (SQLException e) {
+            System.err.println("Database Update Warning: Could not alter scores table. " + e.getMessage());
+        }
     }
 
     @Override
     public void save(String competitionName, ScoreEntry entry) {
+        // ★ 增加了 6 个新字段，共计 27 个参数
         String sql = "INSERT INTO scores(competitionName, scoreType, matchNumber, alliance, team1, team2, " +
+                "team1AutoScore, team2AutoScore, team1AutoProj, team2AutoProj, team1AutoRow, team2AutoRow, " +
                 "autoArtifacts, teleopArtifacts, team1CanSequence, team2CanSequence, team1L2Climb, team2L2Climb, " +
                 "team1Ignored, team2Ignored, team1Broken, team2Broken, " +
                 "totalScore, clickLocations, submitter, submissionTime, syncStatus) " +
-                "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
         try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setString(1, competitionName);
             pstmt.setString(2, entry.getScoreType().name());
@@ -31,21 +46,31 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
             pstmt.setString(4, entry.getAlliance());
             pstmt.setInt(5, entry.getTeam1());
             pstmt.setInt(6, entry.getTeam2());
-            pstmt.setInt(7, entry.getAutoArtifacts());
-            pstmt.setInt(8, entry.getTeleopArtifacts());
-            pstmt.setBoolean(9, entry.isTeam1CanSequence());
-            pstmt.setBoolean(10, entry.isTeam2CanSequence());
-            pstmt.setBoolean(11, entry.isTeam1L2Climb());
-            pstmt.setBoolean(12, entry.isTeam2L2Climb());
-            pstmt.setBoolean(13, entry.isTeam1Ignored());
-            pstmt.setBoolean(14, entry.isTeam2Ignored());
-            pstmt.setBoolean(15, entry.isTeam1Broken());
-            pstmt.setBoolean(16, entry.isTeam2Broken());
-            pstmt.setInt(17, entry.getTotalScore());
-            pstmt.setString(18, entry.getClickLocations());
-            pstmt.setString(19, entry.getSubmitter());
-            pstmt.setString(20, entry.getSubmissionTime());
-            pstmt.setString(21, entry.getSyncStatus().name());
+
+            // --- 绑定新增字段 ---
+            pstmt.setInt(7, entry.getTeam1AutoScore());
+            pstmt.setInt(8, entry.getTeam2AutoScore());
+            pstmt.setString(9, entry.getTeam1AutoProj());
+            pstmt.setString(10, entry.getTeam2AutoProj());
+            pstmt.setString(11, entry.getTeam1AutoRow());
+            pstmt.setString(12, entry.getTeam2AutoRow());
+
+            pstmt.setInt(13, entry.getAutoArtifacts()); // 依然保留聚合值以便向下兼容
+            pstmt.setInt(14, entry.getTeleopArtifacts());
+            pstmt.setBoolean(15, entry.isTeam1CanSequence());
+            pstmt.setBoolean(16, entry.isTeam2CanSequence());
+            pstmt.setBoolean(17, entry.isTeam1L2Climb());
+            pstmt.setBoolean(18, entry.isTeam2L2Climb());
+            pstmt.setBoolean(19, entry.isTeam1Ignored());
+            pstmt.setBoolean(20, entry.isTeam2Ignored());
+            pstmt.setBoolean(21, entry.isTeam1Broken());
+            pstmt.setBoolean(22, entry.isTeam2Broken());
+            pstmt.setInt(23, entry.getTotalScore());
+            pstmt.setString(24, entry.getClickLocations());
+            pstmt.setString(25, entry.getSubmitter());
+            pstmt.setString(26, entry.getSubmissionTime());
+            pstmt.setString(27, entry.getSyncStatus().name());
+
             pstmt.executeUpdate();
             try (ResultSet rs = pstmt.getGeneratedKeys()) {
                 if (rs.next()) {
@@ -60,29 +85,42 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
 
     @Override
     public void update(ScoreEntry entry) {
-        String sql = "UPDATE scores SET matchNumber=?, alliance=?, team1=?, team2=?, autoArtifacts=?, teleopArtifacts=?, " +
+        String sql = "UPDATE scores SET matchNumber=?, alliance=?, team1=?, team2=?, " +
+                "team1AutoScore=?, team2AutoScore=?, team1AutoProj=?, team2AutoProj=?, team1AutoRow=?, team2AutoRow=?, " +
+                "autoArtifacts=?, teleopArtifacts=?, " +
                 "team1CanSequence=?, team2CanSequence=?, team1L2Climb=?, team2L2Climb=?, " +
                 "team1Ignored=?, team2Ignored=?, team1Broken=?, team2Broken=?, totalScore=?, clickLocations=?, syncStatus=? " +
                 "WHERE id=?";
+
         try (Connection conn = DatabaseManager.getConnection(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, entry.getMatchNumber());
             pstmt.setString(2, entry.getAlliance());
             pstmt.setInt(3, entry.getTeam1());
             pstmt.setInt(4, entry.getTeam2());
-            pstmt.setInt(5, entry.getAutoArtifacts());
-            pstmt.setInt(6, entry.getTeleopArtifacts());
-            pstmt.setBoolean(7, entry.isTeam1CanSequence());
-            pstmt.setBoolean(8, entry.isTeam2CanSequence());
-            pstmt.setBoolean(9, entry.isTeam1L2Climb());
-            pstmt.setBoolean(10, entry.isTeam2L2Climb());
-            pstmt.setBoolean(11, entry.isTeam1Ignored());
-            pstmt.setBoolean(12, entry.isTeam2Ignored());
-            pstmt.setBoolean(13, entry.isTeam1Broken());
-            pstmt.setBoolean(14, entry.isTeam2Broken());
-            pstmt.setInt(15, entry.getTotalScore());
-            pstmt.setString(16, entry.getClickLocations());
-            pstmt.setString(17, entry.getSyncStatus().name());
-            pstmt.setInt(18, entry.getId());
+
+            // --- 绑定新增字段 ---
+            pstmt.setInt(5, entry.getTeam1AutoScore());
+            pstmt.setInt(6, entry.getTeam2AutoScore());
+            pstmt.setString(7, entry.getTeam1AutoProj());
+            pstmt.setString(8, entry.getTeam2AutoProj());
+            pstmt.setString(9, entry.getTeam1AutoRow());
+            pstmt.setString(10, entry.getTeam2AutoRow());
+
+            pstmt.setInt(11, entry.getAutoArtifacts());
+            pstmt.setInt(12, entry.getTeleopArtifacts());
+            pstmt.setBoolean(13, entry.isTeam1CanSequence());
+            pstmt.setBoolean(14, entry.isTeam2CanSequence());
+            pstmt.setBoolean(15, entry.isTeam1L2Climb());
+            pstmt.setBoolean(16, entry.isTeam2L2Climb());
+            pstmt.setBoolean(17, entry.isTeam1Ignored());
+            pstmt.setBoolean(18, entry.isTeam2Ignored());
+            pstmt.setBoolean(19, entry.isTeam1Broken());
+            pstmt.setBoolean(20, entry.isTeam2Broken());
+            pstmt.setInt(21, entry.getTotalScore());
+            pstmt.setString(22, entry.getClickLocations());
+            pstmt.setString(23, entry.getSyncStatus().name());
+            pstmt.setInt(24, entry.getId());
+
             pstmt.executeUpdate();
         } catch (SQLException e) {
             System.err.println("Error updating score (ID: " + entry.getId() + "): " + e.getMessage());
@@ -95,22 +133,18 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
         try (Connection conn = DatabaseManager.getConnection()) {
             conn.setAutoCommit(false);
 
-            // 1. 获取本地目前所有尚未同步的记录
             List<ScoreEntry> localPending = findPendingExports(competitionName);
 
-            // 2. 清空本地对应赛事的记录
             try(PreparedStatement del = conn.prepareStatement("DELETE FROM scores WHERE competitionName = ?")) {
                 del.setString(1, competitionName);
                 del.executeUpdate();
             }
 
-            // 3. 把主机数据全部插回去 (此时已经是完全同步的状态)
             for (ScoreEntry hs : hostData) {
                 hs.setSyncStatus(ScoreEntry.SyncStatus.SYNCED);
                 save(competitionName, hs);
             }
 
-            // 4. 将刚才保留的未同步数据比对，如果主机里没有，则插回本地
             for (ScoreEntry pending : localPending) {
                 boolean alreadyInHost = hostData.stream().anyMatch(h ->
                         h.getSubmitter().equals(pending.getSubmitter()) &&
@@ -231,6 +265,17 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
             } catch (IllegalArgumentException ignored) {}
         }
 
+        // --- 安全地提取新增列（防止在首次启动刚建表时由于某些原因抛出异常） ---
+        int t1AutoScore = 0, t2AutoScore = 0;
+        String t1Proj = "NONE", t2Proj = "NONE", t1Row = "NONE", t2Row = "NONE";
+
+        try { t1AutoScore = rs.getInt("team1AutoScore"); } catch (SQLException ignore) {}
+        try { t2AutoScore = rs.getInt("team2AutoScore"); } catch (SQLException ignore) {}
+        try { t1Proj = rs.getString("team1AutoProj"); if(t1Proj == null) t1Proj = "NONE"; } catch (SQLException ignore) {}
+        try { t2Proj = rs.getString("team2AutoProj"); if(t2Proj == null) t2Proj = "NONE"; } catch (SQLException ignore) {}
+        try { t1Row = rs.getString("team1AutoRow"); if(t1Row == null) t1Row = "NONE"; } catch (SQLException ignore) {}
+        try { t2Row = rs.getString("team2AutoRow"); if(t2Row == null) t2Row = "NONE"; } catch (SQLException ignore) {}
+
         boolean t1Ign = false, t2Ign = false, t1Brk = false, t2Brk = false;
         try { t1Ign = rs.getBoolean("team1Ignored"); } catch (SQLException ignore) {}
         try { t2Ign = rs.getBoolean("team2Ignored"); } catch (SQLException ignore) {}
@@ -244,7 +289,12 @@ public class ScoreRepositoryJdbcImpl implements ScoreRepository {
                 rs.getString("alliance"),
                 rs.getInt("team1"),
                 rs.getInt("team2"),
-                rs.getInt("autoArtifacts"),
+                t1AutoScore,
+                t2AutoScore,
+                t1Proj,
+                t2Proj,
+                t1Row,
+                t2Row,
                 rs.getInt("teleopArtifacts"),
                 rs.getBoolean("team1CanSequence"),
                 rs.getBoolean("team2CanSequence"),

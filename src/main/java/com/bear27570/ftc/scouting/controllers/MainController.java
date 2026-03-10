@@ -28,11 +28,14 @@ import javafx.util.Callback;
 import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 public class MainController {
+
+    @FXML private TabPane mainTabPane;
 
     @FXML private Label competitionNameLabel, submitterLabel, errorLabel, statusLabel;
     @FXML private Button manageMembersBtn, submitButton, editRatingButton, offlineSyncBtn;
@@ -41,8 +44,16 @@ public class MainController {
     @FXML private VBox scoringFormVBox;
     @FXML private RadioButton allianceModeRadio, singleModeRadio;
     @FXML private TextField matchNumberField, team1Field, team2Field;
-    @FXML private TextField autoArtifactsField, teleopArtifactsField;
     @FXML private ToggleButton redAllianceToggle, blueAllianceToggle;
+
+    // 精细化 Auto 阶段面板
+    @FXML private VBox team2AutoBox;
+    @FXML private TextField t1AutoScoreField, t2AutoScoreField;
+    @FXML private ToggleButton t1ProjNearBtn, t1ProjFarBtn, t2ProjNearBtn, t2ProjFarBtn;
+    @FXML private ToggleButton t1Row1Btn, t1Row2Btn, t1Row3Btn;
+    @FXML private ToggleButton t2Row1Btn, t2Row2Btn, t2Row3Btn;
+
+    @FXML private TextField teleopArtifactsField;
 
     @FXML private CheckBox team1SequenceCheck, team1L2ClimbCheck;
     @FXML private CheckBox team1IgnoreCheck, team2IgnoreCheck;
@@ -52,7 +63,7 @@ public class MainController {
     @FXML private Label lblTeam2;
     @FXML private CheckBox team2SequenceCheck, team2L2ClimbCheck;
 
-    // Penalty Tab
+    // Penalty / FTCScout Tab
     @FXML private TextField ftcScoutSeasonField, ftcScoutEventField;
     @FXML private Label boundEventNameLabel, autoFetchStatusLabel;
 
@@ -76,9 +87,12 @@ public class MainController {
     @FXML private TableColumn<ScoreEntry, Void> histActionsCol;
 
     private ToggleGroup allianceToggleGroup, modeToggleGroup;
+    private ToggleGroup t1ProjGroup, t2ProjGroup;
+    // 注意：去掉了 t1RowGroup 和 t2RowGroup，允许单队多选
+
     private String currentClickLocations = "";
 
-    // --- 依赖注入的服务 ---
+    // 依赖注入的服务
     private MainApplication mainApp;
     private MatchDataService matchDataService;
     private RankingService rankingService;
@@ -107,7 +121,6 @@ public class MainController {
         }
     }
 
-    // --- 核心注入方法 ---
     public void setDependencies(MainApplication mainApp, Competition competition, String username, boolean isHost,
                                 MatchDataService matchDataService, RankingService rankingService,
                                 CompetitionRepository competitionRepository, UserService userService) {
@@ -120,8 +133,6 @@ public class MainController {
         this.competitionRepository = competitionRepository;
         this.userService = userService;
 
-        // ★ [核心修复] 从本地数据库补全赛事信息 (尤其是 officialEventName)
-        // 确保从机一进页面就显示完整的 FTCScout 比赛名，而不是等待网络同步
         Competition localComp = competitionRepository.findByName(competition.getName());
         if (localComp != null && localComp.getOfficialEventName() != null && !localComp.getOfficialEventName().trim().isEmpty()) {
             this.currentCompetition.setOfficialEventName(localComp.getOfficialEventName());
@@ -129,7 +140,6 @@ public class MainController {
             this.currentCompetition.setEventCode(localComp.getEventCode());
         }
 
-        // 实例化专门负责 FTC Scout API 的客户端
         this.ftcScoutApiClient = new FtcScoutApiClient(matchDataService);
 
         updateTopLabel();
@@ -160,7 +170,6 @@ public class MainController {
             manageMembersBtn.setManaged(true);
             startAsHost();
         } else {
-            // ★ 完美修复数据无法同步：从机启动前，静默创建一个同名的房主账户，确保满足 users 外键依赖
             if (this.userService != null && currentCompetition.getCreatorUsername() != null) {
                 this.userService.register(currentCompetition.getCreatorUsername(), "dummy_password_for_fk");
             }
@@ -169,7 +178,6 @@ public class MainController {
             manageMembersBtn.setVisible(false);
             manageMembersBtn.setManaged(false);
 
-            // ★ [核心要求] 让 Client 端不显示 FTCScout 编辑页面 (自动找出其所在的 Tab 并移除)
             Platform.runLater(() -> {
                 if (ftcScoutSeasonField != null) {
                     javafx.scene.Node current = ftcScoutSeasonField;
@@ -184,7 +192,6 @@ public class MainController {
                     if (foundTabPane != null) {
                         foundTabPane.getTabs().removeIf(tab -> tab.getContent() != null && isDescendant(ftcScoutSeasonField, tab.getContent()));
                     } else {
-                        // 降级方案：如果不在 TabPane 中，则直接隐藏它所在的父容器
                         if (ftcScoutSeasonField.getParent() != null) {
                             ftcScoutSeasonField.getParent().setVisible(false);
                             ftcScoutSeasonField.getParent().setManaged(false);
@@ -197,7 +204,6 @@ public class MainController {
         }
     }
 
-    // 辅助方法：用于判断某个节点是否包含在父节点中
     private boolean isDescendant(javafx.scene.Node node, javafx.scene.Node parent) {
         while (node != null) {
             if (node == parent) return true;
@@ -222,11 +228,29 @@ public class MainController {
         }
     }
 
+    // 核心逻辑：设置多队之间对同一个Row的互斥“抢夺”
+    private void setupRowExclusivity(ToggleButton t1Btn, ToggleButton t2Btn) {
+        t1Btn.selectedProperty().addListener((obs, oldVal, isSelected) -> {
+            if (isSelected) t2Btn.setSelected(false);
+        });
+        t2Btn.selectedProperty().addListener((obs, oldVal, isSelected) -> {
+            if (isSelected) t1Btn.setSelected(false);
+        });
+    }
+
     private void setupScoringTab() {
         allianceToggleGroup = new ToggleGroup();
         redAllianceToggle.setToggleGroup(allianceToggleGroup);
         blueAllianceToggle.setToggleGroup(allianceToggleGroup);
         redAllianceToggle.setSelected(true);
+
+        t1ProjGroup = new ToggleGroup(); t1ProjNearBtn.setToggleGroup(t1ProjGroup); t1ProjFarBtn.setToggleGroup(t1ProjGroup);
+        t2ProjGroup = new ToggleGroup(); t2ProjNearBtn.setToggleGroup(t2ProjGroup); t2ProjFarBtn.setToggleGroup(t2ProjGroup);
+
+        // ★ 跨队 Row 互斥逻辑
+        setupRowExclusivity(t1Row1Btn, t2Row1Btn);
+        setupRowExclusivity(t1Row2Btn, t2Row2Btn);
+        setupRowExclusivity(t1Row3Btn, t2Row3Btn);
 
         modeToggleGroup = new ToggleGroup();
         allianceModeRadio.setToggleGroup(modeToggleGroup);
@@ -240,11 +264,18 @@ public class MainController {
             if (team2IgnoreBox != null) team2IgnoreBox.setVisible(!isS);
             if (team2IgnoreCheck != null) team2IgnoreCheck.setVisible(!isS);
             if (team2BrokenCheck != null) team2BrokenCheck.setVisible(!isS);
+            if (team2AutoBox != null) { team2AutoBox.setVisible(!isS); team2AutoBox.setManaged(!isS); }
             if (isS) {
                 if (team2IgnoreCheck != null) team2IgnoreCheck.setSelected(false);
                 if (team2BrokenCheck != null) team2BrokenCheck.setSelected(false);
                 if (team2SequenceCheck != null) team2SequenceCheck.setSelected(false);
                 if (team2L2ClimbCheck != null) team2L2ClimbCheck.setSelected(false);
+                t2AutoScoreField.setText("0");
+                t2ProjGroup.selectToggle(null);
+
+                t2Row1Btn.setSelected(false);
+                t2Row2Btn.setSelected(false);
+                t2Row3Btn.setSelected(false);
             }
         });
 
@@ -253,6 +284,38 @@ public class MainController {
 
         team1Field.textProperty().addListener((obs, old, newVal) -> updateWeakCheckboxStatus(newVal, team1IgnoreCheck));
         team2Field.textProperty().addListener((obs, old, newVal) -> updateWeakCheckboxStatus(newVal, team2IgnoreCheck));
+    }
+
+    private String getSelectedToggleText(ToggleGroup group) {
+        ToggleButton selected = (ToggleButton) group.getSelectedToggle();
+        return selected == null ? "NONE" : selected.getText().toUpperCase().replace(" ", "");
+    }
+
+    // 获取多选的 Row，用空格分隔，例如 "R1 R3"
+    private String getSelectedRowsString(ToggleButton r1, ToggleButton r2, ToggleButton r3) {
+        List<String> selected = new ArrayList<>();
+        if (r1.isSelected()) selected.add("R1");
+        if (r2.isSelected()) selected.add("R2");
+        if (r3.isSelected()) selected.add("R3");
+        return selected.isEmpty() ? "NONE" : String.join(" ", selected);
+    }
+
+    private void setToggleGroupByText(ToggleGroup group, String text) {
+        group.selectToggle(null);
+        if (text == null || text.equals("NONE")) return;
+        for (Toggle toggle : group.getToggles()) {
+            if (((ToggleButton) toggle).getText().toUpperCase().replace(" ", "").equals(text)) {
+                group.selectToggle(toggle);
+                break;
+            }
+        }
+    }
+
+    // 恢复多选的 Row 状态
+    private void setRowsFromText(String text, ToggleButton r1, ToggleButton r2, ToggleButton r3) {
+        r1.setSelected(text != null && text.contains("R1"));
+        r2.setSelected(text != null && text.contains("R2"));
+        r3.setSelected(text != null && text.contains("R3"));
     }
 
     private void setupRankingsTab() {
@@ -316,7 +379,7 @@ public class MainController {
             }
         });
 
-        rankingLegendLabel.setText("Penalty: Major=15, Minor=5. Auto scores are NOT doubled per Into The Deep rules.");
+        rankingLegendLabel.setText("Penalty: Major=15, Minor=5. Auto Score now correctly skips matches with 0 points from average calculation.");
     }
 
     private <T> Callback<TableColumn<T, Double>, TableCell<T, Double>> createNumberCellFactory(String format) {
@@ -328,7 +391,6 @@ public class MainController {
         };
     }
 
-    // ★ 重构后：利用独立的 API Client 异步获取数据
     @FXML
     private void handleBindAndFetch() {
         if (!isHost) {
@@ -357,7 +419,6 @@ public class MainController {
         autoFetchStatusLabel.setStyle("-fx-text-fill: #0A84FF;");
         boundEventNameLabel.setText("Event: Fetching...");
 
-        // 调用重构到服务层的方法
         ftcScoutApiClient.fetchAndSyncEventDataAsync(season, eventCode, currentCompetition.getName(), new FtcScoutApiClient.ApiCallback() {
             @Override
             public void onEventFound(String eventName, boolean hasMatches) {
@@ -408,32 +469,32 @@ public class MainController {
             if (selectedToggle == null) throw new IllegalArgumentException("Select an alliance.");
             String alliance = selectedToggle.getText().contains("Red") ? "RED" : "BLUE";
             boolean isSingle = singleModeRadio.isSelected();
-            ScoreEntry entry;
-            if (editingScoreId != -1) {
-                entry = new ScoreEntry(
-                        editingScoreId, isSingle ? ScoreEntry.Type.SINGLE : ScoreEntry.Type.ALLIANCE,
-                        Integer.parseInt(matchNumberField.getText()), alliance,
-                        Integer.parseInt(team1Field.getText()), isSingle ? 0 : Integer.parseInt(team2Field.getText()),
-                        Integer.parseInt(autoArtifactsField.getText()), Integer.parseInt(teleopArtifactsField.getText()),
-                        team1SequenceCheck.isSelected(), isSingle ? false : team2SequenceCheck.isSelected(),
-                        team1L2ClimbCheck.isSelected(), isSingle ? false : team2L2ClimbCheck.isSelected(),
-                        team1IgnoreCheck.isSelected(), isSingle ? false : team2IgnoreCheck.isSelected(),
-                        team1BrokenCheck.isSelected(), isSingle ? false : team2BrokenCheck.isSelected(),
-                        currentClickLocations, currentUsername, editingOriginalTime, ScoreEntry.SyncStatus.UNSYNCED
-                );
-            } else {
-                entry = new ScoreEntry(
-                        isSingle ? ScoreEntry.Type.SINGLE : ScoreEntry.Type.ALLIANCE,
-                        Integer.parseInt(matchNumberField.getText()), alliance,
-                        Integer.parseInt(team1Field.getText()), isSingle ? 0 : Integer.parseInt(team2Field.getText()),
-                        Integer.parseInt(autoArtifactsField.getText()), Integer.parseInt(teleopArtifactsField.getText()),
-                        team1SequenceCheck.isSelected(), isSingle ? false : team2SequenceCheck.isSelected(),
-                        team1L2ClimbCheck.isSelected(), isSingle ? false : team2L2ClimbCheck.isSelected(),
-                        team1IgnoreCheck.isSelected(), isSingle ? false : team2IgnoreCheck.isSelected(),
-                        team1BrokenCheck.isSelected(), isSingle ? false : team2BrokenCheck.isSelected(),
-                        currentClickLocations, currentUsername);
-                entry.setSyncStatus(ScoreEntry.SyncStatus.UNSYNCED);
-            }
+
+            int t1AutoScore = Integer.parseInt(t1AutoScoreField.getText().trim());
+            int t2AutoScore = isSingle ? 0 : Integer.parseInt(t2AutoScoreField.getText().trim());
+            String t1Proj = getSelectedToggleText(t1ProjGroup);
+            String t2Proj = isSingle ? "NONE" : getSelectedToggleText(t2ProjGroup);
+
+            // ★ 获取由空格分隔的多选 Row 字符串
+            String t1Row = getSelectedRowsString(t1Row1Btn, t1Row2Btn, t1Row3Btn);
+            String t2Row = isSingle ? "NONE" : getSelectedRowsString(t2Row1Btn, t2Row2Btn, t2Row3Btn);
+
+            ScoreEntry entry = new ScoreEntry(
+                    editingScoreId == -1 ? 0 : editingScoreId,
+                    isSingle ? ScoreEntry.Type.SINGLE : ScoreEntry.Type.ALLIANCE,
+                    Integer.parseInt(matchNumberField.getText()), alliance,
+                    Integer.parseInt(team1Field.getText()), isSingle ? 0 : Integer.parseInt(team2Field.getText()),
+                    t1AutoScore, t2AutoScore, t1Proj, t2Proj, t1Row, t2Row,
+                    Integer.parseInt(teleopArtifactsField.getText()),
+                    team1SequenceCheck.isSelected(), isSingle ? false : team2SequenceCheck.isSelected(),
+                    team1L2ClimbCheck.isSelected(), isSingle ? false : team2L2ClimbCheck.isSelected(),
+                    team1IgnoreCheck.isSelected(), isSingle ? false : team2IgnoreCheck.isSelected(),
+                    team1BrokenCheck.isSelected(), isSingle ? false : team2BrokenCheck.isSelected(),
+                    currentClickLocations, currentUsername,
+                    editingScoreId == -1 ? null : editingOriginalTime,
+                    editingScoreId == -1 ? ScoreEntry.SyncStatus.UNSYNCED : editingOriginalSyncStatus
+            );
+
             if (isHost) {
                 entry.setSyncStatus(ScoreEntry.SyncStatus.SYNCED);
                 matchDataService.submitScore(currentCompetition.getName(), entry);
@@ -459,7 +520,13 @@ public class MainController {
         editingScoreId = -1; editingOriginalTime = null; editingOriginalSyncStatus = null;
         if(submitButton != null) { submitButton.setText("Submit Score"); submitButton.setStyle(""); }
         submitterLabel.setText("Submitter: " + currentUsername); submitterLabel.setStyle("");
-        currentClickLocations = ""; autoArtifactsField.setText("0"); teleopArtifactsField.setText("0");
+        currentClickLocations = "";
+        t1AutoScoreField.setText("0"); t2AutoScoreField.setText("0"); teleopArtifactsField.setText("0");
+        t1ProjGroup.selectToggle(null); t2ProjGroup.selectToggle(null);
+
+        t1Row1Btn.setSelected(false); t1Row2Btn.setSelected(false); t1Row3Btn.setSelected(false);
+        t2Row1Btn.setSelected(false); t2Row2Btn.setSelected(false); t2Row3Btn.setSelected(false);
+
         if(team1IgnoreCheck != null) { team1IgnoreCheck.setSelected(false); team1IgnoreCheck.setDisable(true); }
         if(team2IgnoreCheck != null) { team2IgnoreCheck.setSelected(false); team2IgnoreCheck.setDisable(true); }
         team1BrokenCheck.setSelected(false); team2BrokenCheck.setSelected(false);
@@ -560,7 +627,6 @@ public class MainController {
 
         histSubmitterCol.setCellValueFactory(new PropertyValueFactory<>("submitter"));
 
-        // ★ 自定义 CellFactory：使用 Ikonli 图标与红色文字高亮
         histSubmitterCol.setCellFactory(column -> new TableCell<ScoreEntry, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -573,18 +639,14 @@ public class MainController {
                     Double weight = submitterReliabilityMap.getOrDefault(item, 1.0);
                     if (weight < 1.0) {
                         setText(item + " (Low Rel)");
-                        // 设置文字为红色粗体
                         setStyle("-fx-text-fill: #F87171 !important; -fx-font-weight: bold;");
-
-                        // 使用 Feather 图标包的警告三角形
                         FontIcon warningIcon = new FontIcon("fth-alert-triangle");
                         warningIcon.setIconSize(14);
-                        warningIcon.setIconColor(Color.web("#F87171")); // 图标也染成红色
-
-                        setGraphic(warningIcon); // 将图标放在文字左侧
+                        warningIcon.setIconColor(Color.web("#F87171"));
+                        setGraphic(warningIcon);
                     } else {
                         setText(item);
-                        setGraphic(null); // 正常人没有图标
+                        setGraphic(null);
                         setStyle("");
                     }
                 }
@@ -652,17 +714,36 @@ public class MainController {
         submitterLabel.setText("EDITING RECORD ID: " + editingScoreId);
         submitterLabel.setStyle("-fx-text-fill: orange; -fx-font-weight: bold;");
         if(submitButton != null) { submitButton.setText("Update Record"); submitButton.setStyle("-fx-background-color: #f39c12; -fx-text-fill: white;"); }
+
         matchNumberField.setText(String.valueOf(selected.getMatchNumber()));
-        team1Field.setText(String.valueOf(selected.getTeam1())); team2Field.setText(String.valueOf(selected.getTeam2()));
-        autoArtifactsField.setText(String.valueOf(selected.getAutoArtifacts())); teleopArtifactsField.setText(String.valueOf(selected.getTeleopArtifacts()));
+        team1Field.setText(String.valueOf(selected.getTeam1()));
+        team2Field.setText(String.valueOf(selected.getTeam2()));
+
+        t1AutoScoreField.setText(String.valueOf(selected.getTeam1AutoScore()));
+        t2AutoScoreField.setText(String.valueOf(selected.getTeam2AutoScore()));
+        setToggleGroupByText(t1ProjGroup, selected.getTeam1AutoProj());
+        setToggleGroupByText(t2ProjGroup, selected.getTeam2AutoProj());
+
+        setRowsFromText(selected.getTeam1AutoRow(), t1Row1Btn, t1Row2Btn, t1Row3Btn);
+        setRowsFromText(selected.getTeam2AutoRow(), t2Row1Btn, t2Row2Btn, t2Row3Btn);
+
+        teleopArtifactsField.setText(String.valueOf(selected.getTeleopArtifacts()));
+
         if ("RED".equalsIgnoreCase(selected.getAlliance())) redAllianceToggle.setSelected(true); else blueAllianceToggle.setSelected(true);
         if (selected.getScoreType() == ScoreEntry.Type.SINGLE) singleModeRadio.setSelected(true); else allianceModeRadio.setSelected(true);
+
         team1SequenceCheck.setSelected(selected.isTeam1CanSequence()); team2SequenceCheck.setSelected(selected.isTeam2CanSequence());
         team1L2ClimbCheck.setSelected(selected.isTeam1L2Climb()); team2L2ClimbCheck.setSelected(selected.isTeam2L2Climb());
         if(team1IgnoreCheck != null) { team1IgnoreCheck.setDisable(false); team1IgnoreCheck.setSelected(selected.isTeam1Ignored()); }
         if(team2IgnoreCheck != null) { team2IgnoreCheck.setDisable(false); team2IgnoreCheck.setSelected(selected.isTeam2Ignored()); }
         team1BrokenCheck.setSelected(selected.isTeam1Broken()); team2BrokenCheck.setSelected(selected.isTeam2Broken());
-        currentClickLocations = selected.getClickLocations(); errorLabel.setText("Editing record loaded.");
+
+        currentClickLocations = selected.getClickLocations();
+        errorLabel.setText("Editing record loaded.");
+
+        if (mainTabPane != null) {
+            mainTabPane.getSelectionModel().select(0);
+        }
     }
 
     private void handleDeleteAction(ScoreEntry selected) {
@@ -750,11 +831,15 @@ public class MainController {
     }
 
     private void writeMatchHistoryCSV(java.io.BufferedWriter writer) throws IOException {
-        writer.write("Match,Alliance,T1,T2,Auto,Teleop,Total,T1Seq,T1Climb,T2Seq,T2Climb,Submitter,Time,SyncStatus"); writer.newLine();
+        writer.write("Match,Alliance,T1,T2,T1Auto,T2Auto,T1Proj,T2Proj,T1Row,T2Row,Teleop,Total,T1Seq,T1Climb,T2Seq,T2Climb,Submitter,Time,SyncStatus");
+        writer.newLine();
         for (ScoreEntry s : scoreHistoryList) {
-            writer.write(String.format("%d,%s,%d,%d,%d,%d,%d,%b,%b,%b,%b,%s,%s,%s",
-                    s.getMatchNumber(), s.getAlliance(), s.getTeam1(), s.getTeam2(), s.getAutoArtifacts(), s.getTeleopArtifacts(),
-                    s.getTotalScore(), s.isTeam1CanSequence(), s.isTeam1L2Climb(), s.isTeam2CanSequence(), s.isTeam2L2Climb(), s.getSubmitter(), s.getSubmissionTime(), s.getSyncStatus().name()));
+            writer.write(String.format("%d,%s,%d,%d,%d,%d,%s,%s,%s,%s,%d,%d,%b,%b,%b,%b,%s,%s,%s",
+                    s.getMatchNumber(), s.getAlliance(), s.getTeam1(), s.getTeam2(),
+                    s.getTeam1AutoScore(), s.getTeam2AutoScore(), s.getTeam1AutoProj(), s.getTeam2AutoProj(), s.getTeam1AutoRow(), s.getTeam2AutoRow(),
+                    s.getTeleopArtifacts(), s.getTotalScore(),
+                    s.isTeam1CanSequence(), s.isTeam1L2Climb(), s.isTeam2CanSequence(), s.isTeam2L2Climb(),
+                    s.getSubmitter(), s.getSubmissionTime(), s.getSyncStatus().name()));
             writer.newLine();
         }
     }
@@ -767,7 +852,6 @@ public class MainController {
             writer.newLine();
         }
     }
-
 
     private void setUIEnabled(boolean e) { scoringFormVBox.setDisable(!e); }
 

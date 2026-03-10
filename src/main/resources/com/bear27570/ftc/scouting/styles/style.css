@@ -4,18 +4,20 @@
    ============================================== */
 
 * {
-    -color-bg-default: #080808;      /* 极夜黑底色 */
-    -color-bg-overlay: #111111;      /* 覆盖层深灰 */
+    /* Define global color variables for the theme */
+    -color-bg-default: #080808;      /* 极夜黑底色 (Midnight Black Background) */
+    -color-bg-overlay: #111111;      /* 覆盖层深灰 (Overlay Dark Gray) */
 
-    -color-gold-base: #D4AF37;       /* 经典黄金色 */
-    -color-gold-light: #FFDF73;      /* 高亮明金色 */
-    -color-gold-dark: #8B7322;       /* 暗金色 */
+    -color-gold-base: #D4AF37;       /* 经典黄金色 (Classic Gold) */
+    -color-gold-light: #FFDF73;      /* 高亮明金色 (Highlight Bright Gold) */
+    -color-gold-dark: #8B7322;       /* 暗金色 (Dark Gold) */
 
-    -color-gold-glow: rgba(212, 175, 55, 0.65); /* 黄金光晕 */
+    -color-gold-glow: rgba(212, 175, 55, 0.65); /* 黄金光晕 (Gold Glow) */
 
-    -color-text-main: #F2F2F2;       /* 主文本白 */
-    -color-text-muted: #A69B7D;      /* 暗金灰 (次要文本) */
+    -color-text-main: #F2F2F2;       /* 主文本白 (Main Text White) */
+    -color-text-muted: #A69B7D;      /* 暗金灰 (Muted Text - Dark Gold Gray) */
 
+    /* Set default font family for the application */
     -fx-font-family: "-apple-system", "BlinkMacSystemFont", "SF Pro Display", "Inter", "Segoe UI", sans-serif;
 }
 
@@ -23,16 +25,18 @@
 .mono-text { -fx-font-family: "JetBrains Mono", "SF Mono", "Consolas", monospace; }
 
 /* ==============================================
-   排版与文本光效
+   Typography & Text Effects (排版与文本光效)
    ============================================== */
 .label { -fx-text-fill: -color-text-main; }
 
+/* Headers with gold color and glow effect */
 .title-2, .title-3, .title-4, .header-label {
     -fx-text-fill: -color-gold-light;
     -fx-font-weight: bold;
     -fx-effect: dropshadow(gaussian, rgba(212, 175, 55, 0.5), 10, 0.3, 0, 0);
 }
 
+/* Utility classes for text colors */
 .text-muted { -fx-text-fill: -color-text-muted; }
 .text-warning { -fx-text-fill: #FFB340; }
 .text-success { -fx-text-fill: #4ADE80; }
@@ -40,8 +44,9 @@
 .text-accent  { -fx-text-fill: -color-gold-light; -fx-effect: dropshadow(gaussian, -color-gold-glow, 10, 0.5, 0, 0); }
 
 /* ==============================================
-   立体卡片 (Sleek Panels)
+   3D Cards & Panels (立体卡片 - Sleek Panels)
    ============================================== */
+/* Main card style with border and shadow */
 .mac-card {
     -fx-background-color: -color-bg-overlay;
     -fx-background-radius: 12px;
@@ -51,6 +56,7 @@
     -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.9), 20, 0.3, 0, 10);
 }
 
+/* Inner panel for nested content */
 .panel-inner {
     -fx-background-color: #050505;
     -fx-background-radius: 8px;
@@ -60,17 +66,19 @@
     -fx-padding: 15px;
 }
 
+/* Radial gradient background */
 .bg-gradient {
     -fx-background-color: radial-gradient(center 50% 50%, radius 90%, #17140B, #030303);
 }
 
+/* Top bar with bottom border gradient */
 .top-bar {
     -fx-background-color: rgba(10, 8, 5, 0.95);
     -fx-border-color: linear-gradient(to right, transparent, -color-gold-dark, transparent);
     -fx-border-width: 0 0 1px 0;
 }
 
-/* 两端渐变消失的能量分割线 */
+/* Energy separator line with fading ends (两端渐变消失的能量分割线) */
 .separator *.line {
     -fx-border-color: linear-gradient(to right, transparent, -color-gold-base, transparent);
     -fx-border-width: 1.5 0 0 0;
@@ -79,7 +87,7 @@
     -fx-effect: dropshadow(gaussian, -color-gold-glow, 8, 0.3, 0, 0);
 }
 
-/* 输入框 */
+/* Input Fields (输入框) */
 .text-field, .password-field {
     -fx-background-color: #050505;
     -fx-text-fill: -color-gold-light;
@@ -89,14 +97,15 @@
     -fx-background-radius: 4px;
     -fx-padding: 10px;
 }
+/* Focus state with glow */
 .text-field:focused, .password-field:focused {
     -fx-border-color: -color-gold-light;
     -fx-effect: dropshadow(gaussian, -color-gold-glow, 10, 0.5, 0, 0);
 }
 
 /* ==============================================
-   极简发光描边按钮 (Sleek Glowing Outline Buttons)
-   强制使用 !important 杀掉 Java 代码里硬编码的蓝色！
+   Minimalist Glowing Outline Buttons (极简发光描边按钮)
+   Using !important to override hardcoded Java styles
    ============================================== */
 .button {
     -fx-background-color: rgba(20, 20, 20, 0.6) !important;
@@ -109,6 +118,7 @@
     -fx-cursor: hand !important;
 }
 
+/* Hover state: Brighten border and add glow */
 .button:hover {
     -fx-background-color: rgba(212, 175, 55, 0.08) !important;
     -fx-border-color: -color-gold-light !important;
@@ -116,12 +126,13 @@
     -fx-effect: dropshadow(gaussian, -color-gold-glow, 12, 0.4, 0, 0) !important;
 }
 
+/* Pressed state: Slight movement and background change */
 .button:pressed {
     -fx-background-color: rgba(212, 175, 55, 0.15) !important;
     -fx-translate-y: 1px;
 }
 
-/* 主强调按钮 (Accent) */
+/* Accent Button (主强调按钮) */
 .button.accent {
     -fx-border-color: -color-gold-base !important;
     -fx-text-fill: -color-gold-base !important;
@@ -134,20 +145,20 @@
     -fx-effect: dropshadow(gaussian, -color-gold-glow, 15, 0.6, 0, 0) !important;
 }
 
-/* 覆盖表格里的 View 按钮，不让它那么巨大 */
+/* Override View buttons in tables to be smaller */
 .table-view .button {
     -fx-padding: 3 8 3 8 !important;
     -fx-font-size: 11px !important;
 }
 
-/* 其他颜色按钮强制发光 */
+/* Status Buttons with forced glow */
 .button.success { -fx-border-color: #2F6B38 !important; -fx-text-fill: #A3F5B1 !important; }
 .button.success:hover { -fx-border-color: #4ADE80 !important; -fx-text-fill: #FFFFFF !important; -fx-effect: dropshadow(gaussian, rgba(74,222,128,0.5), 12, 0.4, 0, 0) !important; }
 .button.danger { -fx-border-color: #6B2F2F !important; -fx-text-fill: #F5A3A3 !important; }
 .button.danger:hover { -fx-border-color: #F87171 !important; -fx-text-fill: #FFFFFF !important; -fx-effect: dropshadow(gaussian, rgba(248,113,113,0.5), 12, 0.4, 0, 0) !important; }
 
 /* ==============================================
-   顶部光带标签页 (Glowing Top Strip Tabs)
+   Glowing Top Strip Tabs (顶部光带标签页)
    ============================================== */
 .tab-pane .tab-header-area .tab-header-background {
     -fx-background-color: transparent;
@@ -161,6 +172,7 @@
     -fx-padding: 5 20 5 20;
 }
 
+/* Selected Tab: Top gold border and gradient glow */
 .tab-pane .tab:selected {
     /* 选中时：顶部出现 3px 亮金边框，背景产生从上到下的金色渐变光晕 */
     -fx-background-color: linear-gradient(to bottom, rgba(212,175,55,0.15) 0%, transparent 80%);
@@ -179,7 +191,7 @@
 }
 
 /* ==============================================
-   修复表格文字黑色的问题 (Fix Table Text Colors)
+   Table View Styling (修复表格文字黑色的问题)
    ============================================== */
 .table-view, .list-view {
     -fx-background-color: transparent;
@@ -187,6 +199,7 @@
     -fx-border-radius: 8px;
 }
 
+/* Column Headers */
 .table-view .column-header-background {
     -fx-background-color: #0A0A0A;
     -fx-border-color: transparent transparent #2A2415 transparent;
@@ -203,20 +216,23 @@
     -fx-text-fill: -color-gold-base;
 }
 
+/* Row Cells */
 .table-row-cell {
     -fx-background-color: #0A0A0A;
     -fx-table-cell-border-color: #111111;
 }
 
+/* Zebra striping for rows */
 .table-row-cell:odd {
     -fx-background-color: #0F0D0A;
 }
 
+/* Selected row style */
 .table-row-cell:selected {
     -fx-background-color: rgba(212, 175, 55, 0.15);
 }
 
-/* 强制覆盖表格里的文字为白色，选中为高亮金色！ */
+/* Force table cell text to be white, highlight gold when selected */
 .table-view .table-cell {
     -fx-text-fill: #E0E0E0 !important;
 }
@@ -226,7 +242,7 @@
 }
 
 /* ==============================================
-   开关控件
+   Toggle Controls (开关控件)
    ============================================== */
 .toggle-button {
     -fx-background-color: #111;
@@ -242,6 +258,36 @@
     -fx-border-color: -color-gold-base;
     -fx-effect: dropshadow(gaussian, -color-gold-glow, 10, 0.3, 0, 0);
 }
+/* ==============================================
+   Box Toggles (修改为方形列表)
+   ============================================== */
+.box-toggle {
+    -fx-background-color: #111111;
+    -fx-border-color: #332C17;
+    -fx-text-fill: -color-text-muted;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-padding: 4 10;
+    -fx-cursor: hand;
+    -fx-font-weight: bold;
+    -fx-font-size: 11px;
+    -fx-alignment: center;
+    -fx-min-width: 55px;
+    -fx-max-width: 55px;
+    -fx-min-height: 28px;
+}
+.box-toggle:hover {
+    -fx-background-color: #1A1A1A;
+    -fx-border-color: -color-gold-dark;
+}
+.box-toggle:selected {
+    -fx-background-color: rgba(212, 175, 55, 0.25);
+    -fx-border-color: -color-gold-light;
+    -fx-text-fill: -color-gold-light;
+    -fx-effect: dropshadow(gaussian, -color-gold-glow, 8, 0.5, 0, 0);
+}
+
+/* Checkbox styling */
 .check-box .box {
     -fx-background-color: #050505;
     -fx-border-color: -color-gold-dark;
@@ -253,8 +299,9 @@
     -fx-border-color: -color-gold-light;
     -fx-effect: dropshadow(gaussian, -color-gold-glow, 6, 0.5, 0, 0);
 }
+
 /* ==============================================
-   列表控件 (ListView - Hub页面的赛事选择列表等)
+   List View Controls (列表控件 - Hub页面的赛事选择列表等)
    ============================================== */
 .list-view {
     -fx-background-color: transparent;
@@ -263,31 +310,37 @@
     -fx-background-radius: 8px;
 }
 
-/* 列表默认基础样式 */
+/* Default list cell style */
 .list-cell {
     -fx-background-color: #0A0A0A;
     -fx-text-fill: #E0E0E0 !important;
-    -fx-padding: 10 15 10 15; /* 增加上下间距，让选项更大气 */
+    -fx-padding: 10 15 10 15; /* Increase padding for spacious look */
     -fx-font-size: 14px;
 }
 
-/* 斑马线交替背景 */
+/* Zebra striping for list items */
 .list-cell:odd {
     -fx-background-color: #0F0D0A;
 }
 
-/* 鼠标悬浮时的微光反馈 */
-.list-cell:hover:not(:selected) {
+/* Hover effect */
+.list-cell:hover {
     -fx-background-color: rgba(255, 255, 255, 0.05) !important;
     -fx-cursor: hand;
 }
 
-/* 核心：选中时的浅金背景与亮黄字体！ */
+/* Selected state: Gold background and text */
 .list-cell:selected {
     -fx-background-color: rgba(212, 175, 55, 0.15) !important;
     -fx-text-fill: -color-gold-light !important;
     -fx-font-weight: bold !important;
-    /* 选中时左侧出现 3px 的亮金色指示线 */
+    /* Left gold indicator line when selected */
     -fx-border-color: transparent transparent transparent -color-gold-light;
     -fx-border-width: 0 0 0 3px;
+}
+
+/* Selected and hovered state */
+.list-cell:selected:hover {
+    -fx-background-color: rgba(212, 175, 55, 0.25) !important;
+    -fx-cursor: hand;
 }
