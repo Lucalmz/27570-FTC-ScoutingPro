@@ -4,37 +4,37 @@
 <?import javafx.scene.layout.*?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<VBox spacing="30" alignment="CENTER" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.CoordinatorController">
-    <padding><Insets top="40" right="40" bottom="40" left="40" /></padding>
+<VBox spacing="40" alignment="CENTER" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.CoordinatorController">
+    <padding><Insets top="50" right="50" bottom="50" left="50" /></padding>
 
     <Label styleClass="title-2" text="Manage Competition Members"/>
 
-    <HBox spacing="30" alignment="CENTER">
-        <VBox spacing="15" styleClass="mac-card" style="-fx-padding: 25;" HBox.hgrow="ALWAYS">
+    <HBox spacing="40" alignment="CENTER">
+        <VBox spacing="20" styleClass="mac-card" style="-fx-padding: 30;" HBox.hgrow="ALWAYS">
             <Label text="Pending Applications" styleClass="title-4"/>
-            <ListView fx:id="pendingListView" prefHeight="300" prefWidth="260" styleClass="edge-to-edge"/>
+            <ListView fx:id="pendingListView" prefHeight="350" prefWidth="280"/>
         </VBox>
 
-        <VBox spacing="20" alignment="CENTER">
-            <Button onAction="#handleApprove" text="Approve" styleClass="success" prefWidth="160" prefHeight="45">
-                <graphic><FontIcon iconLiteral="fth-check" iconSize="16" iconColor="white"/></graphic>
+        <VBox spacing="25" alignment="CENTER">
+            <Button onAction="#handleApprove" text="Approve" styleClass="success" prefWidth="180">
+                <graphic><FontIcon iconLiteral="fth-check" iconSize="16" iconColor="#34D399"/></graphic>
             </Button>
-            <Button onAction="#handleDeny" text="Deny" styleClass="danger" prefWidth="160" prefHeight="45">
-                <graphic><FontIcon iconLiteral="fth-x" iconSize="16" iconColor="white"/></graphic>
+            <Button onAction="#handleDeny" text="Deny" styleClass="danger" prefWidth="180">
+                <graphic><FontIcon iconLiteral="fth-x" iconSize="16" iconColor="#F87171"/></graphic>
             </Button>
             <Region prefHeight="40"/>
-            <Button onAction="#handleKick" text="Kick Member" styleClass="warning" prefWidth="160" prefHeight="45">
-                <graphic><FontIcon iconLiteral="fth-user-minus" iconSize="16" iconColor="black"/></graphic>
+            <Button onAction="#handleKick" text="Kick Member" styleClass="warning" prefWidth="180">
+                <graphic><FontIcon iconLiteral="fth-user-minus" iconSize="16" iconColor="#FBBF24"/></graphic>
             </Button>
         </VBox>
 
-        <VBox spacing="15" styleClass="mac-card" style="-fx-padding: 25;" HBox.hgrow="ALWAYS">
+        <VBox spacing="20" styleClass="mac-card" style="-fx-padding: 30;" HBox.hgrow="ALWAYS">
             <Label text="Approved Members" styleClass="title-4"/>
-            <ListView fx:id="approvedListView" prefHeight="300" prefWidth="260" styleClass="edge-to-edge"/>
+            <ListView fx:id="approvedListView" prefHeight="350" prefWidth="280"/>
         </VBox>
     </HBox>
 
-    <Button onAction="#handleClose" text="Done / Close" prefWidth="240" prefHeight="45">
+    <Button onAction="#handleClose" text="Done / Close" prefWidth="260">
         <graphic><FontIcon iconLiteral="fth-chevron-left" iconSize="16"/></graphic>
     </Button>
 </VBox>

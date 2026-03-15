@@ -1,4 +1,3 @@
-// File: PenaltyEntry.java
 package com.bear27570.ftc.scouting.models;
 
 public class PenaltyEntry {
@@ -6,8 +5,7 @@ public class PenaltyEntry {
     private String alliance; // "RED" or "BLUE"
     private int majorCount;
     private int minorCount;
-    // ★ 新增：官方最终总分
-    private int officialScore;
+    private int officialScore; // ★ 官方最终净得分 (totalPointsNp)
 
     public PenaltyEntry(int matchNumber, String alliance, int majorCount, int minorCount, int officialScore) {
         this.matchNumber = matchNumber;
@@ -21,5 +19,5 @@ public class PenaltyEntry {
     public String getAlliance() { return alliance; }
     public int getMajorCount() { return majorCount; }
     public int getMinorCount() { return minorCount; }
-    public int getOfficialScore() { return officialScore; } // Getter
+    public int getOfficialScore() { return officialScore; }
 }

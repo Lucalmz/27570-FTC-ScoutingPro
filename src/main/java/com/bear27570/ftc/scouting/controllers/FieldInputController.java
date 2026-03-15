@@ -147,7 +147,6 @@ public class FieldInputController {
         if (removeModeBtn.isSelected()) inputPane.setCursor(Cursor.CROSSHAIR);
         else inputPane.setCursor(Cursor.HAND);
     }
-
     @FXML
     private void handleCanvasClick(MouseEvent event) {
         if (!event.isControlDown()) {
@@ -165,12 +164,49 @@ public class FieldInputController {
             int currentTeam = team1Btn.isSelected() ? 1 : 2;
             boolean isMiss = (event.getButton() == MouseButton.SECONDARY);
             points.add(new TeamPoint(x, y, currentTeam, isMiss, System.currentTimeMillis()));
+
+            // ====== 修复后的声纳波纹动效 ======
+            // 1. 创建圆（初始半径为2，不设置初始中心系，默认为0,0）
+            javafx.scene.shape.Circle ripple = new javafx.scene.shape.Circle(2);
+            ripple.setStroke(currentTeam == 1 ? Color.web("#00BCD4") : Color.web("#E91E63"));
+            ripple.setFill(Color.TRANSPARENT);
+            ripple.setStrokeWidth(2);
+
+            // 2. ★ 核心修复：解除 StackPane 的自动居中强制束缚
+            ripple.setManaged(false);
+
+            // 3. ★ 核心修复：坐标系跃迁转换
+            // 将 Canvas 的内部坐标系(x,y) -> 转换到整个窗口场景的绝对坐标 -> 再转换到外层 inputPane 的局部坐标
+            javafx.geometry.Point2D sceneCoords = drawCanvas.localToScene(x, y);
+            javafx.geometry.Point2D paneCoords = inputPane.sceneToLocal(sceneCoords);
+
+            // 精确设置波纹的绝对原点
+            ripple.setLayoutX(paneCoords.getX());
+            ripple.setLayoutY(paneCoords.getY());
+
+            inputPane.getChildren().add(ripple);
+
+            // 4. 动效播放
+            javafx.animation.ScaleTransition st = new javafx.animation.ScaleTransition(Duration.millis(400), ripple);
+            st.setToX(15);
+            st.setToY(15);
+
+            javafx.animation.FadeTransition ft = new javafx.animation.FadeTransition(Duration.millis(400), ripple);
+            ft.setFromValue(1.0);
+            ft.setToValue(0);
+
+            // 动画结束后，自动把波纹对象从内存/UI树中安全移除，防止内存泄漏
+            ft.setOnFinished(e -> inputPane.getChildren().remove(ripple));
+
+            st.play();
+            ft.play();
+            // ============================
+
         } else {
             removeClosestPoint(x, y);
         }
         updateUI();
     }
-
     private void removeClosestPoint(double x, double y) {
         TeamPoint closest = null;
         double minDesc = Double.MAX_VALUE;

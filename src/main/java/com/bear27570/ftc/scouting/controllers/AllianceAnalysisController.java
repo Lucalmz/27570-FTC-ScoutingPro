@@ -25,6 +25,8 @@ import javafx.scene.web.WebView;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedList;
@@ -241,8 +243,17 @@ public class AllianceAnalysisController {
 
     private void appendAiMessage(String text, boolean isError) {
         Platform.runLater(() -> {
-            safeExecuteScript("removeThinking();");
-            safeExecuteScript("addAiMsg('" + escapeJsString(text) + "', " + isError + ");");
+            try {
+                // 将所有文本进行 URL 编码（将 + 号替换回 %20 以防空格丢失）
+                // 这样无论 AI 返回 </script> 还是带有各种转义符，都变成了纯粹的字母和%符号
+                String safeEncodedText = URLEncoder.encode(text, StandardCharsets.UTF_8).replace("+", "%20");
+
+                safeExecuteScript("removeThinking();");
+                // 在 JS 侧通过 decodeURIComponent 还原出原本的 Markdown 字符串
+                safeExecuteScript("addAiMsg(decodeURIComponent('" + safeEncodedText + "'), " + isError + ");");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         });
     }
 

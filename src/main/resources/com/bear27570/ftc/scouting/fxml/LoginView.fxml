@@ -4,28 +4,24 @@
 <?import javafx.scene.layout.*?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<StackPane styleClass="bg-gradient" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.LoginController">
-    <VBox alignment="CENTER" spacing="25.0" styleClass="mac-card" maxWidth="420" maxHeight="400">
-        <padding><Insets bottom="45.0" left="45.0" right="45.0" top="45.0" /></padding>
+<StackPane stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.LoginController">    <VBox alignment="CENTER" spacing="35.0" styleClass="mac-card" maxWidth="450" maxHeight="450">
+        <padding><Insets bottom="60.0" left="50.0" right="50.0" top="60.0" /></padding>
 
-        <VBox alignment="CENTER" spacing="8">
+        <VBox alignment="CENTER" spacing="12">
             <Label styleClass="title-2" text="FTC Scouting Pro" />
-            <Label styleClass="text-muted" text="Sign in to your account" />
+            <Label styleClass="text-muted" text="Sign in to your workspace" />
         </VBox>
 
-        <VBox spacing="15" alignment="CENTER" style="-fx-padding: 10 0;">
-            <!-- 使用 Ikonli 插入文本框左侧图标 -->
-            <TextField fx:id="usernameField" maxWidth="300" prefHeight="42" promptText="Username">
-                <!-- AtlantaFX 支持原生对 TextField 插入 left 节点 -->
-            </TextField>
-            <PasswordField fx:id="passwordField" maxWidth="300" prefHeight="42" promptText="Password" />
+        <VBox spacing="20" alignment="CENTER" style="-fx-padding: 10 0;">
+            <TextField fx:id="usernameField" maxWidth="320" promptText="Username" />
+            <PasswordField fx:id="passwordField" maxWidth="320" promptText="Password" />
         </VBox>
 
-        <HBox alignment="CENTER" spacing="20.0">
-            <Button onAction="#handleLoginButton" prefWidth="130" prefHeight="40" styleClass="accent" text="Login">
-                <graphic><FontIcon iconLiteral="fth-log-in" iconSize="16" iconColor="white"/></graphic>
+        <HBox alignment="CENTER" spacing="25.0">
+            <Button onAction="#handleLoginButton" prefWidth="140" prefHeight="45" styleClass="accent" text="Login">
+                <graphic><FontIcon iconLiteral="fth-log-in" iconSize="16" iconColor="#18181B"/></graphic>
             </Button>
-            <Button onAction="#handleCreateUserButton" prefWidth="130" prefHeight="40" text="Create User">
+            <Button onAction="#handleCreateUserButton" prefWidth="140" prefHeight="45" text="Create User">
                 <graphic><FontIcon iconLiteral="fth-user-plus" iconSize="16"/></graphic>
             </Button>
         </HBox>

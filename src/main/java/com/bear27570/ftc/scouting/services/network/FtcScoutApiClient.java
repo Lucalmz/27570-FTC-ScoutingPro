@@ -2,7 +2,10 @@ package com.bear27570.ftc.scouting.services.network;
 
 import com.bear27570.ftc.scouting.models.PenaltyEntry;
 import com.bear27570.ftc.scouting.services.domain.MatchDataService;
-
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -69,8 +72,8 @@ public class FtcScoutApiClient {
                 // 2. 获取具体比赛数据 (★ 修改点：加入了 totalPoints 字段请求)
                 int matchCount = 0;
                 String[] queriesToTry = {
-                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2025 { red { totalPoints majorsCommitted minorsCommitted } blue { totalPoints majorsCommitted minorsCommitted } } } } } }\"}",
-                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2024 { red { totalPoints majorsCommitted minorsCommitted } blue { totalPoints majorsCommitted minorsCommitted } } } } } }\"}"
+                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2025 { red { totalPointsNp majorsCommitted minorsCommitted } blue { totalPointsNp majorsCommitted minorsCommitted } } } } } }\"}",
+                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2024 { red { totalPointsNp majorsCommitted minorsCommitted } blue { totalPointsNp majorsCommitted minorsCommitted } } } } } }\"}"
                 };
 
                 for (String qFormat : queriesToTry) {
@@ -96,81 +99,77 @@ public class FtcScoutApiClient {
             }
         }).start();
     }
-
     private int parseAndSaveMatchData(String json, String competitionName) {
         int count = 0;
-        int startIdx = json.indexOf("\"matches\"");
-        if (startIdx == -1) return 0;
-        String content = json.substring(startIdx);
+        try {
+            // 安全地将字符串解析为 JSON 树
+            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+            JsonObject data = root.getAsJsonObject("data");
+            if (data == null || data.isJsonNull()) return 0;
 
-        String[] matchBlocks = content.split("\"matchNum\"\\s*:");
+            JsonObject eventByCode = data.getAsJsonObject("eventByCode");
+            if (eventByCode == null || eventByCode.isJsonNull()) return 0;
 
-        Set<String> processedMatches = new HashSet<>();
+            JsonArray matches = eventByCode.getAsJsonArray("matches");
+            if (matches == null || matches.isJsonNull()) return 0;
 
-        for (int i = 1; i < matchBlocks.length; i++) {
-            String block = matchBlocks[i];
+            Set<String> processedMatches = new HashSet<>();
 
-            Matcher mNum = Pattern.compile("^\\s*(\\d+)").matcher(block);
-            if (!mNum.find()) continue;
-            int matchNum = Integer.parseInt(mNum.group(1));
+            // 遍历每一场比赛
+            for (JsonElement matchElem : matches) {
+                JsonObject matchObj = matchElem.getAsJsonObject();
+                int matchNum = matchObj.get("matchNum").getAsInt();
 
-            String lowerBlock = block.toLowerCase();
-            int redIdx = lowerBlock.indexOf("\"red\"");
-            int blueIdx = lowerBlock.indexOf("\"blue\"");
+                JsonObject scores = matchObj.getAsJsonObject("scores");
+                if (scores == null || scores.isJsonNull()) continue;
 
-            if (redIdx != -1 && blueIdx != -1) {
-                String redPart, bluePart;
-                if (redIdx < blueIdx) {
-                    redPart = lowerBlock.substring(redIdx, blueIdx);
-                    bluePart = lowerBlock.substring(blueIdx, Math.min(lowerBlock.length(), blueIdx + 300));
-                } else {
-                    bluePart = lowerBlock.substring(blueIdx, redIdx);
-                    redPart = lowerBlock.substring(redIdx, Math.min(lowerBlock.length(), redIdx + 300));
-                }
+                JsonObject red = scores.getAsJsonObject("red");
+                JsonObject blue = scores.getAsJsonObject("blue");
 
-                int rMin = extractValue(redPart, "minorscommitted");
-                int rMaj = extractValue(redPart, "majorscommitted");
-                int rScore = extractValue(redPart, "totalpoints"); // ★ 解析红方总分
+                if (red != null && blue != null) {
+                    // 安全提取字段，如果官方以后加了别的字段，这里绝对不会越界崩溃
+                    int rMin = extractSafeInt(red, "minorsCommitted");
+                    int rMaj = extractSafeInt(red, "majorsCommitted");
+                    int rScore = extractSafeInt(red, "totalPointsNp");
 
-                int bMin = extractValue(bluePart, "minorscommitted");
-                int bMaj = extractValue(bluePart, "majorscommitted");
-                int bScore = extractValue(bluePart, "totalpoints"); // ★ 解析蓝方总分
+                    int bMin = extractSafeInt(blue, "minorsCommitted");
+                    int bMaj = extractSafeInt(blue, "majorsCommitted");
+                    int bScore = extractSafeInt(blue, "totalPointsNp");
 
-                boolean isNewMatch = false;
+                    boolean isNewMatch = false;
 
-                String redKey = matchNum + "_RED";
-                if (!processedMatches.contains(redKey)) {
-                    processedMatches.add(redKey);
-                    isNewMatch = true;
-                    // 如果有任意数据，就存入数据库
-                    if (rMaj > 0 || rMin > 0 || rScore > 0) {
-                        matchDataService.submitPenalty(competitionName, new PenaltyEntry(matchNum, "RED", rMaj, rMin, rScore));
+                    String redKey = matchNum + "_RED";
+                    if (!processedMatches.contains(redKey)) {
+                        processedMatches.add(redKey);
+                        isNewMatch = true;
+                        if (rMaj > 0 || rMin > 0 || rScore > 0) {
+                            matchDataService.submitPenalty(competitionName, new PenaltyEntry(matchNum, "RED", rMaj, rMin, rScore));
+                        }
                     }
-                }
 
-                String blueKey = matchNum + "_BLUE";
-                if (!processedMatches.contains(blueKey)) {
-                    processedMatches.add(blueKey);
-                    isNewMatch = true;
-                    if (bMaj > 0 || bMin > 0 || bScore > 0) {
-                        matchDataService.submitPenalty(competitionName, new PenaltyEntry(matchNum, "BLUE", bMaj, bMin, bScore));
+                    String blueKey = matchNum + "_BLUE";
+                    if (!processedMatches.contains(blueKey)) {
+                        processedMatches.add(blueKey);
+                        isNewMatch = true;
+                        if (bMaj > 0 || bMin > 0 || bScore > 0) {
+                            matchDataService.submitPenalty(competitionName, new PenaltyEntry(matchNum, "BLUE", bMaj, bMin, bScore));
+                        }
                     }
-                }
 
-                if (isNewMatch) {
-                    count++;
+                    if (isNewMatch) count++;
                 }
             }
+        } catch (Exception e) {
+            System.err.println("JSON 解析异常: " + e.getMessage());
+            e.printStackTrace();
         }
         return count;
     }
 
-    // 重命名方法，更通用
-    private int extractValue(String jsonPart, String keyNameLowerCase) {
-        Pattern p = Pattern.compile("\"" + keyNameLowerCase + "\"\\s*:\\s*(\\d+)");
-        Matcher m = p.matcher(jsonPart);
-        if (m.find()) {
-            return Integer.parseInt(m.group(1));
+    // 替代原有的 Regex extractValue 方法
+    private int extractSafeInt(JsonObject obj, String key) {
+        if (obj.has(key) && !obj.get(key).isJsonNull()) {
+            return obj.get(key).getAsInt();
         }
         return 0;
     }

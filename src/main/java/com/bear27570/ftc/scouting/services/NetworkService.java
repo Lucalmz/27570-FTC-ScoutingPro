@@ -25,7 +25,17 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 public class NetworkService {
+    // 在 NetworkService 类内部增加一个静态数据类
+    public static class UdpBeaconData {
+        public String magic = "FTC_SCOUTER";
+        public String compName;
+        public String creator;
 
+        public UdpBeaconData(String compName, String creator) {
+            this.compName = compName;
+            this.creator = creator;
+        }
+    }
     private static NetworkService instance;
 
     public static synchronized NetworkService getInstance() {
@@ -201,7 +211,8 @@ public class NetworkService {
                 // TTL=1 意味着包绝对不会越过路由器，仅限本地物理线缆和当前交换机 (极其克制文明)
                 beacon.setTimeToLive(1);
                 InetAddress group = InetAddress.getByName(MULTICAST_IP);
-                String msg = "FTC_SCOUTER;" + comp.getName() + ";" + comp.getCreatorUsername();
+                UdpBeaconData beaconData = new UdpBeaconData(comp.getName(), comp.getCreatorUsername());
+                String msg = gson.toJson(beaconData);
                 byte[] buf = msg.getBytes(StandardCharsets.UTF_8);
 
                 System.out.println("[网络调试] 主机 Multicast 多播引擎已启动 (智能多网卡穿透模式)...");
@@ -283,19 +294,23 @@ public class NetworkService {
                         socket.receive(packet);
                         String msg = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
 
-                        if (msg.startsWith("FTC_SCOUTER;")) {
-                            String[] parts = msg.split(";");
-                            if (parts.length >= 3) {
-                                Competition d = new Competition(parts[1], parts[2]);
-                                d.setHostAddress(packet.getAddress().getHostAddress());
+                        if (msg.contains("FTC_SCOUTER")) { // 初步过滤
+                            try {
+                                UdpBeaconData beacon = gson.fromJson(msg, UdpBeaconData.class);
+                                if ("FTC_SCOUTER".equals(beacon.magic)) {
+                                    Competition d = new Competition(beacon.compName, beacon.creator);
+                                    d.setHostAddress(packet.getAddress().getHostAddress());
 
-                                Platform.runLater(() -> {
-                                    boolean exists = discoveredCompetitions.stream()
-                                            .anyMatch(c -> c.getName().equals(d.getName()) && c.getHostAddress().equals(d.getHostAddress()));
-                                    if (!exists) {
-                                        discoveredCompetitions.add(d);
-                                    }
-                                });
+                                    Platform.runLater(() -> {
+                                        boolean exists = discoveredCompetitions.stream()
+                                                .anyMatch(c -> c.getName().equals(d.getName()) && c.getHostAddress().equals(d.getHostAddress()));
+                                        if (!exists) {
+                                            discoveredCompetitions.add(d);
+                                        }
+                                    });
+                                }
+                            } catch (Exception ignored) {
+                                // 如果解析失败，说明不是我们的广播包，忽略即可
                             }
                         }
                     } catch (SocketTimeoutException ignored) {

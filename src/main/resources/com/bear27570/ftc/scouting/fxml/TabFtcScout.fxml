@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<VBox alignment="CENTER" spacing="20" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.TabFtcScoutController">
+    <VBox maxWidth="550" spacing="30" styleClass="mac-card">
+        <padding><Insets bottom="50" left="50" right="50" top="50" /></padding>
+
+        <Label styleClass="title-3" text="FTCScout Integration" />
+        <Label text="Host only. Bind an event to fetch the official name and automatically sync all penalty data from the cloud." styleClass="text-muted" wrapText="true" style="-fx-line-spacing: 4px;"/>
+
+        <GridPane hgap="20" vgap="20" styleClass="panel-inner">
+            <Label text="Season:" style="-fx-font-weight: bold;"/>
+            <TextField fx:id="ftcScoutSeasonField" text="2024" GridPane.columnIndex="1" prefWidth="200"/>
+            <Label text="Event Code:" style="-fx-font-weight: bold;" GridPane.rowIndex="1"/>
+            <TextField fx:id="ftcScoutEventField" promptText="e.g. USCA" GridPane.columnIndex="1" GridPane.rowIndex="1" prefWidth="200"/>
+        </GridPane>
+
+        <Label fx:id="boundEventNameLabel" text="Event: Not Bound" styleClass="title-4, text-accent" wrapText="true"/>
+
+        <Button onAction="#handleBindAndFetch" styleClass="accent" text="Bind Event &amp; Sync Penalties" maxWidth="Infinity" prefHeight="55">
+            <graphic><FontIcon iconLiteral="fth-cloud-drizzle" iconSize="18" iconColor="#18181B"/></graphic>
+        </Button>
+        <Label fx:id="autoFetchStatusLabel" alignment="CENTER" text="" wrapText="true" styleClass="text-success" maxWidth="Infinity"/>
+    </VBox>
+</VBox>

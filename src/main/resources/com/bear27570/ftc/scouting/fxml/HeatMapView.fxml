@@ -5,91 +5,86 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.canvas.Canvas?>
 
-<BorderPane stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.HeatmapController">
-    <top>
-        <HBox alignment="CENTER" styleClass="top-bar">
-            <padding><Insets top="20" bottom="20"/></padding>
-            <Label fx:id="teamTitleLabel" styleClass="header-label" text="Team Heatmap"/>
-        </HBox>
-    </top>
+<ScrollPane fitToWidth="true" style="-fx-background-color: transparent;" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.HeatmapController">
 
-    <center>
-        <StackPane fx:id="mapPane" style="-fx-padding: 25;">
-            <StackPane styleClass="panel-inner" style="-fx-padding: 0;">
-                <ImageView fx:id="fieldImageView" fitHeight="600" fitWidth="600" preserveRatio="true">
-                    <image><Image url="@../images/field.png"/></image>
-                </ImageView>
-                <Canvas fx:id="heatmapCanvas" height="600" width="600"/>
-            </StackPane>
-        </StackPane>
-    </center>
+    <StackPane styleClass="heatmap-bg-pane">
 
-    <right>
-        <ScrollPane fitToWidth="true" styleClass="scroll-pane" prefWidth="280">
-            <VBox spacing="20" styleClass="sidebar">
-                <padding><Insets top="25" right="25" bottom="25" left="25"/></padding>
+        <Region style="-fx-background-color: rgba(0, 0, 0, 0.75);"/>
 
-                <VBox fx:id="statusBox" spacing="10" styleClass="card" style="-fx-padding: 15;">
-                    <Label text="Team Status" styleClass="sub-header-label"/>
-                    <Label fx:id="statusTextLabel" text="Loading..." styleClass="text-success, text-bold" style="-fx-font-size: 16px;"/>
-                    <Label text="Broken Matches:" styleClass="text-muted" style="-fx-font-size: 12px;"/>
-                    <Label fx:id="brokenTextLabel" text="None" styleClass="text-warning" wrapText="true"/>
-                </VBox>
+        <VBox spacing="40" alignment="TOP_CENTER" maxWidth="1200">
+            <padding><Insets top="40" right="50" bottom="60" left="50"/></padding>
 
-                <Label text="Performance Insights" styleClass="sub-header-label"/>
+            <HBox alignment="CENTER" styleClass="top-bar" style="-fx-background-color: transparent; -fx-border-color: transparent transparent rgba(255,255,255,0.1) transparent;">
+                <padding><Insets bottom="20"/></padding>
+                <Label fx:id="teamTitleLabel" styleClass="title-2" text="Team Analytics" style="-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 10, 0.5, 0, 0);"/>
+            </HBox>
 
-                <VBox spacing="15" styleClass="card" style="-fx-padding: 18;">
-                    <VBox spacing="5">
-                        <Label text="Play Style" styleClass="text-muted"/>
-                        <Label fx:id="playStyleLabel" text="Analyzing..." styleClass="text-accent, text-bold" style="-fx-font-size: 18px;"/>
+            <HBox spacing="40" alignment="CENTER">
+
+                <StackPane fx:id="mapPane" styleClass="mac-card" style="-fx-padding: 30; -fx-background-color: rgba(10,10,12,0.6);">
+                    <StackPane style="-fx-padding: 0; -fx-background-color: transparent;">
+                        <ImageView fx:id="fieldImageView" fitHeight="500" fitWidth="500" preserveRatio="true">
+                            <image><Image url="@../images/field.png"/></image>
+                        </ImageView>
+                        <Canvas fx:id="heatmapCanvas" height="500" width="500"/>
+                    </StackPane>
+                </StackPane>
+
+                <VBox spacing="20" styleClass="mac-card" style="-fx-background-color: rgba(10,10,12,0.6);" prefWidth="350">
+                    <padding><Insets top="30" right="30" bottom="30" left="30"/></padding>
+
+                    <VBox fx:id="statusBox" spacing="10" styleClass="panel-inner" style="-fx-background-color: rgba(0,0,0,0.4);">
+                        <Label text="Team Status" styleClass="title-4"/>
+                        <Label fx:id="statusTextLabel" text="Loading..." styleClass="text-success" style="-fx-font-size: 20px; -fx-font-weight: 800;"/>
+                        <Label text="Broken Matches:" styleClass="text-muted"/>
+                        <Label fx:id="brokenTextLabel" text="None" styleClass="text-danger" wrapText="true"/>
                     </VBox>
-                    <Separator/>
-                    <VBox spacing="5">
-                        <Label text="Efficiency" styleClass="text-muted"/>
-                        <Label fx:id="efficiencyLabel" text="0.0 PPS" styleClass="text-warning, text-bold, mono-text" style="-fx-font-size: 24px;"/>
-                    </VBox>
-                    <Separator/>
-                    <VBox fx:id="cyclesBox" spacing="5">
-                        <Label text="Avg Intake Cycles" styleClass="text-muted"/>
-                        <Label fx:id="cyclesLabel" text="0.0" styleClass="text-bold, mono-text" style="-fx-font-size: 20px;"/>
-                    </VBox>
-                </VBox>
 
-                <!-- Zone Stats with colored accents -->
-                <VBox spacing="10" styleClass="panel-inner" style="-fx-border-color: #FBBF24;">
-                    <Label text="Far Zone (Bottom)" styleClass="text-warning, text-bold"/>
-                    <HBox spacing="15"><Label text="Avg:" styleClass="text-muted"/><Label fx:id="farShotsLabel" text="0" styleClass="text-bold"/></HBox>
-                    <HBox spacing="15"><Label text="Acc:" styleClass="text-muted"/><Label fx:id="farAccLabel" text="0%" styleClass="text-bold"/></HBox>
-                </VBox>
+                    <Label text="Performance Insights" styleClass="title-4" style="-fx-padding: 10 0 0 0;"/>
 
-                <VBox spacing="10" styleClass="panel-inner" style="-fx-border-color: #34D399;">
-                    <Label text="Near Zone (Top)" styleClass="text-success, text-bold"/>
-                    <HBox spacing="15"><Label text="Avg:" styleClass="text-muted"/><Label fx:id="nearShotsLabel" text="0" styleClass="text-bold"/></HBox>
-                    <HBox spacing="15"><Label text="Acc:" styleClass="text-muted"/><Label fx:id="nearAccLabel" text="0%" styleClass="text-bold"/></HBox>
+                    <VBox spacing="15" styleClass="panel-inner" style="-fx-background-color: rgba(0,0,0,0.4);">
+                        <VBox spacing="5">
+                            <Label text="Play Style" styleClass="text-muted"/>
+                            <Label fx:id="playStyleLabel" text="Analyzing..." styleClass="text-accent" style="-fx-font-size: 22px; -fx-font-weight: bold;"/>
+                        </VBox>
+                        <Region style="-fx-background-color: rgba(255,255,255,0.05); -fx-pref-height: 1px;"/>
+                        <VBox spacing="5">
+                            <Label text="Efficiency" styleClass="text-muted"/>
+                            <Label fx:id="efficiencyLabel" text="0.0 PPS" styleClass="text-warning, mono-text" style="-fx-font-size: 26px; -fx-font-weight: bold;"/>
+                        </VBox>
+                    </VBox>
+
+                    <HBox spacing="15">
+                        <VBox spacing="10" styleClass="panel-inner" style="-fx-border-color: rgba(251, 191, 36, 0.4); -fx-background-color: rgba(0,0,0,0.4);" HBox.hgrow="ALWAYS">
+                            <Label text="Far Zone" styleClass="text-warning" style="-fx-font-weight: bold;"/>
+                            <HBox spacing="10"><Label text="Avg:" styleClass="text-muted"/><Label fx:id="farShotsLabel" style="-fx-text-fill: -color-text-main;"/></HBox>
+                        </VBox>
+
+                        <VBox spacing="10" styleClass="panel-inner" style="-fx-border-color: rgba(52, 211, 153, 0.4); -fx-background-color: rgba(0,0,0,0.4);" HBox.hgrow="ALWAYS">
+                            <Label text="Near Zone" styleClass="text-success" style="-fx-font-weight: bold;"/>
+                            <HBox spacing="10"><Label text="Avg:" styleClass="text-muted"/><Label fx:id="nearShotsLabel" style="-fx-text-fill: -color-text-main;"/></HBox>
+                        </VBox>
+                    </HBox>
                 </VBox>
+            </HBox>
+
+            <VBox spacing="15" styleClass="mac-card" style="-fx-background-color: rgba(10,10,12,0.6);" maxWidth="900">
+                <padding><Insets top="25" right="30" bottom="25" left="30"/></padding>
+                <Label text="Match Log &amp; Advanced Detail" styleClass="title-4"/>
+
+                <TableView fx:id="matchTable" prefHeight="250" style="-fx-background-color: transparent;">
+                    <columns>
+                        <TableColumn fx:id="colMatchNum" text="Match #" prefWidth="80"/>
+                        <TableColumn fx:id="colAlliance" text="Alliance" prefWidth="90"/>
+                        <TableColumn fx:id="colAuto" text="Auto" prefWidth="80"/>
+                        <TableColumn fx:id="colTeleop" text="TeleOp" prefWidth="80"/>
+                        <TableColumn fx:id="colPenalties" text="Penalties" prefWidth="150"/>
+                        <TableColumn fx:id="colScore" text="Total Score" prefWidth="100"/>
+                        <TableColumn fx:id="colStatus" text="Robot Status" prefWidth="120"/>
+                    </columns>
+                    <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
+                </TableView>
             </VBox>
-        </ScrollPane>
-    </right>
-    <!-- 【新增/修改】底部展示比赛详情及判罚列表 -->
-    <bottom>
-        <VBox spacing="10" styleClass="mac-card">
-            <BorderPane.margin>
-                <Insets top="0" right="25" bottom="25" left="25"/>
-            </BorderPane.margin>
-            <padding><Insets top="15" right="20" bottom="15" left="20"/></padding>
-            <Label text="Match Log &amp; Advanced Detail (Inc. Penalties)" styleClass="title-4"/>
-            <TableView fx:id="matchTable" prefHeight="220" styleClass="striped">
-                <columns>
-                    <TableColumn fx:id="colMatchNum" text="Match #" prefWidth="70"/>
-                    <TableColumn fx:id="colAlliance" text="Alliance" prefWidth="80"/>
-                    <TableColumn fx:id="colAuto" text="Auto" prefWidth="70"/>
-                    <TableColumn fx:id="colTeleop" text="TeleOp" prefWidth="70"/>
-                    <TableColumn fx:id="colPenalties" text="Penalties (Comm/Opp)" prefWidth="180"/>
-                    <TableColumn fx:id="colScore" text="Total Score" prefWidth="90"/>
-                    <TableColumn fx:id="colStatus" text="Robot Status" prefWidth="140"/>
-                </columns>
-                <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
-            </TableView>
         </VBox>
-    </bottom>
-</BorderPane>
+    </StackPane>
+</ScrollPane>

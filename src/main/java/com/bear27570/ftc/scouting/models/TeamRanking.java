@@ -2,9 +2,12 @@
 package com.bear27570.ftc.scouting.models;
 
 import java.io.Serializable;
+import java.util.LinkedList;
+import java.util.List;
 
 public class TeamRanking implements Serializable {
     private static final long serialVersionUID = 11L;
+    private final LinkedList<Double> recentRatings = new LinkedList<>();
 
     private final int teamNumber;
     private int matchesPlayed = 0;
@@ -65,14 +68,17 @@ public class TeamRanking implements Serializable {
 
         if (sequence) this.canSequence = true;
         if (climb) this.l2Capable = true;
-
+        recentRatings.add(rating);
+        if(recentRatings.size() > 5) recentRatings.removeFirst();
         this.totalHits += hits;
         this.totalShots += shots;
     }
 
     public int getTeamNumber() { return teamNumber; }
     public int getMatchesPlayed() { return matchesPlayed; }
-
+    public List<Double> getRecentRatings() {
+        return recentRatings;
+    }
     public String getAvgAutoArtifactsFormatted() { return String.format("%.1f", avgAutoArtifacts); }
     public String getAvgTeleopArtifactsFormatted() { return String.format("%.1f", avgTeleopArtifacts); }
     public String getAvgPenaltyCommittedFormatted() { return String.format("%.1f", avgPenaltyCommitted); }

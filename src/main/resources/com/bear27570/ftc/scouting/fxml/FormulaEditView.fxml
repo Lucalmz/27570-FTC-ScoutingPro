@@ -4,32 +4,31 @@
 <?import javafx.scene.layout.*?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<VBox spacing="30" alignment="CENTER" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.FormulaEditController">
-    <padding><Insets top="40" right="45" bottom="40" left="45"/></padding>
+<VBox spacing="40" alignment="CENTER" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.FormulaEditController">
+    <padding><Insets top="50" right="60" bottom="50" left="60"/></padding>
 
-    <Label text="Edit Rating Formula" styleClass="title-2"/>
+    <Label text="Configure Rating Formula" styleClass="title-2"/>
 
-    <VBox spacing="15" styleClass="mac-card" style="-fx-padding: 30;">
-        <Label text="Available Variables: auto, teleop, seq (0/1), climb (0/1), total" styleClass="text-muted"/>
+    <VBox spacing="20" styleClass="mac-card" style="-fx-padding: 40;">
+        <Label text="Variables: auto, teleop, seq (0/1), climb (0/1), total" styleClass="text-muted"/>
         <Label text="Supported Math: +, -, *, /, ^, sqrt(), abs()" styleClass="text-muted"/>
-        <Label text="Example: (auto / 2) * 5 + (teleop / 2) * 3 + (seq ? 10 : 0)" styleClass="mono-text" style="-fx-text-fill: #0A84FF; -fx-font-style: italic;"/>
+        <Label text="Example: (auto / 2) * 5 + (teleop / 2) * 3 + (seq ? 10 : 0)" styleClass="mono-text" style="-fx-text-fill: #A1A1AA;"/>
 
-        <Region prefHeight="15"/>
-        <!-- 核心输入框使用高亮蓝色发光边框 -->
-        <TextField fx:id="formulaField" promptText="total + (auto * 5)" prefWidth="550" prefHeight="50" styleClass="mono-text" style="-fx-font-size: 16px;"/>
+        <Region prefHeight="10"/>
+        <TextField fx:id="formulaField" promptText="total + (auto * 5)" prefWidth="600" styleClass="mono-text" style="-fx-font-size: 18px; -fx-padding: 15px;"/>
     </VBox>
 
     <Label fx:id="errorLabel" styleClass="text-danger" style="-fx-font-weight: bold;"/>
 
-    <HBox spacing="20" alignment="CENTER">
-        <Button onAction="#handleCancel" text="Cancel" prefWidth="120" prefHeight="45">
+    <HBox spacing="25" alignment="CENTER">
+        <Button onAction="#handleCancel" text="Cancel" prefWidth="140">
             <graphic><FontIcon iconLiteral="fth-x" iconSize="14"/></graphic>
         </Button>
-        <Button onAction="#handleReset" text="Reset Default" styleClass="warning" prefWidth="140" prefHeight="45">
-            <graphic><FontIcon iconLiteral="fth-rotate-ccw" iconSize="14" iconColor="black"/></graphic>
+        <Button onAction="#handleReset" text="Reset Default" styleClass="warning" prefWidth="160">
+            <graphic><FontIcon iconLiteral="fth-rotate-ccw" iconSize="14" iconColor="#FBBF24"/></graphic>
         </Button>
-        <Button onAction="#handleSave" text="Save &amp; Apply" styleClass="accent" prefWidth="140" prefHeight="45">
-            <graphic><FontIcon iconLiteral="fth-save" iconSize="16" iconColor="white"/></graphic>
+        <Button onAction="#handleSave" text="Save &amp; Apply" styleClass="accent" prefWidth="180" prefHeight="50">
+            <graphic><FontIcon iconLiteral="fth-save" iconSize="16" iconColor="#18181B"/></graphic>
         </Button>
     </HBox>
 </VBox>

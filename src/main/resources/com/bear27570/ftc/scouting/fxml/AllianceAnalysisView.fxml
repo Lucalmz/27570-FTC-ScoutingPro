@@ -5,66 +5,60 @@
 <?import javafx.scene.web.WebView?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<SplitPane dividerPositions="0.60" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.AllianceAnalysisController" prefHeight="700" prefWidth="1200">
+<SplitPane dividerPositions="0.60" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.AllianceAnalysisController" prefHeight="750" prefWidth="1300">
 
-    <!-- 左侧：原有分析面板 (保持不变) -->
-    <VBox spacing="20" styleClass="mac-card">
-        <padding><Insets top="30" right="30" bottom="30" left="30"/></padding>
+    <VBox spacing="25" styleClass="mac-card">
+        <padding><Insets top="40" right="40" bottom="40" left="40"/></padding>
 
-        <Label text="Alliance Partner Analysis" styleClass="header-label"/>
+        <Label text="Alliance Partner Analysis" styleClass="title-3"/>
 
-        <HBox spacing="20" alignment="CENTER_LEFT" styleClass="panel-inner" style="-fx-padding: 20;">
+        <HBox spacing="20" alignment="CENTER_LEFT" styleClass="panel-inner">
             <Label text="Target Main Team:" styleClass="text-muted, text-bold"/>
-            <TextField fx:id="mainTeamField" promptText="Team #" prefWidth="140" prefHeight="38"/>
-            <Button text="Analyze Potential Partners" onAction="#handleAnalyze" styleClass="submit-button" prefHeight="38"/>
+            <TextField fx:id="mainTeamField" promptText="Team #" prefWidth="160"/>
+            <Button text="Analyze Partners" onAction="#handleAnalyze" styleClass="button"/>
             <Region HBox.hgrow="ALWAYS"/>
             <Label fx:id="mainTeamStatsLabel" text="Waiting for input..." styleClass="text-accent, text-bold"/>
         </HBox>
 
         <TableView fx:id="analysisTable" VBox.vgrow="ALWAYS">
             <columns>
-                <TableColumn fx:id="partnerCol" text="Partner Team" prefWidth="100"/>
-                <TableColumn fx:id="totalEffCol" text="Proj. Total Score" prefWidth="130"/>
-                <TableColumn fx:id="combinedAccCol" text="Comb. Accuracy" prefWidth="130"/>
-                <TableColumn fx:id="stabilityCol" text="Stability (StdDev)" prefWidth="130"/>
-                <TableColumn fx:id="styleCol" text="Analysis Note" prefWidth="280"/>
+                <TableColumn fx:id="partnerCol" text="Partner" prefWidth="100"/>
+                <TableColumn fx:id="totalEffCol" text="Proj. Score" prefWidth="120"/>
+                <TableColumn fx:id="combinedAccCol" text="Accuracy" prefWidth="120"/>
+                <TableColumn fx:id="stabilityCol" text="Stability" prefWidth="120"/>
+                <TableColumn fx:id="styleCol" text="Analysis Note" prefWidth="300"/>
             </columns>
             <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
         </TableView>
     </VBox>
 
-    <!-- 右侧：Gemini AI 聊天区域 (深度进化) -->
-    <VBox spacing="15" styleClass="mac-card">
-        <padding><Insets top="30" right="30" bottom="30" left="30"/></padding>
+    <VBox spacing="20" styleClass="mac-card">
+        <padding><Insets top="40" right="40" bottom="40" left="40"/></padding>
         <Label text="AI Studio Assistant" styleClass="title-3"/>
         <Label text="Markdown supported. Press Enter to send, Shift+Enter for new line." styleClass="text-muted"/>
 
-        <!-- 第一行：API Key 与 模型选择 -->
-        <HBox spacing="10" alignment="CENTER_LEFT">
-            <PasswordField fx:id="apiKeyField" promptText="Enter Gemini API Key..." HBox.hgrow="ALWAYS" prefHeight="38"/>
-            <ComboBox fx:id="modelComboBox" prefWidth="180" prefHeight="38"/>
-            <Button text="Save Key" onAction="#handleSaveApiKey" styleClass="accent" prefHeight="38">
-                <graphic><FontIcon iconLiteral="fth-key" iconSize="16" iconColor="white"/></graphic>
+        <HBox spacing="15" alignment="CENTER_LEFT">
+            <PasswordField fx:id="apiKeyField" promptText="Enter Gemini API Key..." HBox.hgrow="ALWAYS"/>
+            <ComboBox fx:id="modelComboBox" prefWidth="180"/>
+            <Button text="Save Key" onAction="#handleSaveApiKey" styleClass="accent">
+                <graphic><FontIcon iconLiteral="fth-key" iconSize="16" iconColor="#18181B"/></graphic>
             </Button>
         </HBox>
 
-        <!-- 第二行：代理设置与测试连接 -->
-        <HBox spacing="10" alignment="CENTER_LEFT" styleClass="panel-inner" style="-fx-padding: 8; -fx-background-color: transparent;">
-            <CheckBox fx:id="useProxyCheck" text="Manual HTTP Proxy" style="-fx-text-fill: #555;"/>
-            <TextField fx:id="proxyHostField" promptText="Host (e.g., 127.0.0.1)" prefWidth="140" prefHeight="30"/>
-            <TextField fx:id="proxyPortField" promptText="Port" prefWidth="80" prefHeight="30"/>
+        <HBox spacing="15" alignment="CENTER_LEFT" styleClass="panel-inner" style="-fx-background-color: transparent;">
+            <CheckBox fx:id="useProxyCheck" text="HTTP Proxy"/>
+            <TextField fx:id="proxyHostField" promptText="Host (127.0.0.1)" prefWidth="150"/>
+            <TextField fx:id="proxyPortField" promptText="Port" prefWidth="100"/>
             <Region HBox.hgrow="ALWAYS"/>
-            <Button text="Check Connection" onAction="#handleCheckConnection" styleClass="button-small" prefHeight="30"/>
+            <Button text="Test" onAction="#handleCheckConnection" styleClass="button"/>
         </HBox>
 
-        <!-- ★ 革命性升级：Markdown 渲染容器 -->
         <WebView fx:id="chatWebView" VBox.vgrow="ALWAYS" prefHeight="400" />
 
-        <!-- ★ 输入体验升级：多行输入框支持 Shift+Enter -->
-        <HBox spacing="10" alignment="BOTTOM_LEFT">
-            <TextArea fx:id="chatInputField" promptText="Ask Gemini about the data..." wrapText="true" prefRowCount="2" HBox.hgrow="ALWAYS"/>
-            <Button text="Send" onAction="#handleSendChat" styleClass="success" prefHeight="48" prefWidth="80">
-                <graphic><FontIcon iconLiteral="fth-send" iconSize="16" iconColor="white"/></graphic>
+        <HBox spacing="15" alignment="BOTTOM_LEFT">
+            <TextArea fx:id="chatInputField" promptText="Ask AI about scouting data..." wrapText="true" prefRowCount="2" HBox.hgrow="ALWAYS"/>
+            <Button text="Send" onAction="#handleSendChat" styleClass="accent" prefWidth="90" prefHeight="50">
+                <graphic><FontIcon iconLiteral="fth-send" iconSize="16" iconColor="#18181B"/></graphic>
             </Button>
         </HBox>
     </VBox>

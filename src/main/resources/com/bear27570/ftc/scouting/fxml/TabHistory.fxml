@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox spacing="20" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.TabHistoryController">
+    <padding><Insets bottom="40" left="50" right="50" top="40" /></padding>
+
+    <HBox alignment="CENTER_LEFT" spacing="20">
+        <TextField fx:id="searchField" promptText="Search Match or Team..." prefWidth="400" />
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label text="Status: Red=Unsynced, Orange=Exported, Green=Synced" styleClass="text-muted"/>
+    </HBox>
+
+    <TableView fx:id="historyTableView" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="histSyncCol" prefWidth="60" text="Sync" />
+            <TableColumn fx:id="histMatchCol" prefWidth="80" text="Match" />
+            <TableColumn fx:id="histAllianceCol" text="Alliance" />
+            <TableColumn fx:id="histTeamsCol" text="Teams" />
+            <TableColumn fx:id="histTotalCol" text="Score" />
+            <TableColumn fx:id="histSubmitterCol" text="Submitter" />
+            <TableColumn fx:id="histTimeCol" prefWidth="160" text="Time" />
+            <TableColumn fx:id="histActionsCol" prefWidth="160" text="Actions" />
+        </columns>
+        <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY" /></columnResizePolicy>
+    </TableView>
+</VBox>

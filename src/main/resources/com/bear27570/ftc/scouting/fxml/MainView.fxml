@@ -1,32 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<?import javafx.geometry.*?>
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane prefHeight="850.0" prefWidth="1400.0" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.MainController">
+<BorderPane styleClass="main-bg-pane" prefHeight="900.0" prefWidth="1440.0" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.MainController">
     <top>
-        <HBox alignment="CENTER_LEFT" spacing="15" styleClass="top-bar">
-            <padding><Insets bottom="15" left="30" right="30" top="15" /></padding>
+        <HBox alignment="CENTER_LEFT" spacing="20" styleClass="top-bar">
+            <padding><Insets bottom="20" left="40" right="40" top="20" /></padding>
             <Label fx:id="competitionNameLabel" styleClass="title-3" text="Competition Name" />
             <Region HBox.hgrow="ALWAYS" />
             <Button fx:id="offlineSyncBtn" onAction="#handleOfflineSync" styleClass="warning" text="Offline Sync">
-                <graphic><FontIcon iconLiteral="fth-refresh-cw" iconSize="14" iconColor="black"/></graphic>
+                <graphic><FontIcon iconLiteral="fth-refresh-cw" iconSize="14" iconColor="#FBBF24"/></graphic>
             </Button>
-            <Button onAction="#handleExport" styleClass="success" text="Export CSV">
-                <graphic><FontIcon iconLiteral="fth-download" iconSize="14" iconColor="white"/></graphic>
+            <Button onAction="#handleExport" styleClass="button" text="Export CSV">
+                <graphic><FontIcon iconLiteral="fth-download" iconSize="14"/></graphic>
             </Button>
             <Button fx:id="manageMembersBtn" onAction="#handleManageMembers" styleClass="accent" text="Members" visible="false" managed="false">
-                <graphic><FontIcon iconLiteral="fth-users" iconSize="14" iconColor="white"/></graphic>
+                <graphic><FontIcon iconLiteral="fth-users" iconSize="14" iconColor="#18181B"/></graphic>
             </Button>
             <Button onAction="#handleAllianceAnalysis" text="Analysis">
                 <graphic><FontIcon iconLiteral="fth-pie-chart" iconSize="14"/></graphic>
             </Button>
             <Button onAction="#handleBackButton" text="Hub">
                 <graphic><FontIcon iconLiteral="fth-arrow-left" iconSize="14"/></graphic>
-            </Button>
-            <Button onAction="#handleLogout" styleClass="danger" text="Logout">
-                <graphic><FontIcon iconLiteral="fth-log-out" iconSize="14" iconColor="white"/></graphic>
             </Button>
         </HBox>
     </top>
@@ -36,247 +33,22 @@
             <tabs>
                 <Tab text="Scoring">
                     <content>
-                        <ScrollPane fitToWidth="true" styleClass="edge-to-edge">
-                            <VBox alignment="CENTER" spacing="20">
-                                <padding><Insets bottom="50" left="20" right="20" top="50" /></padding>
-
-                                <VBox fx:id="scoringFormVBox" maxWidth="600" spacing="25" styleClass="mac-card">
-                                    <padding><Insets bottom="40" left="40" right="40" top="40" /></padding>
-
-                                    <HBox alignment="CENTER_LEFT" spacing="20">
-                                        <Label styleClass="title-4" text="Scoring Mode" />
-                                        <Region HBox.hgrow="ALWAYS"/>
-                                        <RadioButton fx:id="allianceModeRadio" selected="true" text="Alliance (2)" />
-                                        <RadioButton fx:id="singleModeRadio" text="Single" />
-                                    </HBox>
-
-                                    <Separator />
-
-                                    <HBox spacing="25" alignment="CENTER_LEFT">
-                                        <VBox spacing="8" HBox.hgrow="ALWAYS">
-                                            <Label text="Match #" styleClass="text-muted"/>
-                                            <TextField fx:id="matchNumberField" promptText="Enter Match #" prefHeight="38"/>
-                                        </VBox>
-                                        <VBox spacing="8">
-                                            <Label text="Alliance" styleClass="text-muted"/>
-                                            <HBox spacing="10">
-                                                <ToggleButton fx:id="redAllianceToggle" text="Red" prefWidth="90" prefHeight="38" styleClass="danger"/>
-                                                <ToggleButton fx:id="blueAllianceToggle" text="Blue" prefWidth="90" prefHeight="38" styleClass="accent"/>
-                                            </HBox>
-                                        </VBox>
-                                    </HBox>
-
-                                    <VBox spacing="10">
-                                        <Label text="Teams Configuration" styleClass="text-muted"/>
-                                        <GridPane hgap="15" vgap="15" styleClass="panel-inner">
-                                            <Label text="Team 1 #" style="-fx-font-weight: bold;"/>
-                                            <TextField fx:id="team1Field" GridPane.columnIndex="1" prefWidth="130" prefHeight="35"/>
-                                            <HBox spacing="20" GridPane.columnIndex="1" GridPane.rowIndex="1">
-                                                <CheckBox fx:id="team1IgnoreCheck" text="Weak" />
-                                                <CheckBox fx:id="team1BrokenCheck" text="Broken" />
-                                            </HBox>
-
-                                            <Label fx:id="lblTeam2" text="Team 2 #" style="-fx-font-weight: bold;" GridPane.rowIndex="2" />
-                                            <TextField fx:id="team2Field" GridPane.columnIndex="1" GridPane.rowIndex="2" prefHeight="35"/>
-                                            <HBox spacing="20" GridPane.columnIndex="1" GridPane.rowIndex="3">
-                                                <CheckBox fx:id="team2IgnoreCheck" text="Weak" />
-                                                <CheckBox fx:id="team2BrokenCheck" text="Broken" />
-                                            </HBox>
-                                            <columnConstraints>
-                                                <ColumnConstraints prefWidth="90"/>
-                                                <ColumnConstraints hgrow="ALWAYS"/>
-                                            </columnConstraints>
-                                        </GridPane>
-                                    </VBox>
-
-                                    <Separator />
-
-                                    <VBox spacing="15" styleClass="panel-inner">
-                                        <Label text="Auto Scoring Analysis" styleClass="title-4, text-accent"/>
-
-                                        <HBox spacing="40">
-                                            <VBox spacing="15">
-                                                <Label text="Team 1 Auto" style="-fx-font-weight: bold;"/>
-
-                                                <VBox spacing="5">
-                                                    <Label text="Score" styleClass="text-muted" style="-fx-font-size: 11px;"/>
-                                                    <TextField fx:id="t1AutoScoreField" text="0" prefWidth="80" prefHeight="35"/>
-                                                </VBox>
-
-                                                <HBox spacing="20">
-                                                    <VBox spacing="5" alignment="CENTER">
-                                                        <Label text="Projection" styleClass="text-muted" style="-fx-font-size: 11px;"/>
-                                                        <VBox spacing="4">
-                                                            <ToggleButton fx:id="t1ProjNearBtn" text="Near" styleClass="box-toggle"/>
-                                                            <ToggleButton fx:id="t1ProjFarBtn" text="Far" styleClass="box-toggle"/>
-                                                        </VBox>
-                                                    </VBox>
-                                                    <VBox spacing="5" alignment="CENTER">
-                                                        <Label text="Preset Rows" styleClass="text-muted" style="-fx-font-size: 11px;"/>
-                                                        <VBox spacing="4">
-                                                            <ToggleButton fx:id="t1Row1Btn" text="R1" styleClass="box-toggle"/>
-                                                            <ToggleButton fx:id="t1Row2Btn" text="R2" styleClass="box-toggle"/>
-                                                            <ToggleButton fx:id="t1Row3Btn" text="R3" styleClass="box-toggle"/>
-                                                        </VBox>
-                                                    </VBox>
-                                                </HBox>
-                                            </VBox>
-
-                                            <VBox fx:id="team2AutoBox" spacing="15">
-                                                <Label text="Team 2 Auto" style="-fx-font-weight: bold;"/>
-
-                                                <VBox spacing="5">
-                                                    <Label text="Score" styleClass="text-muted" style="-fx-font-size: 11px;"/>
-                                                    <TextField fx:id="t2AutoScoreField" text="0" prefWidth="80" prefHeight="35"/>
-                                                </VBox>
-
-                                                <HBox spacing="20">
-                                                    <VBox spacing="5" alignment="CENTER">
-                                                        <Label text="Projection" styleClass="text-muted" style="-fx-font-size: 11px;"/>
-                                                        <VBox spacing="4">
-                                                            <ToggleButton fx:id="t2ProjNearBtn" text="Near" styleClass="box-toggle"/>
-                                                            <ToggleButton fx:id="t2ProjFarBtn" text="Far" styleClass="box-toggle"/>
-                                                        </VBox>
-                                                    </VBox>
-                                                    <VBox spacing="5" alignment="CENTER">
-                                                        <Label text="Preset Rows" styleClass="text-muted" style="-fx-font-size: 11px;"/>
-                                                        <VBox spacing="4">
-                                                            <ToggleButton fx:id="t2Row1Btn" text="R1" styleClass="box-toggle"/>
-                                                            <ToggleButton fx:id="t2Row2Btn" text="R2" styleClass="box-toggle"/>
-                                                            <ToggleButton fx:id="t2Row3Btn" text="R3" styleClass="box-toggle"/>
-                                                        </VBox>
-                                                    </VBox>
-                                                </HBox>
-                                            </VBox>
-                                        </HBox>
-                                    </VBox>
-
-                                    <GridPane hgap="20" vgap="20">
-                                        <Label text="TeleOp Hits" style="-fx-font-weight: bold;" />
-                                        <HBox spacing="20" GridPane.columnIndex="1" alignment="CENTER_LEFT">
-                                            <TextField fx:id="teleopArtifactsField" text="0" prefWidth="100" prefHeight="38"/>
-                                            <Button onAction="#handleOpenFieldInput" text="Draw Map" styleClass="accent" prefHeight="38">
-                                                <graphic><FontIcon iconLiteral="fth-map-pin" iconSize="16" iconColor="white"/></graphic>
-                                            </Button>
-                                        </HBox>
-                                    </GridPane>
-
-                                    <Separator />
-
-                                    <VBox spacing="10">
-                                        <Label text="Capabilities" styleClass="text-muted"/>
-                                        <HBox spacing="60" styleClass="panel-inner">
-                                            <VBox spacing="15">
-                                                <Label text="Team 1" styleClass="title-4, accent"/>
-                                                <CheckBox fx:id="team1SequenceCheck" text="Sequence" />
-                                                <CheckBox fx:id="team1L2ClimbCheck" text="L2 Climb" />
-                                            </VBox>
-                                            <VBox fx:id="team2CapsBox" spacing="15">
-                                                <Label text="Team 2" styleClass="title-4, danger"/>
-                                                <CheckBox fx:id="team2SequenceCheck" text="Sequence" />
-                                                <CheckBox fx:id="team2L2ClimbCheck" text="L2 Climb" />
-                                            </VBox>
-                                        </HBox>
-                                    </VBox>
-
-                                    <Region prefHeight="5"/>
-                                    <Button fx:id="submitButton" maxWidth="Infinity" onAction="#handleSubmitButtonAction" styleClass="success" text="Submit Match Entry" prefHeight="55" style="-fx-font-size: 16px;">
-                                        <graphic><FontIcon iconLiteral="fth-upload-cloud" iconSize="20" iconColor="white"/></graphic>
-                                    </Button>
-
-                                    <HBox alignment="CENTER_LEFT">
-                                        <Label fx:id="submitterLabel" text="Submitter: " styleClass="text-muted" style="-fx-font-size: 13px;"/>
-                                        <Region HBox.hgrow="ALWAYS"/>
-                                        <Label fx:id="statusLabel" text="" styleClass="text-success"/>
-                                    </HBox>
-                                    <Label fx:id="errorLabel" styleClass="text-danger" wrapText="true" />
-                                </VBox>
-                            </VBox>
-                        </ScrollPane>
+                        <fx:include fx:id="tabScoring" source="TabScoring.fxml"/>
                     </content>
                 </Tab>
-
-                <Tab text="FTCScout">
+                <Tab fx:id="ftcScoutTab" text="FTCScout Integrations">
                     <content>
-                        <VBox alignment="CENTER" spacing="20">
-                            <VBox maxWidth="500" spacing="25" styleClass="mac-card">
-                                <padding><Insets bottom="40" left="40" right="40" top="40" /></padding>
-                                <Label styleClass="title-4" text="FTCScout Integration" />
-                                <Label text="Host only. Bind an event to fetch the official name and automatically sync all penalty data from the cloud." styleClass="text-muted" wrapText="true"/>
-
-                                <GridPane hgap="15" vgap="15" styleClass="panel-inner">
-                                    <Label text="Season:" style="-fx-font-weight: bold;"/>
-                                    <TextField fx:id="ftcScoutSeasonField" text="2024" GridPane.columnIndex="1" prefWidth="150" prefHeight="38"/>
-                                    <Label text="Event Code:" style="-fx-font-weight: bold;" GridPane.rowIndex="1"/>
-                                    <TextField fx:id="ftcScoutEventField" promptText="e.g. USCA" GridPane.columnIndex="1" GridPane.rowIndex="1" prefWidth="150" prefHeight="38"/>
-                                </GridPane>
-
-                                <Label fx:id="boundEventNameLabel" text="Event: Not Bound" styleClass="title-4, text-accent" wrapText="true"/>
-
-                                <Button onAction="#handleBindAndFetch" styleClass="accent" text="Bind Event &amp; Sync Penalties" maxWidth="Infinity" prefHeight="50">
-                                    <graphic><FontIcon iconLiteral="fth-cloud-drizzle" iconSize="16" iconColor="white"/></graphic>
-                                </Button>
-                                <Label fx:id="autoFetchStatusLabel" alignment="CENTER" text="" wrapText="true" styleClass="text-success"/>
-                            </VBox>
-                        </VBox>
+                        <fx:include fx:id="tabFtcScout" source="TabFtcScout.fxml"/>
                     </content>
                 </Tab>
-
                 <Tab text="Team Rankings">
                     <content>
-                        <VBox spacing="15">
-                            <padding><Insets bottom="30" left="40" right="40" top="30" /></padding>
-                            <HBox alignment="CENTER_LEFT" spacing="15">
-                                <Label styleClass="title-3" text="Live Leaderboard" />
-                                <Region HBox.hgrow="ALWAYS" />
-                                <Button fx:id="editRatingButton" managed="false" onAction="#handleEditRating" text="Edit Formula" visible="false">
-                                    <graphic><FontIcon iconLiteral="fth-settings" iconSize="14"/></graphic>
-                                </Button>
-                            </HBox>
-                            <Label fx:id="rankingLegendLabel" styleClass="text-muted" text="Legend..." wrapText="true" />
-
-                            <TableView fx:id="rankingsTableView" VBox.vgrow="ALWAYS" styleClass="striped">
-                                <columns>
-                                    <TableColumn fx:id="rankTeamCol" prefWidth="80" text="Team #" />
-                                    <TableColumn fx:id="rankHeatmapCol" prefWidth="90" text="Map" />
-                                    <TableColumn fx:id="rankRatingCol" prefWidth="100" text="Rating" />
-                                    <TableColumn fx:id="rankMatchesCol" prefWidth="70" text="Plays" />
-                                    <TableColumn fx:id="rankAutoCol" text="Avg Auto" />
-                                    <TableColumn fx:id="rankTeleopCol" text="Avg Tele" />
-                                    <TableColumn fx:id="rankAccuracyCol" text="Acc %" />
-                                    <TableColumn fx:id="rankSequenceCol" text="Seq %" />
-                                    <TableColumn fx:id="rankPenCommCol" text="Pen Comm" />
-                                    <TableColumn fx:id="rankPenOppCol" text="Pen Opp" />
-                                    <TableColumn fx:id="rankL2Col" text="L2 Climb" />
-                                </columns>
-                                <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY" /></columnResizePolicy>
-                            </TableView>
-                        </VBox>
+                        <fx:include fx:id="tabRankings" source="TabRankings.fxml"/>
                     </content>
                 </Tab>
-
-                <Tab text="History">
+                <Tab text="Match History">
                     <content>
-                        <VBox spacing="15">
-                            <padding><Insets bottom="30" left="40" right="40" top="30" /></padding>
-                            <HBox alignment="CENTER_LEFT" spacing="15">
-                                <TextField fx:id="searchField" promptText="Search Match or Team..." prefWidth="350" prefHeight="42" />
-                                <Label text="Status: Red=Unsynced, Orange=Exported, Green=Synced" styleClass="text-muted"/>
-                            </HBox>
-                            <TableView fx:id="historyTableView" VBox.vgrow="ALWAYS" styleClass="striped">
-                                <columns>
-                                    <TableColumn fx:id="histSyncCol" prefWidth="50" text="Sync" />
-                                    <TableColumn fx:id="histMatchCol" prefWidth="60" text="Match" />
-                                    <TableColumn fx:id="histAllianceCol" text="Alliance" />
-                                    <TableColumn fx:id="histTeamsCol" text="Teams" />
-                                    <TableColumn fx:id="histTotalCol" text="Score" />
-                                    <TableColumn fx:id="histSubmitterCol" text="Submitter" />
-                                    <TableColumn fx:id="histTimeCol" prefWidth="150" text="Time" />
-                                    <TableColumn fx:id="histActionsCol" prefWidth="150" text="Actions" />
-                                </columns>
-                                <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY" /></columnResizePolicy>
-                            </TableView>
-                        </VBox>
+                        <fx:include fx:id="tabHistory" source="TabHistory.fxml"/>
                     </content>
                 </Tab>
             </tabs>

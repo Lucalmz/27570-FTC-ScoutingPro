@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<ScrollPane fitToWidth="true" style="-fx-background-color: transparent;" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.TabScoringController">
+    <VBox alignment="CENTER" spacing="30">
+        <padding><Insets bottom="60" left="20" right="20" top="60" /></padding>
+
+        <VBox fx:id="scoringFormVBox" maxWidth="650" spacing="35" styleClass="mac-card">
+            <padding><Insets bottom="50" left="50" right="50" top="50" /></padding>
+
+            <HBox alignment="CENTER_LEFT" spacing="20">
+                <Label styleClass="title-3" text="Match Configuration" />
+                <Region HBox.hgrow="ALWAYS"/>
+                <RadioButton fx:id="allianceModeRadio" selected="true" text="Alliance (2)" />
+                <RadioButton fx:id="singleModeRadio" text="Single" />
+            </HBox>
+
+            <Region style="-fx-background-color: rgba(255,255,255,0.05); -fx-pref-height: 1px;"/>
+
+            <HBox spacing="40" alignment="CENTER_LEFT">
+                <VBox spacing="10" HBox.hgrow="ALWAYS">
+                    <Label text="Match Number" styleClass="text-muted"/>
+                    <TextField fx:id="matchNumberField" promptText="Enter Match #"/>
+                </VBox>
+                <VBox spacing="10">
+                    <Label text="Alliance Color" styleClass="text-muted"/>
+                    <HBox spacing="15">
+                        <ToggleButton fx:id="redAllianceToggle" text="Red" prefWidth="100" styleClass="danger"/>
+                        <ToggleButton fx:id="blueAllianceToggle" text="Blue" prefWidth="100" styleClass="accent"/>
+                    </HBox>
+                </VBox>
+            </HBox>
+
+            <VBox spacing="15">
+                <Label text="Teams Selection" styleClass="text-muted"/>
+                <GridPane hgap="20" vgap="20" styleClass="panel-inner">
+                    <Label text="Team 1 #" style="-fx-font-weight: bold;"/>
+                    <TextField fx:id="team1Field" GridPane.columnIndex="1" prefWidth="150"/>
+                    <HBox spacing="25" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                        <CheckBox fx:id="team1IgnoreCheck" text="Weak (Ignore)" />
+                        <CheckBox fx:id="team1BrokenCheck" text="Broken" />
+                    </HBox>
+
+                    <Label fx:id="lblTeam2" text="Team 2 #" style="-fx-font-weight: bold;" GridPane.rowIndex="2" />
+                    <TextField fx:id="team2Field" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+                    <HBox spacing="25" GridPane.columnIndex="1" GridPane.rowIndex="3">
+                        <CheckBox fx:id="team2IgnoreCheck" text="Weak (Ignore)" />
+                        <CheckBox fx:id="team2BrokenCheck" text="Broken" />
+                    </HBox>
+                    <columnConstraints>
+                        <ColumnConstraints prefWidth="100"/>
+                        <ColumnConstraints hgrow="ALWAYS"/>
+                    </columnConstraints>
+                </GridPane>
+            </VBox>
+
+            <Region style="-fx-background-color: rgba(255,255,255,0.05); -fx-pref-height: 1px;"/>
+
+            <VBox spacing="20" styleClass="panel-inner">
+                <Label text="Auto Scoring Analysis" styleClass="title-4"/>
+
+                <HBox spacing="50">
+                    <VBox spacing="20">
+                        <Label text="Team 1 Auto" style="-fx-font-weight: bold; -fx-text-fill: -color-text-main;"/>
+                        <VBox spacing="8">
+                            <Label text="Score" styleClass="text-muted" style="-fx-font-size: 12px;"/>
+                            <TextField fx:id="t1AutoScoreField" text="0" prefWidth="90"/>
+                        </VBox>
+
+                        <HBox spacing="25">
+                            <VBox spacing="8" alignment="CENTER">
+                                <Label text="Projection" styleClass="text-muted" style="-fx-font-size: 12px;"/>
+                                <VBox spacing="5">
+                                    <ToggleButton fx:id="t1ProjNearBtn" text="Near" styleClass="box-toggle"/>
+                                    <ToggleButton fx:id="t1ProjFarBtn" text="Far" styleClass="box-toggle"/>
+                                </VBox>
+                            </VBox>
+                            <VBox spacing="8" alignment="CENTER">
+                                <Label text="Preset Rows" styleClass="text-muted" style="-fx-font-size: 12px;"/>
+                                <VBox spacing="5">
+                                    <ToggleButton fx:id="t1Row1Btn" text="R1" styleClass="box-toggle"/>
+                                    <ToggleButton fx:id="t1Row2Btn" text="R2" styleClass="box-toggle"/>
+                                    <ToggleButton fx:id="t1Row3Btn" text="R3" styleClass="box-toggle"/>
+                                </VBox>
+                            </VBox>
+                        </HBox>
+                    </VBox>
+
+                    <VBox fx:id="team2AutoBox" spacing="20">
+                        <Label text="Team 2 Auto" style="-fx-font-weight: bold; -fx-text-fill: -color-text-main;"/>
+                        <VBox spacing="8">
+                            <Label text="Score" styleClass="text-muted" style="-fx-font-size: 12px;"/>
+                            <TextField fx:id="t2AutoScoreField" text="0" prefWidth="90"/>
+                        </VBox>
+
+                        <HBox spacing="25">
+                            <VBox spacing="8" alignment="CENTER">
+                                <Label text="Projection" styleClass="text-muted" style="-fx-font-size: 12px;"/>
+                                <VBox spacing="5">
+                                    <ToggleButton fx:id="t2ProjNearBtn" text="Near" styleClass="box-toggle"/>
+                                    <ToggleButton fx:id="t2ProjFarBtn" text="Far" styleClass="box-toggle"/>
+                                </VBox>
+                            </VBox>
+                            <VBox spacing="8" alignment="CENTER">
+                                <Label text="Preset Rows" styleClass="text-muted" style="-fx-font-size: 12px;"/>
+                                <VBox spacing="5">
+                                    <ToggleButton fx:id="t2Row1Btn" text="R1" styleClass="box-toggle"/>
+                                    <ToggleButton fx:id="t2Row2Btn" text="R2" styleClass="box-toggle"/>
+                                    <ToggleButton fx:id="t2Row3Btn" text="R3" styleClass="box-toggle"/>
+                                </VBox>
+                            </VBox>
+                        </HBox>
+                    </VBox>
+                </HBox>
+            </VBox>
+
+            <GridPane hgap="25" vgap="25">
+                <Label text="TeleOp Hits" styleClass="title-4" />
+                <HBox spacing="20" GridPane.columnIndex="1" alignment="CENTER_LEFT">
+                    <TextField fx:id="teleopArtifactsField" text="0" prefWidth="120"/>
+                    <Button onAction="#handleOpenFieldInput" text="Draw Map" styleClass="button">
+                        <graphic><FontIcon iconLiteral="fth-map-pin" iconSize="16"/></graphic>
+                    </Button>
+                </HBox>
+            </GridPane>
+
+            <Region style="-fx-background-color: rgba(255,255,255,0.05); -fx-pref-height: 1px;"/>
+
+            <VBox spacing="15">
+                <Label text="Robot Capabilities" styleClass="text-muted"/>
+                <HBox spacing="80" styleClass="panel-inner">
+                    <VBox spacing="15">
+                        <Label text="Team 1" styleClass="title-4" style="-fx-text-fill: #EAB308;"/>
+                        <CheckBox fx:id="team1SequenceCheck" text="Sequence Achieved" />
+                        <CheckBox fx:id="team1L2ClimbCheck" text="Level 2 Climb" />
+                    </VBox>
+                    <VBox fx:id="team2CapsBox" spacing="15">
+                        <Label text="Team 2" styleClass="title-4" style="-fx-text-fill: #F87171;"/>
+                        <CheckBox fx:id="team2SequenceCheck" text="Sequence Achieved" />
+                        <CheckBox fx:id="team2L2ClimbCheck" text="Level 2 Climb" />
+                    </VBox>
+                </HBox>
+            </VBox>
+
+            <Region prefHeight="10"/>
+
+            <Button fx:id="submitButton" maxWidth="Infinity" onAction="#handleSubmitButtonAction" styleClass="accent" text="Submit Match Entry" prefHeight="60" style="-fx-font-size: 18px;">
+                <graphic><FontIcon iconLiteral="fth-upload-cloud" iconSize="22" iconColor="#18181B"/></graphic>
+            </Button>
+
+            <HBox alignment="CENTER_LEFT">
+                <Label fx:id="submitterLabel" text="Submitter: " styleClass="text-muted" style="-fx-font-size: 13px;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="statusLabel" text="" styleClass="text-success" style="-fx-font-weight: bold;"/>
+            </HBox>
+            <Label fx:id="errorLabel" styleClass="text-danger" wrapText="true" />
+        </VBox>
+    </VBox>
+</ScrollPane>

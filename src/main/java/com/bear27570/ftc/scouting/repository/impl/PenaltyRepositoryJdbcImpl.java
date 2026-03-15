@@ -10,24 +10,22 @@ import java.util.Map;
 
 public class PenaltyRepositoryJdbcImpl implements PenaltyRepository {
 
-    private final String dbUrl;
-
     public PenaltyRepositoryJdbcImpl(String dbUrl) {
-        this.dbUrl = dbUrl;
-        // ★ 核心逻辑：初始化时检查并在旧数据库中无缝添加新列，防止报错
+        // ★ 初始化时检查并在旧数据库中无缝添加新列
         try (Connection conn = DatabaseManager.getConnection(); Statement stmt = conn.createStatement()) {
-            // H2 数据库语法: 如果列不存在则添加
             stmt.execute("ALTER TABLE penalties ADD COLUMN IF NOT EXISTS redScore INT DEFAULT 0");
             stmt.execute("ALTER TABLE penalties ADD COLUMN IF NOT EXISTS blueScore INT DEFAULT 0");
         } catch (SQLException e) {
-            System.err.println("Database Update Warning: Could not alter penalties table (Columns might exist). " + e.getMessage());
+            System.err.println("Database Update Info: penalties table columns might already exist. " + e.getMessage());
         }
     }
 
     @Override
     public void savePenaltyEntry(String competitionName, PenaltyEntry entry) {
-        try (Connection conn = DatabaseManager.getConnection()) {
-            conn.setAutoCommit(false); // 开启事务
+        Connection conn = null;
+        try {
+            conn = DatabaseManager.getConnection();
+            conn.setAutoCommit(false); // ★ 开启事务
 
             boolean exists = false;
             try (PreparedStatement checkStmt = conn.prepareStatement("SELECT 1 FROM penalties WHERE competitionName=? AND matchNumber=?")) {
@@ -40,10 +38,8 @@ public class PenaltyRepositoryJdbcImpl implements PenaltyRepository {
 
             String sql;
             if (!exists) {
-                // 插入新记录
                 sql = "INSERT INTO penalties (competitionName, matchNumber, redMajor, redMinor, blueMajor, blueMinor, redScore, blueScore) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             } else {
-                // 更新现有记录：只更新当前联盟的数据
                 if (entry.getAlliance().equalsIgnoreCase("RED")) {
                     sql = "UPDATE penalties SET redMajor=?, redMinor=?, redScore=? WHERE competitionName=? AND matchNumber=?";
                 } else {
@@ -71,7 +67,6 @@ public class PenaltyRepositoryJdbcImpl implements PenaltyRepository {
                         pstmt.setInt(8, entry.getOfficialScore()); // blueScore
                     }
                 } else {
-                    // Update 逻辑
                     pstmt.setInt(1, entry.getMajorCount());
                     pstmt.setInt(2, entry.getMinorCount());
                     pstmt.setInt(3, entry.getOfficialScore());
@@ -80,10 +75,18 @@ public class PenaltyRepositoryJdbcImpl implements PenaltyRepository {
                 }
                 pstmt.executeUpdate();
             }
-            conn.commit(); // 提交事务
+            conn.commit(); // ★ 提交事务
         } catch (SQLException e) {
             System.err.println("Database Error saving penalty: " + e.getMessage());
-            e.printStackTrace();
+            // ★ 安全网：如果发生错误，立刻回滚事务，防止数据不一致或锁表
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
+        } finally {
+            // 恢复 autoCommit 状态并释放回连接池
+            if (conn != null) {
+                try { conn.setAutoCommit(true); conn.close(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
         }
     }
 
@@ -98,7 +101,7 @@ public class PenaltyRepositoryJdbcImpl implements PenaltyRepository {
                     map.put(rs.getInt("matchNumber"), new FullPenaltyRow(
                             rs.getInt("redMajor"), rs.getInt("redMinor"),
                             rs.getInt("blueMajor"), rs.getInt("blueMinor"),
-                            rs.getInt("redScore"), rs.getInt("blueScore") // ★ 读取分数
+                            rs.getInt("redScore"), rs.getInt("blueScore") // ★ 成功读取分数
                     ));
                 }
             }

@@ -1,346 +1,378 @@
 /* ==============================================
-   FTC Scouting Pro - Premium Black & Gold Theme
-   (Sleek Cyber-Luxury Edition)
+   FTC Scouting Pro - Spatial VisionOS / Next-Gen Black & Gold Theme
+   (iOS 27 Concept & OriginOS Fluid Aesthetics)
    ============================================== */
 
 * {
-    /* Define global color variables for the theme */
-    -color-bg-default: #080808;      /* 极夜黑底色 (Midnight Black Background) */
-    -color-bg-overlay: #111111;      /* 覆盖层深灰 (Overlay Dark Gray) */
+    /* 核心调色板：深空 OLED 黑与空间香槟金 */
+    -color-bg-root: #000000;
+    -color-bg-card: rgba(20, 20, 24, 0.65); /* 空间毛玻璃底色 */
+    -color-bg-panel: rgba(10, 10, 12, 0.5); /* 凹陷面板底色 */
 
-    -color-gold-base: #D4AF37;       /* 经典黄金色 (Classic Gold) */
-    -color-gold-light: #FFDF73;      /* 高亮明金色 (Highlight Bright Gold) */
-    -color-gold-dark: #8B7322;       /* 暗金色 (Dark Gold) */
+    /* 黄金层级 */
+    -color-gold-base: #D4AF37;
+    -color-gold-light: #FDE047;
+    -color-gold-dark: #8B7322;
+    -color-gold-glow: rgba(253, 224, 71, 0.4);
 
-    -color-gold-glow: rgba(212, 175, 55, 0.65); /* 黄金光晕 (Gold Glow) */
+    /* 文本层级 */
+    -color-text-main: #FFFFFF;
+    -color-text-normal: #E4E4E7;
+    -color-text-muted: #A1A1AA;
 
-    -color-text-main: #F2F2F2;       /* 主文本白 (Main Text White) */
-    -color-text-muted: #A69B7D;      /* 暗金灰 (Muted Text - Dark Gold Gray) */
+    /* 空间计算边缘光 (模拟玻璃切角折射) */
+    -color-glass-edge-top: rgba(255, 255, 255, 0.15);
+    -color-glass-edge-bottom: rgba(255, 255, 255, 0.02);
+    -color-glass-edge-side: rgba(255, 255, 255, 0.05);
 
-    /* Set default font family for the application */
     -fx-font-family: "-apple-system", "BlinkMacSystemFont", "SF Pro Display", "Inter", "Segoe UI", sans-serif;
+    -fx-font-smoothing-type: lcd;
 }
 
-.root { -fx-background-color: -color-bg-default; }
-.mono-text { -fx-font-family: "JetBrains Mono", "SF Mono", "Consolas", monospace; }
+.root {
+    -fx-background-color: -color-bg-root;
+}
+
+/* 原有背景渐变类保留 */
+.bg-gradient {
+    -fx-background-color: radial-gradient(focus-angle 45deg, focus-distance 20%, center 50% 50%, radius 100%, #17140B 0%, #000000 100%);
+}
+
+.mono-text {
+    -fx-font-family: "JetBrains Mono", "SF Mono", "Consolas", monospace;
+}
 
 /* ==============================================
-   Typography & Text Effects (排版与文本光效)
+   1. Typography (文字与光效) - 保留所有原有类名
    ============================================== */
-.label { -fx-text-fill: -color-text-main; }
+.label { -fx-text-fill: -color-text-normal; }
 
-/* Headers with gold color and glow effect */
-.title-2, .title-3, .title-4, .header-label {
-    -fx-text-fill: -color-gold-light;
-    -fx-font-weight: bold;
-    -fx-effect: dropshadow(gaussian, rgba(212, 175, 55, 0.5), 10, 0.3, 0, 0);
+/* 标题类：加入微弱的文字阴影，模拟屏幕像素发光 */
+.title-2, .title-3, .title-4, .header-label, .sub-header-label {
+    -fx-text-fill: -color-text-main;
+    -fx-font-weight: 800;
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.1), 5, 0.1, 0, 0);
 }
+.title-2 { -fx-font-size: 26px; }
+.title-3 { -fx-font-size: 20px; }
+.title-4 { -fx-font-size: 16px; }
+.header-label { -fx-font-size: 24px; -fx-text-fill: -color-gold-light; }
+.sub-header-label { -fx-font-size: 18px; -fx-text-fill: -color-gold-base; }
 
-/* Utility classes for text colors */
+/* 工具文本类 - 一个都不能少 */
+.text-bold { -fx-font-weight: bold; }
 .text-muted { -fx-text-fill: -color-text-muted; }
-.text-warning { -fx-text-fill: #FFB340; }
-.text-success { -fx-text-fill: #4ADE80; }
-.text-danger  { -fx-text-fill: #F87171; }
-.text-accent  { -fx-text-fill: -color-gold-light; -fx-effect: dropshadow(gaussian, -color-gold-glow, 10, 0.5, 0, 0); }
+.text-warning { -fx-text-fill: #FBBF24; -fx-effect: dropshadow(gaussian, rgba(251,191,36,0.3), 8, 0.3, 0, 0); }
+.text-success { -fx-text-fill: #34D399; -fx-effect: dropshadow(gaussian, rgba(52,211,153,0.3), 8, 0.3, 0, 0); }
+.text-danger  { -fx-text-fill: #F87171; -fx-effect: dropshadow(gaussian, rgba(248,113,113,0.3), 8, 0.3, 0, 0); }
+.text-accent  { -fx-text-fill: -color-gold-light; -fx-effect: dropshadow(gaussian, -color-gold-glow, 10, 0.4, 0, 0); }
 
 /* ==============================================
-   3D Cards & Panels (立体卡片 - Sleek Panels)
+   2. Spatial Cards & Panels (极致拟物玻璃容器)
    ============================================== */
-/* Main card style with border and shadow */
-.mac-card {
-    -fx-background-color: -color-bg-overlay;
+.mac-card, .card {
+    -fx-background-color: linear-gradient(to bottom right, #1A1A1E, #0A0A0C);
+    -fx-background-radius: 16px;
+    /* 核心秘诀 1：多段边框模拟玻璃厚度和切角反光 */
+    -fx-border-color: -color-glass-edge-top -color-glass-edge-side -color-glass-edge-bottom -color-glass-edge-side;
+    -fx-border-width: 1px;
+    -fx-border-radius: 16px;
+    /* 核心秘诀 2：弥散外阴影制造悬浮感 */
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.9), 40, 0.15, 0, 20);
+}
+
+.panel-inner {
+    /* 模拟挖空面板：背景变深，顶部产生内阴影 */
+    -fx-background-color: rgba(0, 0, 0, 0.4);
     -fx-background-radius: 12px;
-    -fx-border-color: #2A2415;
+    -fx-border-color: rgba(255, 255, 255, 0.04);
     -fx-border-width: 1px;
     -fx-border-radius: 12px;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.9), 20, 0.3, 0, 10);
+    -fx-padding: 18px;
+    /* 核心秘诀 3：内阴影模拟下凹立体感 */
+    -fx-effect: innershadow(gaussian, rgba(0,0,0,0.8), 10, 0.2, 0, 4);
 }
 
-/* Inner panel for nested content */
-.panel-inner {
-    -fx-background-color: #050505;
-    -fx-background-radius: 8px;
-    -fx-border-color: #1A160D;
-    -fx-border-width: 1px;
-    -fx-border-radius: 8px;
-    -fx-padding: 15px;
-}
-
-/* Radial gradient background */
-.bg-gradient {
-    -fx-background-color: radial-gradient(center 50% 50%, radius 90%, #17140B, #030303);
-}
-
-/* Top bar with bottom border gradient */
 .top-bar {
-    -fx-background-color: rgba(10, 8, 5, 0.95);
-    -fx-border-color: linear-gradient(to right, transparent, -color-gold-dark, transparent);
+    -fx-background-color: rgba(5, 5, 5, 0.85);
+    -fx-border-color: transparent transparent rgba(255, 255, 255, 0.08) transparent;
     -fx-border-width: 0 0 1px 0;
 }
 
-/* Energy separator line with fading ends (两端渐变消失的能量分割线) */
+.sidebar {
+    -fx-background-color: rgba(10, 10, 12, 0.3);
+    -fx-border-color: transparent transparent transparent rgba(255, 255, 255, 0.05);
+    -fx-border-width: 0 0 0 1px;
+}
+
 .separator *.line {
-    -fx-border-color: linear-gradient(to right, transparent, -color-gold-base, transparent);
-    -fx-border-width: 1.5 0 0 0;
+    -fx-border-color: linear-gradient(to right, transparent, rgba(212,175,55,0.5), transparent);
+    -fx-border-width: 1px 0 0 0;
     -fx-border-style: solid;
     -fx-background-color: transparent;
-    -fx-effect: dropshadow(gaussian, -color-gold-glow, 8, 0.3, 0, 0);
-}
-
-/* Input Fields (输入框) */
-.text-field, .password-field {
-    -fx-background-color: #050505;
-    -fx-text-fill: -color-gold-light;
-    -fx-border-color: #332C17;
-    -fx-border-width: 1px;
-    -fx-border-radius: 4px;
-    -fx-background-radius: 4px;
-    -fx-padding: 10px;
-}
-/* Focus state with glow */
-.text-field:focused, .password-field:focused {
-    -fx-border-color: -color-gold-light;
-    -fx-effect: dropshadow(gaussian, -color-gold-glow, 10, 0.5, 0, 0);
 }
 
 /* ==============================================
-   Minimalist Glowing Outline Buttons (极简发光描边按钮)
-   Using !important to override hardcoded Java styles
+   3. Inputs & Forms (光影呼吸输入框)
    ============================================== */
-.button {
-    -fx-background-color: rgba(20, 20, 20, 0.6) !important;
-    -fx-border-color: #4A4022 !important;
-    -fx-text-fill: -color-text-muted !important;
-    -fx-border-width: 1px !important;
-    -fx-border-radius: 6px !important;
-    -fx-background-radius: 6px !important;
-    -fx-padding: 8 16 8 16 !important;
-    -fx-cursor: hand !important;
-}
-
-/* Hover state: Brighten border and add glow */
-.button:hover {
-    -fx-background-color: rgba(212, 175, 55, 0.08) !important;
-    -fx-border-color: -color-gold-light !important;
-    -fx-text-fill: -color-gold-light !important;
-    -fx-effect: dropshadow(gaussian, -color-gold-glow, 12, 0.4, 0, 0) !important;
-}
-
-/* Pressed state: Slight movement and background change */
-.button:pressed {
-    -fx-background-color: rgba(212, 175, 55, 0.15) !important;
-    -fx-translate-y: 1px;
-}
-
-/* Accent Button (主强调按钮) */
-.button.accent {
-    -fx-border-color: -color-gold-base !important;
-    -fx-text-fill: -color-gold-base !important;
-    -fx-background-color: rgba(212, 175, 55, 0.1) !important;
-}
-.button.accent:hover {
-    -fx-border-color: -color-gold-light !important;
-    -fx-text-fill: -color-gold-light !important;
-    -fx-background-color: rgba(212, 175, 55, 0.2) !important;
-    -fx-effect: dropshadow(gaussian, -color-gold-glow, 15, 0.6, 0, 0) !important;
-}
-
-/* Override View buttons in tables to be smaller */
-.table-view .button {
-    -fx-padding: 3 8 3 8 !important;
-    -fx-font-size: 11px !important;
-}
-
-/* Status Buttons with forced glow */
-.button.success { -fx-border-color: #2F6B38 !important; -fx-text-fill: #A3F5B1 !important; }
-.button.success:hover { -fx-border-color: #4ADE80 !important; -fx-text-fill: #FFFFFF !important; -fx-effect: dropshadow(gaussian, rgba(74,222,128,0.5), 12, 0.4, 0, 0) !important; }
-.button.danger { -fx-border-color: #6B2F2F !important; -fx-text-fill: #F5A3A3 !important; }
-.button.danger:hover { -fx-border-color: #F87171 !important; -fx-text-fill: #FFFFFF !important; -fx-effect: dropshadow(gaussian, rgba(248,113,113,0.5), 12, 0.4, 0, 0) !important; }
-
-/* ==============================================
-   Glowing Top Strip Tabs (顶部光带标签页)
-   ============================================== */
-.tab-pane .tab-header-area .tab-header-background {
-    -fx-background-color: transparent;
-}
-
-.tab-pane .tab {
-    -fx-background-color: transparent;
-    -fx-border-width: 0 0 1px 0;
-    -fx-border-color: transparent transparent #222 transparent;
-    -fx-background-radius: 0;
-    -fx-padding: 5 20 5 20;
-}
-
-/* Selected Tab: Top gold border and gradient glow */
-.tab-pane .tab:selected {
-    /* 选中时：顶部出现 3px 亮金边框，背景产生从上到下的金色渐变光晕 */
-    -fx-background-color: linear-gradient(to bottom, rgba(212,175,55,0.15) 0%, transparent 80%);
-    -fx-border-width: 3px 0 1px 0;
-    -fx-border-color: -color-gold-light transparent #222 transparent;
-}
-
-.tab-pane .tab:selected .tab-label {
-    -fx-text-fill: -color-gold-light;
-    -fx-font-weight: bold;
-    -fx-effect: dropshadow(gaussian, -color-gold-glow, 8, 0.4, 0, 0);
-}
-
-.tab-pane .tab .tab-label {
-    -fx-text-fill: -color-text-muted;
-}
-
-/* ==============================================
-   Table View Styling (修复表格文字黑色的问题)
-   ============================================== */
-.table-view, .list-view {
-    -fx-background-color: transparent;
-    -fx-border-color: #2A2415;
+.text-field, .password-field, .text-area {
+    -fx-background-color: rgba(0, 0, 0, 0.5);
+    -fx-text-fill: -color-text-main;
+    -fx-prompt-text-fill: #52525B;
+    -fx-border-color: rgba(255, 255, 255, 0.1);
+    -fx-border-width: 1.5px;
     -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 10px 14px;
+    -fx-effect: innershadow(gaussian, rgba(0,0,0,0.5), 5, 0, 0, 2);
 }
 
-/* Column Headers */
+/* 焦点状态：边框变金，且向外辐射光晕 */
+.text-field:focused, .password-field:focused ,text-area:focused {
+    -fx-border-color: #FDE047;
+    -fx-background-color: rgba(0, 0, 0, 0.8);
+    -fx-effect: dropshadow(gaussian, rgba(253, 224, 71, 0.4), 10, 0.5, 0, 0);
+}
+
+/* ==============================================
+   4. Buttons (质感满级的 3D 浮雕交互)
+   ============================================== */
+/* 默认普通按钮 */
+.button {
+    -fx-background-color: linear-gradient(to bottom, rgba(50,50,55,0.8), rgba(25,25,30,0.8));
+    -fx-border-color: rgba(255,255,255,0.15) rgba(255,255,255,0.05) rgba(0,0,0,0.8) rgba(255,255,255,0.05);
+    -fx-text-fill: -color-text-main !important;
+    -fx-border-width: 1px !important;
+    -fx-border-radius: 8px !important;
+    -fx-background-radius: 8px !important;
+    -fx-padding: 8px 18px !important;
+    -fx-cursor: hand !important;
+    -fx-font-weight: 700 !important;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 8, 0.2, 0, 4);
+}
+
+.button:hover {
+    -fx-background-color: linear-gradient(to bottom, rgba(70,70,75,0.9), rgba(35,35,40,0.9));
+    -fx-border-color: rgba(255,255,255,0.25) rgba(255,255,255,0.1) rgba(0,0,0,0.8) rgba(255,255,255,0.1);
+}
+
+.button:pressed {
+    -fx-background-color: rgba(15,15,18,0.9);
+    -fx-border-color: rgba(0,0,0,0.8) rgba(255,255,255,0.05) rgba(255,255,255,0.1) rgba(255,255,255,0.05);
+    -fx-translate-y: 2px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0), 0, 0, 0, 0); /* 按下时阴影消失，体现物理反馈 */
+}
+
+/* ★ 核心：Accent 主力金按钮（拟真金属反光与光效） */
+.button.accent {
+    -fx-background-color: linear-gradient(to bottom, #FDE047 0%, #D4AF37 100%);
+    -fx-border-color: #FFFDE7 transparent transparent transparent !important; /* 仅顶部纯白高光 */
+    -fx-border-width: 1px !important;
+    -fx-text-fill: #000000 !important;
+    -fx-effect: dropshadow(gaussian, rgba(253, 224, 71, 0.6), 15, 0.4, 0, 0) !important;
+}
+
+.button.accent:hover {
+    -fx-background-color: linear-gradient(to bottom, #FEF08A 0%, #FDE047 40%, #EAB308 100%);
+    -fx-effect: dropshadow(gaussian, rgba(253, 224, 71, 0.7), 25, 0.4, 0, 8) !important;
+}
+
+/* 状态按钮（带色彩的玻璃微质感） */
+.button.success {
+    -fx-background-color: linear-gradient(to bottom, rgba(16, 185, 129, 0.2), rgba(4, 120, 87, 0.2));
+    -fx-border-color: rgba(52, 211, 153, 0.6) rgba(52, 211, 153, 0.2) rgba(0,0,0,0.5) rgba(52, 211, 153, 0.2) !important;
+    -fx-text-fill: #A7F3D0 !important;
+}
+.button.success:hover { -fx-background-color: linear-gradient(to bottom, rgba(16, 185, 129, 0.4), rgba(4, 120, 87, 0.4)); -fx-effect: dropshadow(gaussian, rgba(52,211,153,0.4), 15, 0.3, 0, 4); }
+
+.button.danger {
+    -fx-background-color: linear-gradient(to bottom, rgba(239, 68, 68, 0.2), rgba(185, 28, 28, 0.2));
+    -fx-border-color: rgba(248, 113, 113, 0.6) rgba(248, 113, 113, 0.2) rgba(0,0,0,0.5) rgba(248, 113, 113, 0.2) !important;
+    -fx-text-fill: #FECACA !important;
+}
+.button.danger:hover { -fx-background-color: linear-gradient(to bottom, rgba(239, 68, 68, 0.4), rgba(185, 28, 28, 0.4)); -fx-effect: dropshadow(gaussian, rgba(248,113,113,0.4), 15, 0.3, 0, 4); }
+
+.button.warning {
+    -fx-background-color: linear-gradient(to bottom, rgba(245, 158, 11, 0.2), rgba(180, 83, 9, 0.2));
+    -fx-border-color: rgba(251, 191, 36, 0.6) rgba(251, 191, 36, 0.2) rgba(0,0,0,0.5) rgba(251, 191, 36, 0.2) !important;
+    -fx-text-fill: #FDE68A !important;
+}
+.button.warning:hover { -fx-background-color: linear-gradient(to bottom, rgba(245, 158, 11, 0.4), rgba(180, 83, 9, 0.4)); -fx-effect: dropshadow(gaussian, rgba(251,191,36,0.4), 15, 0.3, 0, 4); }
+
+/* TableView 内的按钮调整 */
+.table-view .button {
+    -fx-padding: 4px 10px !important;
+    -fx-font-size: 11px !important;
+    -fx-effect: none !important; /* 表格里不需要大发光 */
+}
+
+/* ==============================================
+   5. Data Views (高级数据图表/列表交互)
+   ============================================== */
+.table-view, .list-view, .scroll-pane {
+    -fx-background-color: transparent;
+    -fx-border-color: rgba(255, 255, 255, 0.08);
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
+}
+.edge-to-edge {
+    -fx-border-width: 0 !important;
+}
+
+/* 表头：高级深色磨砂感 */
 .table-view .column-header-background {
-    -fx-background-color: #0A0A0A;
-    -fx-border-color: transparent transparent #2A2415 transparent;
+    -fx-background-color: rgba(0, 0, 0, 0.8);
+    -fx-background-radius: 12px 12px 0 0;
+    -fx-border-color: transparent transparent rgba(255, 255, 255, 0.1) transparent;
     -fx-border-width: 1px;
 }
+.table-view .column-header { -fx-background-color: transparent; -fx-border-width: 0; }
+.table-view .column-header .label { -fx-text-fill: -color-gold-base; -fx-font-weight: 800; }
 
-.table-view .column-header {
+/* 行与斑马纹 (.striped) */
+.table-row-cell, .list-cell {
     -fx-background-color: transparent;
-    -fx-border-color: #2A2415;
-    -fx-border-width: 0 1px 0 0;
+    -fx-table-cell-border-color: transparent;
+    -fx-border-color: transparent transparent rgba(255,255,255,0.03) transparent;
+    -fx-border-width: 1px;
+    -fx-padding: 10px 8px;
+    -fx-text-fill: -color-text-main !important;
+}
+.striped .table-row-cell:odd, .list-cell:odd {
+    -fx-background-color: rgba(255, 255, 255, 0.02);
 }
 
-.table-view .column-header .label {
-    -fx-text-fill: -color-gold-base;
+/* 列表/表格交互动画体验 */
+.table-row-cell:hover, .list-cell:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.08) !important;
+    -fx-cursor: hand;
 }
-
-/* Row Cells */
-.table-row-cell {
-    -fx-background-color: #0A0A0A;
-    -fx-table-cell-border-color: #111111;
+.table-row-cell:selected, .list-cell:selected {
+    /* 选中时，产生从左侧发出的金属光泽背景 */
+    -fx-background-color: linear-gradient(to right, rgba(212, 175, 55, 0.25) 0%, rgba(0,0,0,0) 100%) !important;
+    -fx-border-color: transparent transparent transparent -color-gold-light;
+    -fx-border-width: 0 0 0 4px;
 }
-
-/* Zebra striping for rows */
-.table-row-cell:odd {
-    -fx-background-color: #0F0D0A;
-}
-
-/* Selected row style */
-.table-row-cell:selected {
-    -fx-background-color: rgba(212, 175, 55, 0.15);
-}
-
-/* Force table cell text to be white, highlight gold when selected */
-.table-view .table-cell {
-    -fx-text-fill: #E0E0E0 !important;
-}
-.table-row-cell:selected .table-cell {
+.table-view .table-cell { -fx-text-fill: #E4E4E7 !important; }
+.table-row-cell:selected .table-cell, .list-cell:selected {
     -fx-text-fill: -color-gold-light !important;
     -fx-font-weight: bold;
 }
 
 /* ==============================================
-   Toggle Controls (开关控件)
+   6. Toggles, Checkboxes & Tabs (细致入微的控件)
    ============================================== */
 .toggle-button {
-    -fx-background-color: #111;
+    -fx-background-color: rgba(20, 20, 25, 0.8);
     -fx-text-fill: -color-text-muted;
-    -fx-border-color: #332C17;
-    -fx-border-radius: 4px;
-    -fx-background-radius: 4px;
+    -fx-border-color: rgba(255,255,255,0.1);
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
     -fx-cursor: hand;
+    -fx-font-weight: 600;
 }
+.toggle-button:hover { -fx-background-color: rgba(40, 40, 45, 0.8); }
 .toggle-button:selected {
     -fx-background-color: rgba(212, 175, 55, 0.2);
-    -fx-text-fill: -color-gold-light;
     -fx-border-color: -color-gold-base;
-    -fx-effect: dropshadow(gaussian, -color-gold-glow, 10, 0.3, 0, 0);
+    -fx-text-fill: -color-gold-light;
+    -fx-effect: dropshadow(gaussian, rgba(212,175,55,0.4), 10, 0.2, 0, 0);
 }
-/* ==============================================
-   Box Toggles (修改为方形列表)
-   ============================================== */
+
 .box-toggle {
-    -fx-background-color: #111111;
-    -fx-border-color: #332C17;
+    -fx-background-color: rgba(10, 10, 15, 0.6);
+    -fx-border-color: rgba(255,255,255,0.08);
     -fx-text-fill: -color-text-muted;
-    -fx-border-radius: 4px;
-    -fx-background-radius: 4px;
-    -fx-padding: 4 10;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-padding: 6px 12px;
     -fx-cursor: hand;
-    -fx-font-weight: bold;
+    -fx-font-weight: 700;
     -fx-font-size: 11px;
     -fx-alignment: center;
     -fx-min-width: 55px;
     -fx-max-width: 55px;
-    -fx-min-height: 28px;
-}
-.box-toggle:hover {
-    -fx-background-color: #1A1A1A;
-    -fx-border-color: -color-gold-dark;
 }
 .box-toggle:selected {
-    -fx-background-color: rgba(212, 175, 55, 0.25);
+    -fx-background-color: rgba(253, 224, 71, 0.15);
     -fx-border-color: -color-gold-light;
     -fx-text-fill: -color-gold-light;
-    -fx-effect: dropshadow(gaussian, -color-gold-glow, 8, 0.5, 0, 0);
+    -fx-effect: dropshadow(gaussian, -color-gold-glow, 12, 0.4, 0, 0);
 }
 
-/* Checkbox styling */
-.check-box .box {
-    -fx-background-color: #050505;
-    -fx-border-color: -color-gold-dark;
+.check-box .box, .radio-button .radio {
+    -fx-background-color: rgba(0, 0, 0, 0.5);
+    -fx-border-color: rgba(255,255,255,0.2);
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
 }
-.check-box:selected .mark {
+.radio-button .radio { -fx-border-radius: 100px; -fx-background-radius: 100px; }
+.check-box:selected .mark, .radio-button:selected .dot {
     -fx-background-color: -color-gold-light;
 }
-.check-box:selected .box {
+.check-box:selected .box, .radio-button:selected .radio {
     -fx-border-color: -color-gold-light;
     -fx-effect: dropshadow(gaussian, -color-gold-glow, 6, 0.5, 0, 0);
 }
 
-/* ==============================================
-   List View Controls (列表控件 - Hub页面的赛事选择列表等)
-   ============================================== */
-.list-view {
+/* 顶部标签页 (Tabs) 光感 */
+.tab-pane .tab-header-area .tab-header-background { -fx-background-color: transparent; }
+.tab-pane .tab {
     -fx-background-color: transparent;
-    -fx-border-color: #2A2415;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
+    -fx-border-width: 0;
+    -fx-padding: 10px 25px;
+}
+.tab-pane .tab:selected {
+    -fx-background-color: linear-gradient(to bottom, rgba(212,175,55,0.1) 0%, transparent 100%);
+    -fx-border-color: -color-gold-light transparent transparent transparent;
+    -fx-border-width: 3px 0 0 0;
+}
+.tab-pane .tab:selected .tab-label {
+    -fx-text-fill: -color-gold-light;
+    -fx-font-weight: 800;
+    -fx-effect: dropshadow(gaussian, -color-gold-glow, 8, 0.4, 0, 0);
+}
+.tab-pane .tab .tab-label { -fx-text-fill: -color-text-muted; -fx-font-weight: 600; }
+/* FTC 赛场专属底层背景 */
+.heatmap-bg-pane {
+    -fx-background-image: url('../images/ftc_bg.jpg');
+    -fx-background-size: cover;
+    -fx-background-position: center;
+}
+/* 状态胶囊 (Cyber Badges) */
+.cyber-badge-success {
+    -fx-background-color: rgba(52, 211, 153, 0.15);
+    -fx-border-color: #34D399;
+    -fx-border-radius: 4px; -fx-background-radius: 4px;
+    -fx-padding: 2px 6px; -fx-font-size: 10px; -fx-font-weight: 800;
+    -fx-text-fill: #34D399; -fx-effect: dropshadow(gaussian, rgba(52,211,153,0.5), 5, 0.5, 0, 0);
+}
+.cyber-badge-danger {
+    -fx-background-color: rgba(248, 113, 113, 0.15);
+    -fx-border-color: #F87171;
+    -fx-border-radius: 4px; -fx-background-radius: 4px;
+    -fx-padding: 2px 6px; -fx-font-size: 10px; -fx-font-weight: 800;
+    -fx-text-fill: #F87171; -fx-effect: dropshadow(gaussian, rgba(248,113,113,0.5), 5, 0.5, 0, 0);
+}
+/* ==============================================
+   7. Custom View Backgrounds (全局视图背景)
+   ============================================== */
+
+/* ==============================================
+   7. Custom View Backgrounds (全局视图背景)
+   ============================================== */
+
+
+.hub-bg-pane {
+    -fx-background-image: url('../images/hub_bg.png');
+    -fx-background-position: center center;
+    -fx-background-size: cover;
+    -fx-background-repeat: no-repeat;
 }
 
-/* Default list cell style */
-.list-cell {
-    -fx-background-color: #0A0A0A;
-    -fx-text-fill: #E0E0E0 !important;
-    -fx-padding: 10 15 10 15; /* Increase padding for spacious look */
-    -fx-font-size: 14px;
-}
-
-/* Zebra striping for list items */
-.list-cell:odd {
-    -fx-background-color: #0F0D0A;
-}
-
-/* Hover effect */
-.list-cell:hover {
-    -fx-background-color: rgba(255, 255, 255, 0.05) !important;
-    -fx-cursor: hand;
-}
-
-/* Selected state: Gold background and text */
-.list-cell:selected {
-    -fx-background-color: rgba(212, 175, 55, 0.15) !important;
-    -fx-text-fill: -color-gold-light !important;
-    -fx-font-weight: bold !important;
-    /* Left gold indicator line when selected */
-    -fx-border-color: transparent transparent transparent -color-gold-light;
-    -fx-border-width: 0 0 0 3px;
-}
-
-/* Selected and hovered state */
-.list-cell:selected:hover {
-    -fx-background-color: rgba(212, 175, 55, 0.25) !important;
-    -fx-cursor: hand;
+.main-bg-pane {
+    -fx-background-image: url('../images/main_bg.png');
+    -fx-background-position: center center;
+    -fx-background-size: cover;
+    -fx-background-repeat: no-repeat;
 }
