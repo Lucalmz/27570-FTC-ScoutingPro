@@ -164,6 +164,8 @@ public class MainApplication extends Application {
         stage.show();
     }
 
+    // File: src/main/java/com/bear27570/ftc/scouting/MainApplication.java
+
     public void showHeatmapView(Competition competition, int teamNum) throws IOException {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("fxml/HeatmapView.fxml"));
         Stage stage = new Stage();
@@ -171,7 +173,17 @@ public class MainApplication extends Application {
         List<ScoreEntry> matches = matchDataService.getTeamHistory(competition.getName(), teamNum);
         stage.setTitle("Heatmap - Team " + teamNum);
         setStageIcon(stage);
-        Scene scene = new Scene(loader.load());
+
+        // ★ 修复 1：给定一个初始的合理大小，而不是任由内容无限撑开
+        Scene scene = new Scene(loader.load(), 1200, 800);
+
+        // ★ 修复 2：动态获取当前屏幕的真实可用边界
+        javafx.geometry.Rectangle2D screenBounds = javafx.stage.Screen.getPrimary().getVisualBounds();
+
+        // ★ 修复 3：强行限制最大高度和宽度（留出 40px 的安全边距）
+        stage.setMaxHeight(screenBounds.getHeight() - 40);
+        stage.setMaxWidth(screenBounds.getWidth());
+
         applyTheme(scene);
         stage.setScene(scene);
         HeatmapController controller = loader.getController();

@@ -1,4 +1,4 @@
-// File: HubController.java
+// File: src/main/java/com/bear27570/ftc/scouting/controllers/HubController.java
 package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.MainApplication;
@@ -37,7 +37,6 @@ public class HubController {
         welcomeLabel.setText("Welcome, " + username + "!");
         discoveredCompetitionsListView.setItems(discoveredCompetitions);
 
-        // 初始状态优化：隐藏面板
         hostPane.setVisible(false); hostPane.setManaged(false);
         joinPane.setVisible(false); joinPane.setManaged(false);
 
@@ -46,24 +45,34 @@ public class HubController {
 
     @FXML
     private void selectHostMode() {
-        hostPane.setVisible(true); hostPane.setManaged(true);
-        joinPane.setVisible(false); joinPane.setManaged(false);
-        statusLabel.setStyle("-fx-text-fill: #a6adc8;");
-        statusLabel.setText("Host Mode: Select a competition to start.");
-        hostModeButton.setStyle("-fx-background-color: rgba(212, 175, 55, 0.25) !important; -fx-border-color: #FFDF73 !important; -fx-text-fill: #FFDF73 !important; -fx-effect: dropshadow(gaussian, rgba(212, 175, 55, 0.65), 15, 0.5, 0, 0) !important;");
-        joinModeButton.setStyle("");
+        if (!hostPane.isVisible()) {
+            hostPane.setVisible(true); hostPane.setManaged(true);
+            joinPane.setVisible(false); joinPane.setManaged(false);
+
+            statusLabel.setStyle("-fx-text-fill: #a6adc8;");
+            statusLabel.setText("Host Mode: Select a competition to start.");
+            hostModeButton.setStyle("-fx-background-color: rgba(212, 175, 55, 0.25) !important; -fx-border-color: #FFDF73 !important; -fx-text-fill: #FFDF73 !important; -fx-effect: dropshadow(gaussian, rgba(212, 175, 55, 0.65), 15, 0.5, 0, 0) !important;");
+            joinModeButton.setStyle("");
+
+            AnimationUtils.playSmoothEntrance(hostPane);
+        }
     }
 
     @FXML
     private void selectJoinMode() {
-        hostPane.setVisible(false); hostPane.setManaged(false);
-        joinPane.setVisible(true); joinPane.setManaged(true);
-        statusLabel.setStyle("-fx-text-fill: #f9e2af;");
-        statusLabel.setText("Searching for local competitions via UDP...");
-        joinModeButton.setStyle("-fx-background-color: rgba(212, 175, 55, 0.25) !important; -fx-border-color: #FFDF73 !important; -fx-text-fill: #FFDF73 !important; -fx-effect: dropshadow(gaussian, rgba(212, 175, 55, 0.65), 15, 0.5, 0, 0) !important;");
-        hostModeButton.setStyle("");
-        discoveredCompetitions.clear();
-        NetworkService.getInstance().startDiscovery(discoveredCompetitions);
+        if (!joinPane.isVisible()) {
+            hostPane.setVisible(false); hostPane.setManaged(false);
+            joinPane.setVisible(true); joinPane.setManaged(true);
+
+            statusLabel.setStyle("-fx-text-fill: #f9e2af;");
+            statusLabel.setText("Searching for local competitions via UDP...");
+            joinModeButton.setStyle("-fx-background-color: rgba(212, 175, 55, 0.25) !important; -fx-border-color: #FFDF73 !important; -fx-text-fill: #FFDF73 !important; -fx-effect: dropshadow(gaussian, rgba(212, 175, 55, 0.65), 15, 0.5, 0, 0) !important;");
+            hostModeButton.setStyle("");
+            discoveredCompetitions.clear();
+            NetworkService.getInstance().startDiscovery(discoveredCompetitions);
+
+            AnimationUtils.playSmoothEntrance(joinPane);
+        }
     }
 
     private void refreshMyCompetitionsList() {
@@ -99,7 +108,7 @@ public class HubController {
     }
 
     @FXML
-    private void handleJoinButton() { // ★ 修复点：去掉 throws IOException，不要抛给 JavaFX
+    private void handleJoinButton() {
         Competition selected = discoveredCompetitionsListView.getSelectionModel().getSelectedItem();
         if (selected == null) {
             statusLabel.setStyle("-fx-text-fill: #fab387;");
@@ -124,7 +133,6 @@ public class HubController {
                 }
             });
         } catch (IOException e) {
-            // ★ 修复点：捕获网络拒绝连接的异常，不仅防止了软件崩溃，还能在 UI 上友好提示用户
             statusLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold;");
             statusLabel.setText("Connection failed: Host may be offline or closed.");
         }
@@ -144,7 +152,6 @@ public class HubController {
         }
 
         try {
-            // ★ 核心修复：传入 currentUsername
             mainApp.showAllianceAnalysisView(selected, currentUsername);
         } catch (IOException e) {
             e.printStackTrace();

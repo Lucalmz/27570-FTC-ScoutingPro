@@ -57,12 +57,26 @@
                     <HBox spacing="15">
                         <VBox spacing="10" styleClass="panel-inner" style="-fx-border-color: rgba(251, 191, 36, 0.4); -fx-background-color: rgba(0,0,0,0.4);" HBox.hgrow="ALWAYS">
                             <Label text="Far Zone" styleClass="text-warning" style="-fx-font-weight: bold;"/>
-                            <HBox spacing="10"><Label text="Avg:" styleClass="text-muted"/><Label fx:id="farShotsLabel" style="-fx-text-fill: -color-text-main;"/></HBox>
+                            <HBox spacing="10">
+                                <Label text="Avg Hits:" styleClass="text-muted"/>
+                                <Label fx:id="farShotsLabel" style="-fx-text-fill: -color-text-main;"/>
+                            </HBox>
+                            <HBox spacing="10">
+                                <Label text="Accuracy:" styleClass="text-muted"/>
+                                <Label fx:id="farAccLabel" style="-fx-text-fill: -color-text-main;"/>
+                            </HBox>
                         </VBox>
 
                         <VBox spacing="10" styleClass="panel-inner" style="-fx-border-color: rgba(52, 211, 153, 0.4); -fx-background-color: rgba(0,0,0,0.4);" HBox.hgrow="ALWAYS">
                             <Label text="Near Zone" styleClass="text-success" style="-fx-font-weight: bold;"/>
-                            <HBox spacing="10"><Label text="Avg:" styleClass="text-muted"/><Label fx:id="nearShotsLabel" style="-fx-text-fill: -color-text-main;"/></HBox>
+                            <HBox spacing="10">
+                                <Label text="Avg Hits:" styleClass="text-muted"/>
+                                <Label fx:id="nearShotsLabel" style="-fx-text-fill: -color-text-main;"/>
+                            </HBox>
+                            <HBox spacing="10">
+                                <Label text="Accuracy:" styleClass="text-muted"/>
+                                <Label fx:id="nearAccLabel" style="-fx-text-fill: -color-text-main;"/>
+                            </HBox>
                         </VBox>
                     </HBox>
                 </VBox>

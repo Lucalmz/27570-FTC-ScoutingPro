@@ -323,9 +323,7 @@
     -fx-padding: 10px 25px;
 }
 .tab-pane .tab:selected {
-    -fx-background-color: linear-gradient(to bottom, rgba(212,175,55,0.1) 0%, transparent 100%);
-    -fx-border-color: -color-gold-light transparent transparent transparent;
-    -fx-border-width: 3px 0 0 0;
+    -fx-border-width: 0;
 }
 .tab-pane .tab:selected .tab-label {
     -fx-text-fill: -color-gold-light;

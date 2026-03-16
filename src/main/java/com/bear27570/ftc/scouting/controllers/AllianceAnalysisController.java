@@ -1,4 +1,4 @@
-// File: AllianceAnalysisController.java
+// File: src/main/java/com/bear27570/ftc/scouting/controllers/AllianceAnalysisController.java
 package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.models.Competition;
@@ -10,7 +10,7 @@ import com.bear27570.ftc.scouting.services.domain.UserService;
 import com.bear27570.ftc.scouting.services.network.GeminiApiClient;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
-import javafx.concurrent.Worker; // 必须导入这个
+import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
@@ -55,7 +55,6 @@ public class AllianceAnalysisController {
     @FXML private TextField proxyPortField;
 
     private WebEngine webEngine;
-    // ★ 修复核心：JS 指令缓冲队列
     private final Queue<String> jsQueue = new LinkedList<>();
 
     private Competition competition;
@@ -67,6 +66,17 @@ public class AllianceAnalysisController {
     private static final double ZONE_DIVIDER_Y = 400.0;
 
     private GeminiApiClient geminiApiClient;
+
+    // ★ 聊天记录管理
+    private static class ChatMessage {
+        String role; // "SYS", "USER", "AI"
+        String text;
+        boolean isError;
+        ChatMessage(String role, String text, boolean isError) {
+            this.role = role; this.text = text; this.isError = isError;
+        }
+    }
+    private List<ChatMessage> chatHistory = new ArrayList<>();
 
     public void setDependencies(Stage dialogStage, Competition competition, RankingService rankingService, MatchDataService matchDataService, UserService userService, String currentUsername) {
         this.dialogStage = dialogStage;
@@ -81,19 +91,17 @@ public class AllianceAnalysisController {
         String savedKey = userService.getApiKey(currentUsername);
         if (savedKey != null && !savedKey.isEmpty()) {
             apiKeyField.setText(savedKey);
-            appendSystemMessage("✅ Gemini API Key loaded from your profile.");
+            addMessageToHistory("SYS", "✅ Gemini API Key loaded from your profile.", false);
         } else {
-            appendSystemMessage("⚠️ Please link a Gemini API Key to use the AI Assistant.");
+            addMessageToHistory("SYS", "⚠️ Please link a Gemini API Key to use the AI Assistant.", false);
         }
     }
 
     @FXML public void initialize() {
         webEngine = chatWebView.getEngine();
 
-        // ★ 修复核心：监听加载状态，加载完成后才执行队列里的 JS
         webEngine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
             if (newState == Worker.State.SUCCEEDED) {
-                // 页面加载完成，清空队列
                 while (!jsQueue.isEmpty()) {
                     webEngine.executeScript(jsQueue.poll());
                 }
@@ -131,14 +139,11 @@ public class AllianceAnalysisController {
         proxyPortField.disableProperty().bind(useProxyCheck.selectedProperty().not());
     }
 
-    // ★ 修复核心：安全的 JS 执行方法
     private void safeExecuteScript(String script) {
         Platform.runLater(() -> {
             if (webEngine.getLoadWorker().getState() == Worker.State.SUCCEEDED) {
-                // 页面已就绪，直接执行
                 webEngine.executeScript(script);
             } else {
-                // 页面未就绪，加入队列等待
                 jsQueue.add(script);
             }
         });
@@ -233,23 +238,36 @@ public class AllianceAnalysisController {
         return text.replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
     }
 
-    private void appendSystemMessage(String text) {
+    // --- 新增：Java端统一消息记录和全量刷新 ---
+    private void addMessageToHistory(String role, String text, boolean isError) {
+        chatHistory.add(new ChatMessage(role, text, isError));
+        if (role.equals("SYS")) appendSystemMessageJS(text);
+        else if (role.equals("USER")) appendUserMessageJS(text);
+        else appendAiMessageJS(text, isError);
+    }
+
+    private void redrawChat() {
+        safeExecuteScript("document.getElementById('chat-box').innerHTML = '';");
+        for (ChatMessage msg : chatHistory) {
+            if (msg.role.equals("SYS")) appendSystemMessageJS(msg.text);
+            else if (msg.role.equals("USER")) appendUserMessageJS(msg.text);
+            else appendAiMessageJS(msg.text, msg.isError);
+        }
+    }
+
+    private void appendSystemMessageJS(String text) {
         safeExecuteScript("addSysMsg('" + escapeJsString(text) + "');");
     }
 
-    private void appendUserMessage(String text) {
+    private void appendUserMessageJS(String text) {
         safeExecuteScript("addUserMsg('" + escapeJsString(text) + "');");
     }
 
-    private void appendAiMessage(String text, boolean isError) {
+    private void appendAiMessageJS(String text, boolean isError) {
         Platform.runLater(() -> {
             try {
-                // 将所有文本进行 URL 编码（将 + 号替换回 %20 以防空格丢失）
-                // 这样无论 AI 返回 </script> 还是带有各种转义符，都变成了纯粹的字母和%符号
                 String safeEncodedText = URLEncoder.encode(text, StandardCharsets.UTF_8).replace("+", "%20");
-
                 safeExecuteScript("removeThinking();");
-                // 在 JS 侧通过 decodeURIComponent 还原出原本的 Markdown 字符串
                 safeExecuteScript("addAiMsg(decodeURIComponent('" + safeEncodedText + "'), " + isError + ");");
             } catch (Exception e) {
                 e.printStackTrace();
@@ -261,14 +279,49 @@ public class AllianceAnalysisController {
         safeExecuteScript("showThinking();");
     }
 
-    // ========== API Chat 功能区 ==========
+    // ========== API Chat 工具栏功能区 ==========
+
+    @FXML
+    private void handleEditLastPrompt() {
+        int lastUserIdx = -1;
+        for (int i = chatHistory.size() - 1; i >= 0; i--) {
+            if (chatHistory.get(i).role.equals("USER")) { lastUserIdx = i; break; }
+        }
+        if (lastUserIdx != -1) {
+            String lastPrompt = chatHistory.get(lastUserIdx).text;
+            chatInputField.setText(lastPrompt);
+            chatHistory.subList(lastUserIdx, chatHistory.size()).clear(); // 移除它和之后的AI回答
+            redrawChat();
+        }
+    }
+
+    @FXML
+    private void handleRegenerate() {
+        int lastUserIdx = -1;
+        for (int i = chatHistory.size() - 1; i >= 0; i--) {
+            if (chatHistory.get(i).role.equals("USER")) { lastUserIdx = i; break; }
+        }
+        if (lastUserIdx != -1) {
+            String lastPrompt = chatHistory.get(lastUserIdx).text;
+            chatHistory.subList(lastUserIdx + 1, chatHistory.size()).clear(); // 只移除AI回答
+            redrawChat();
+            executeGeminiCall(lastPrompt);
+        }
+    }
+
+    @FXML
+    private void handleClearChat() {
+        chatHistory.clear();
+        redrawChat();
+        addMessageToHistory("SYS", "Chat history cleared.", false);
+    }
 
     @FXML
     private void handleSaveApiKey() {
         String key = apiKeyField.getText();
         if (key != null && !key.isEmpty()) {
             userService.updateApiKey(currentUsername, key);
-            appendSystemMessage("✅ API Key saved successfully to your account!");
+            addMessageToHistory("SYS", "✅ API Key saved successfully to your account!", false);
         }
     }
 
@@ -305,14 +358,8 @@ public class AllianceAnalysisController {
             resultArea.setText("Testing connection to " + targetUrl + "...\n");
 
             geminiApiClient.testGenericNetworkAsync(targetUrl, useProxy, host, port, new GeminiApiClient.GeminiCallback() {
-                @Override
-                public void onSuccess(String response) {
-                    Platform.runLater(() -> resultArea.appendText("✅ " + response + "\n"));
-                }
-                @Override
-                public void onError(String errorMessage) {
-                    Platform.runLater(() -> resultArea.appendText("❌ Failed:\n" + errorMessage + "\n"));
-                }
+                @Override public void onSuccess(String response) { Platform.runLater(() -> resultArea.appendText("✅ " + response + "\n")); }
+                @Override public void onError(String errorMessage) { Platform.runLater(() -> resultArea.appendText("❌ Failed:\n" + errorMessage + "\n")); }
             });
         });
 
@@ -324,16 +371,19 @@ public class AllianceAnalysisController {
     @FXML
     private void handleSendChat() {
         String prompt = chatInputField.getText();
-        String apiKey = apiKeyField.getText();
-
         if (prompt == null || prompt.trim().isEmpty()) return;
+
+        chatInputField.clear();
+        addMessageToHistory("USER", prompt, false);
+        executeGeminiCall(prompt);
+    }
+
+    private void executeGeminiCall(String prompt) {
+        String apiKey = apiKeyField.getText();
         if (apiKey == null || apiKey.trim().isEmpty()) {
-            appendSystemMessage("⚠️ Error: Please configure and save your Gemini API Key first.");
+            addMessageToHistory("SYS", "⚠️ Error: Please configure and save your Gemini API Key first.", true);
             return;
         }
-
-        appendUserMessage(prompt);
-        chatInputField.clear();
 
         StringBuilder context = new StringBuilder("FTC Alliance Analysis for Main Team: " + mainTeamField.getText() + ":\n");
         if (analysisTable.getItems().isEmpty()) {
@@ -355,11 +405,11 @@ public class AllianceAnalysisController {
         geminiApiClient.sendChatRequestAsync(apiKey, model, context.toString(), prompt, useProxy, host, port, new GeminiApiClient.GeminiCallback() {
             @Override
             public void onSuccess(String response) {
-                appendAiMessage(response, false);
+                Platform.runLater(() -> addMessageToHistory("AI", response, false));
             }
             @Override
             public void onError(String errorMessage) {
-                appendAiMessage(errorMessage, true);
+                Platform.runLater(() -> addMessageToHistory("AI", errorMessage, true));
             }
         });
     }

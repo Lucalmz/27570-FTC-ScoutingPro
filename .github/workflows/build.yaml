@@ -11,12 +11,18 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [windows-latest, macos-latest]
+        # 你的矩阵环境配置建议改成这样：
+        os: [ windows-latest, macos-15-intel, macos-latest ]
         include:
           - os: windows-latest
             installer_ext: exe
-          - os: macos-latest
+            arch_name: x64
+          - os: macos-15-intel # 继续保留这个，用来兼容被 macOS 26 淘汰掉的老旧 Intel 机器
             installer_ext: dmg
+            arch_name: intel
+          - os: macos-latest # 这个标签目前会指向最新的 macOS 26 Tahoe (Apple Silicon) 环境
+            installer_ext: dmg
+            arch_name: apple-silicon
 
     runs-on: ${{ matrix.os }}
 
@@ -30,20 +36,25 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-
-      # 1. 打包 Fat Jar (Shade 插件会把 JavaFX 库打包进 jar)
-      # 这一步会自动根据当前系统 (Windows/Mac) 下载对应的 JavaFX 本地库
+      # 1. 打包 Fat Jar (Maven 会根据当前的 runner OS 自动下载对应的 JavaFX 平台库)
       - name: Build with Maven
         run: mvn clean package -DskipTests
 
-      # 2. 运行 JPackage 生成安装包
-      # 注意：这里不再需要传入 -Djavafx.jmods.path，因为 Jar 包里已经全都有了
+      # 2. 准备 JPackage 的输入目录 (关键修复！)
+      - name: Prepare JPackage Input
+        shell: bash
+        run: |
+          mkdir -p target/jpackage-input
+          # 将 shade 插件生成的 fat jar 复制到 input 目录中
+          cp target/*.jar target/jpackage-input/
+
+      # 3. 运行 JPackage 生成安装包
       - name: Create Installer with JPackage
         run: mvn jpackage:jpackage
 
-      # 3. 上传产物
+      # 4. 上传产物 (重命名以便用户区分芯片版本)
       - name: Upload Installer
         uses: actions/upload-artifact@v4
         with:
-          name: FTCScoutingPro-${{ matrix.os }}
+          name: FTCScoutingPro-${{ runner.os }}-${{ matrix.arch_name }}
           path: target/dist/*.${{ matrix.installer_ext }}

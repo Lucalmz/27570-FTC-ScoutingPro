@@ -27,11 +27,8 @@ public class MainController {
     @FXML private TabPane mainTabPane;
     @FXML private Tab ftcScoutTab;
     @FXML private Label competitionNameLabel;
-
-    // 注意：去掉了 editRatingButton，它现在属于 TabRankingsController
     @FXML private Button manageMembersBtn, offlineSyncBtn;
 
-    // --- 注入的子标签页控制器 (通过 fx:id 自动装配) ---
     @FXML private TabScoringController tabScoringController;
     @FXML private TabFtcScoutController tabFtcScoutController;
     @FXML private TabRankingsController tabRankingsController;
@@ -81,14 +78,12 @@ public class MainController {
             offlineSyncBtn.setText(isHost ? "Import Offline Data" : "Export Offline Data");
         }
 
-        // 初始化子控制器
         tabScoringController.setDependencies(this, matchDataService, currentCompetition, username, isHost);
         tabFtcScoutController.setDependencies(this, ftcScoutApiClient, currentCompetition, isHost);
         tabRankingsController.setDependencies(this, mainApp, currentCompetition, isHost);
         tabHistoryController.setDependencies(this, matchDataService, currentCompetition, username, isHost);
 
         if (isHost) {
-            // 注意：去掉 editRatingButton 的逻辑，保留管理成员按钮
             manageMembersBtn.setVisible(true);
             manageMembersBtn.setManaged(true);
             startAsHost();
@@ -101,10 +96,13 @@ public class MainController {
             manageMembersBtn.setVisible(false);
             manageMembersBtn.setManaged(false);
 
-            // 优雅移除 FTC Scout 标签页
             Platform.runLater(() -> mainTabPane.getTabs().remove(ftcScoutTab));
             startAsClient();
         }
+
+        // ★ 挂载酷炫的滑动光条动效
+        AnimationUtils.attachLightBarAnimation(mainTabPane);
+
         mainTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
             if (newTab != null && newTab.getContent() != null) {
                 AnimationUtils.playSmoothEntrance(newTab.getContent());

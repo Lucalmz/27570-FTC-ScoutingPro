@@ -92,7 +92,6 @@ public class TabScoringController {
         if (team1IgnoreCheck != null) team1IgnoreCheck.setDisable(true);
         if (team2IgnoreCheck != null) team2IgnoreCheck.setDisable(true);
 
-        // ★ BUG FIX: 使用 focusedProperty 代替 textProperty，解决键盘输入每个字母都查数据库卡死 UI 的问题
         team1Field.focusedProperty().addListener((obs, oldVal, newVal) -> {
             if (!newVal) updateWeakCheckboxStatus(team1Field.getText(), team1IgnoreCheck);
         });
@@ -152,29 +151,115 @@ public class TabScoringController {
         currentClickLocations = clickLocations;
     }
 
+    // ★ 增加表单重置边框的方法
+    private void clearErrors() {
+        errorLabel.setText("");
+        String defaultStyle = "";
+        matchNumberField.setStyle(defaultStyle);
+        team1Field.setStyle(defaultStyle);
+        team2Field.setStyle(defaultStyle);
+        t1AutoScoreField.setStyle(defaultStyle);
+        t2AutoScoreField.setStyle(defaultStyle);
+        teleopArtifactsField.setStyle(defaultStyle);
+    }
+
+    // ★ 精准定位红框报错
+    private void showFieldError(Control field, String message) {
+        errorLabel.setText("❌ " + message);
+        field.setStyle("-fx-border-color: #F87171; -fx-border-width: 2px; -fx-border-radius: 6px; -fx-background-color: rgba(248, 113, 113, 0.1);");
+        field.requestFocus();
+        field.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+            if (isNowFocused) {
+                field.setStyle("");
+                errorLabel.setText("");
+            }
+        });
+    }
+
     @FXML
     private void handleSubmitButtonAction() {
+        clearErrors();
+
         try {
             ToggleButton selectedToggle = (ToggleButton) allianceToggleGroup.getSelectedToggle();
-            if (selectedToggle == null) throw new IllegalArgumentException("Select an alliance.");
+            if (selectedToggle == null) {
+                setErrorText("❌ Please select an Alliance (Red/Blue).");
+                return;
+            }
             String alliance = selectedToggle.getText().contains("Red") ? "RED" : "BLUE";
             boolean isSingle = singleModeRadio.isSelected();
 
-            int t1AutoScore = Integer.parseInt(t1AutoScoreField.getText().trim());
-            int t2AutoScore = isSingle ? 0 : Integer.parseInt(t2AutoScoreField.getText().trim());
+            int matchNum;
+            try {
+                matchNum = Integer.parseInt(matchNumberField.getText().trim());
+                if (matchNum <= 0) throw new NumberFormatException();
+            } catch (NumberFormatException e) {
+                showFieldError(matchNumberField, "Match Number must be a valid positive integer.");
+                return;
+            }
+
+            int team1;
+            try {
+                team1 = Integer.parseInt(team1Field.getText().trim());
+                if (team1 <= 0) throw new NumberFormatException();
+            } catch (NumberFormatException e) {
+                showFieldError(team1Field, "Team 1 requires a valid team number.");
+                return;
+            }
+
+            int team2 = 0;
+            if (!isSingle) {
+                try {
+                    team2 = Integer.parseInt(team2Field.getText().trim());
+                    if (team2 <= 0) throw new NumberFormatException();
+                    if (team1 == team2) {
+                        showFieldError(team2Field, "Team 1 and Team 2 cannot be the same.");
+                        return;
+                    }
+                } catch (NumberFormatException e) {
+                    showFieldError(team2Field, "Team 2 requires a valid team number.");
+                    return;
+                }
+            }
+
+            int t1AutoScore;
+            try {
+                t1AutoScore = Integer.parseInt(t1AutoScoreField.getText().trim());
+            } catch (NumberFormatException e) {
+                showFieldError(t1AutoScoreField, "Team 1 Auto Score must be a number.");
+                return;
+            }
+
+            int t2AutoScore = 0;
+            if (!isSingle) {
+                try {
+                    t2AutoScore = Integer.parseInt(t2AutoScoreField.getText().trim());
+                } catch (NumberFormatException e) {
+                    showFieldError(t2AutoScoreField, "Team 2 Auto Score must be a number.");
+                    return;
+                }
+            }
+
+            int teleopArtifacts;
+            try {
+                teleopArtifacts = Integer.parseInt(teleopArtifactsField.getText().trim());
+            } catch (NumberFormatException e) {
+                showFieldError(teleopArtifactsField, "TeleOp Hits must be a valid number.");
+                return;
+            }
+
             String t1Proj = getSelectedToggleText(t1ProjGroup);
             String t2Proj = isSingle ? "NONE" : getSelectedToggleText(t2ProjGroup);
-
             String t1Row = getSelectedRowsString(t1Row1Btn, t1Row2Btn, t1Row3Btn);
             String t2Row = isSingle ? "NONE" : getSelectedRowsString(t2Row1Btn, t2Row2Btn, t2Row3Btn);
 
             ScoreEntry entry = new ScoreEntry(
                     editingScoreId == -1 ? 0 : editingScoreId,
                     isSingle ? ScoreEntry.Type.SINGLE : ScoreEntry.Type.ALLIANCE,
-                    Integer.parseInt(matchNumberField.getText()), alliance,
-                    Integer.parseInt(team1Field.getText()), isSingle ? 0 : Integer.parseInt(team2Field.getText()),
+                    matchNum, alliance,
+                    team1, team2,
                     t1AutoScore, t2AutoScore, t1Proj, t2Proj, t1Row, t2Row,
-                    Integer.parseInt(teleopArtifactsField.getText()),
+                    teleopArtifacts,
                     team1SequenceCheck.isSelected(), isSingle ? false : team2SequenceCheck.isSelected(),
                     team1L2ClimbCheck.isSelected(), isSingle ? false : team2L2ClimbCheck.isSelected(),
                     team1IgnoreCheck.isSelected(), isSingle ? false : team2IgnoreCheck.isSelected(),
@@ -188,20 +273,25 @@ public class TabScoringController {
                 entry.setSyncStatus(ScoreEntry.SyncStatus.SYNCED);
                 matchDataService.submitScore(currentCompetition.getName(), entry);
                 mainController.triggerDataRefreshAndBroadcast();
-                errorLabel.setText("Score saved and broadcasted!");
+                statusLabel.setText("✔ Score saved and broadcasted!");
+                statusLabel.setStyle("-fx-text-fill: #34D399;");
             } else {
                 boolean sent = NetworkService.getInstance().sendScoreToServer(entry);
                 if (sent) {
-                    errorLabel.setText("Score sent to host!");
+                    statusLabel.setText("✔ Score sent to host!");
+                    statusLabel.setStyle("-fx-text-fill: #34D399;");
                 } else {
                     entry.setSyncStatus(ScoreEntry.SyncStatus.UNSYNCED);
                     matchDataService.submitScore(currentCompetition.getName(), entry);
                     mainController.triggerDataRefreshAndBroadcast();
-                    errorLabel.setText("Score saved locally (Offline mode).");
+                    statusLabel.setText("⚠ Score saved locally (Offline mode).");
+                    statusLabel.setStyle("-fx-text-fill: #FBBF24;");
                 }
             }
             resetFormState();
-        } catch (Exception e) { errorLabel.setText("Error: " + e.getMessage()); }
+        } catch (Exception e) {
+            setErrorText("❌ Unexpected Error: " + e.getMessage());
+        }
     }
 
     private void updateWeakCheckboxStatus(String teamNumberStr, CheckBox checkBox) {
@@ -282,5 +372,7 @@ public class TabScoringController {
         team1SequenceCheck.setSelected(false); team1L2ClimbCheck.setSelected(false);
         if(team2SequenceCheck != null) team2SequenceCheck.setSelected(false);
         if(team2L2ClimbCheck != null) team2L2ClimbCheck.setSelected(false);
+
+        clearErrors();
     }
 }
