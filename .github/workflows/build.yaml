@@ -38,7 +38,7 @@ jobs:
 
       # 1. 打包 Fat Jar (Maven 会根据当前的 runner OS 自动下载对应的 JavaFX 平台库)
       - name: Build with Maven
-        run: mvn clean package -DskipTests -Dmaven.test.skip=true
+        run: mvn clean package "-Dmaven.test.skip=true"
 
       # 2. 准备 JPackage 的输入目录 (关键修复！)
       - name: Prepare JPackage Input
