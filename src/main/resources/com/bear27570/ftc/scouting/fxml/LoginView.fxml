@@ -4,7 +4,8 @@
 <?import javafx.scene.layout.*?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<StackPane stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.LoginController">    <VBox alignment="CENTER" spacing="35.0" styleClass="mac-card" maxWidth="450" maxHeight="450">
+<StackPane stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.LoginController">
+    <VBox alignment="CENTER" spacing="35.0" styleClass="mac-card" maxWidth="450" maxHeight="450">
         <padding><Insets bottom="60.0" left="50.0" right="50.0" top="60.0" /></padding>
 
         <VBox alignment="CENTER" spacing="12">
@@ -25,6 +26,7 @@
                 <graphic><FontIcon iconLiteral="fth-user-plus" iconSize="16"/></graphic>
             </Button>
         </HBox>
+
         <Label fx:id="messageLabel" styleClass="text-danger" wrapText="true" textAlignment="CENTER" />
     </VBox>
 </StackPane>

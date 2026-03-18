@@ -25,12 +25,13 @@
     -color-glass-edge-bottom: rgba(255, 255, 255, 0.02);
     -color-glass-edge-side: rgba(255, 255, 255, 0.05);
 
-    -fx-font-family: "-apple-system", "BlinkMacSystemFont", "SF Pro Display", "Inter", "Segoe UI", sans-serif;
-    -fx-font-smoothing-type: lcd;
+
 }
 
 .root {
     -fx-background-color: -color-bg-root;
+    -fx-font-family: "-apple-system", "BlinkMacSystemFont", "SF Pro Display", "Inter", "Segoe UI", sans-serif;
+    -fx-font-smoothing-type: lcd;
 }
 
 /* 原有背景渐变类保留 */
@@ -356,11 +357,6 @@
    7. Custom View Backgrounds (全局视图背景)
    ============================================== */
 
-/* ==============================================
-   7. Custom View Backgrounds (全局视图背景)
-   ============================================== */
-
-
 .hub-bg-pane {
     -fx-background-image: url('../images/hub_bg.png');
     -fx-background-position: center center;
@@ -373,4 +369,12 @@
     -fx-background-position: center center;
     -fx-background-size: cover;
     -fx-background-repeat: no-repeat;
+}
+.hub-bg-pane, .main-bg-pane, .heatmap-bg-pane, .login-bg-pane {
+    /* 强制背景从正中心开始对齐 */
+    -fx-background-position: center center;
+    /* 禁止图片重复平铺 */
+    -fx-background-repeat: no-repeat;
+
+    -fx-background-size: cover;
 }

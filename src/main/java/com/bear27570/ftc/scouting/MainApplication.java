@@ -13,6 +13,7 @@ import com.bear27570.ftc.scouting.services.domain.impl.*;
 import com.bear27570.ftc.scouting.services.network.DefaultNetworkDataHandler;
 import com.bear27570.ftc.scouting.services.network.NetworkDataHandler;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -109,6 +110,7 @@ public class MainApplication extends Application {
         Scene scene = new Scene(root);
         applyTheme(scene);
         primaryStage.setScene(scene);
+        centerStage();
         setStageIcon(primaryStage);
         LoginController controller = loader.getController();
         controller.setDependencies(this, userService);
@@ -121,6 +123,7 @@ public class MainApplication extends Application {
         Scene scene = new Scene(root);
         applyTheme(scene);
         primaryStage.setScene(scene);
+        centerStage();
         HubController controller = loader.getController();
         controller.setDependencies(this, username, competitionService);
     }
@@ -131,8 +134,8 @@ public class MainApplication extends Application {
         Scene scene = new Scene(root);
         applyTheme(scene);
         primaryStage.setScene(scene);
+        centerStage();
         MainController controller = loader.getController();
-        // ★ 修复点：将 userService 一并注入进去
         controller.setDependencies(this, competition, username, isHost, matchDataService, rankingService, competitionRepository, userService);
     }
 
@@ -216,5 +219,9 @@ public class MainApplication extends Application {
         FieldInputController controller = loader.getController();
         controller.setDependencies(stage, parentController, isAllianceMode, existingLocations);
         stage.showAndWait();
+    }
+    private void centerStage() {
+        primaryStage.sizeToScene(); // 让 Stage 适应新 Scene 的大小
+        primaryStage.centerOnScreen();
     }
 }
