@@ -166,15 +166,15 @@ public class FieldInputController {
             points.add(new TeamPoint(x, y, currentTeam, isMiss, System.currentTimeMillis()));
 
             // ====== 修复后的声纳波纹动效 ======
-            // 1. 创建圆（初始半径为2，不设置初始中心系，默认为0,0）
-            javafx.scene.shape.Circle ripple = new javafx.scene.shape.Circle(2);
+            // 1. 创建圆（初始半径为1，不设置初始中心系，默认为0,0）
+            javafx.scene.shape.Circle ripple = new javafx.scene.shape.Circle(1);
             ripple.setStroke(currentTeam == 1 ? Color.web("#00BCD4") : Color.web("#E91E63"));
             ripple.setFill(Color.TRANSPARENT);
             ripple.setStrokeWidth(2);
 
             // 2. ★ 核心修复：解除 StackPane 的自动居中强制束缚
             ripple.setManaged(false);
-
+            ripple.setMouseTransparent(true);
             // 3. ★ 核心修复：坐标系跃迁转换
             // 将 Canvas 的内部坐标系(x,y) -> 转换到整个窗口场景的绝对坐标 -> 再转换到外层 inputPane 的局部坐标
             javafx.geometry.Point2D sceneCoords = drawCanvas.localToScene(x, y);
@@ -187,11 +187,11 @@ public class FieldInputController {
             inputPane.getChildren().add(ripple);
 
             // 4. 动效播放
-            javafx.animation.ScaleTransition st = new javafx.animation.ScaleTransition(Duration.millis(400), ripple);
+            javafx.animation.ScaleTransition st = new javafx.animation.ScaleTransition(Duration.millis(250), ripple);
             st.setToX(15);
             st.setToY(15);
 
-            javafx.animation.FadeTransition ft = new javafx.animation.FadeTransition(Duration.millis(400), ripple);
+            javafx.animation.FadeTransition ft = new javafx.animation.FadeTransition(Duration.millis(250), ripple);
             ft.setFromValue(1.0);
             ft.setToValue(0);
 

@@ -100,7 +100,6 @@ public class CompetitionRepositoryJdbcImpl implements CompetitionRepository {
         }
     }
 
-    // 新增：将绑定的赛事信息写入数据库
     @Override
     public void updateEventInfo(String competitionName, int season, String eventCode, String officialName) {
         String sql = "UPDATE competitions SET eventSeason = ?, eventCode = ?, officialEventName = ? WHERE name = ?";
@@ -112,6 +111,54 @@ public class CompetitionRepositoryJdbcImpl implements CompetitionRepository {
             pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
+        }
+    }
+
+    @Override
+    public boolean deleteByName(String name) {
+        // SQL 语句：清理所有与该比赛相关的数据表
+        String delScores = "DELETE FROM scores WHERE competitionName = ?";
+        String delPenalties = "DELETE FROM penalties WHERE competitionName = ?";
+        String delMemberships = "DELETE FROM memberships WHERE competitionName = ?";
+        String delComp = "DELETE FROM competitions WHERE name = ?";
+
+        try (Connection conn = DatabaseManager.getConnection()) {
+            conn.setAutoCommit(false); // 开启事务
+
+            try (PreparedStatement ps1 = conn.prepareStatement(delScores);
+                 PreparedStatement ps2 = conn.prepareStatement(delPenalties);
+                 PreparedStatement ps3 = conn.prepareStatement(delMemberships);
+                 PreparedStatement ps4 = conn.prepareStatement(delComp)) {
+
+                // 1. 删成绩
+                ps1.setString(1, name);
+                ps1.executeUpdate();
+
+                // 2. 删判罚
+                ps2.setString(1, name);
+                ps2.executeUpdate();
+
+                // 3. 删成员
+                ps3.setString(1, name);
+                ps3.executeUpdate();
+
+                // 4. 最后删比赛本体
+                ps4.setString(1, name);
+                int rows = ps4.executeUpdate();
+
+                conn.commit(); // 提交事务
+                return rows > 0;
+
+            } catch (SQLException e) {
+                conn.rollback(); // 发生任何错误立刻回滚，保护数据安全
+                e.printStackTrace();
+                return false;
+            } finally {
+                conn.setAutoCommit(true); // 恢复默认自动提交状态
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
         }
     }
 }

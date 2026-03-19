@@ -177,4 +177,41 @@ public class HubController {
         NetworkService.getInstance().stop();
         mainApp.showLoginView();
     }
+    @FXML
+    private void handleDeleteCompetition() {
+        Competition selected = myCompetitionsListView.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            statusLabel.setStyle("-fx-text-fill: #fab387;");
+            statusLabel.setText("Please select a competition to delete!");
+            return;
+        }
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
+                "Are you sure you want to permanently delete '" + selected.getName() + "' and ALL its data? This cannot be undone.",
+                ButtonType.YES, ButtonType.NO);
+        alert.setTitle("Delete Competition");
+        alert.setHeaderText("Warning: Data Deletion");
+
+        // ✨ UI 补丁：给原生 Alert 注入深色全局 CSS 和毛玻璃卡片样式
+        DialogPane dialogPane = alert.getDialogPane();
+        try {
+            dialogPane.getStylesheets().add(getClass().getResource("/com/bear27570/ftc/scouting/styles/style.css").toExternalForm());
+            dialogPane.getStyleClass().add("mac-card");
+        } catch (Exception e) {
+            System.err.println("CSS 加载失败，采用降级样式");
+        }
+
+        alert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.YES) {
+                if (competitionService.deleteCompetition(selected.getName(), currentUsername)) {
+                    statusLabel.setStyle("-fx-text-fill: #a6e3a1; -fx-font-weight: bold;");
+                    statusLabel.setText("Deleted successfully: " + selected.getName());
+                    refreshMyCompetitionsList();
+                } else {
+                    statusLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold;");
+                    statusLabel.setText("Error: Failed to delete competition.");
+                }
+            }
+        });
+    }
 }

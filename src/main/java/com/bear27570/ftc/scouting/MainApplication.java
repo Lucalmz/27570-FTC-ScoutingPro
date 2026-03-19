@@ -18,6 +18,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
+import javafx.scene.text.Font;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -98,6 +99,15 @@ public class MainApplication extends Application {
 
     @Override
     public void start(Stage primaryStage) throws IOException {
+        Font.loadFont(getClass().getResourceAsStream("/com/bear27570/ftc/scouting/fonts/Audiowide-Regular.ttf"), 14);
+
+        // 预加载 Oxanium 的常规和粗体
+        Font.loadFont(getClass().getResourceAsStream("/com/bear27570/ftc/scouting/fonts/Oxanium-Regular.ttf"), 14);
+        Font.loadFont(getClass().getResourceAsStream("/com/bear27570/ftc/scouting/fonts/Oxanium-Bold.ttf"), 14);
+
+        // 预加载 Teko 的常规和粗体
+        Font.loadFont(getClass().getResourceAsStream("/com/bear27570/ftc/scouting/fonts/Teko-Regular.ttf"), 14);
+        Font.loadFont(getClass().getResourceAsStream("/com/bear27570/ftc/scouting/fonts/Teko-Bold.ttf"), 14);
         this.primaryStage = primaryStage;
         primaryStage.setTitle("FTC Scouting Pro");
         setStageIcon(primaryStage);

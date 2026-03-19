@@ -1,4 +1,3 @@
-// File: src/main/java/com/bear27570/ftc/scouting/controllers/AllianceAnalysisController.java
 package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.models.Competition;
@@ -100,10 +99,25 @@ public class AllianceAnalysisController {
     @FXML public void initialize() {
         webEngine = chatWebView.getEngine();
 
+        // 🟢 修复：无内容时的占位符
+        Label placeholder = new Label("No analysis data available.\nEnter a target main team to generate alliance insights.");
+        placeholder.getStyleClass().addAll("text-muted", "title-4");
+        placeholder.setStyle("-fx-text-alignment: center;");
+        analysisTable.setPlaceholder(placeholder);
+
+        // 🟢 修复：设置 WebView 透明，透出底层卡片背景
+        chatWebView.setPageFill(javafx.scene.paint.Color.TRANSPARENT);
+
         webEngine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
             if (newState == Worker.State.SUCCEEDED) {
                 while (!jsQueue.isEmpty()) {
-                    webEngine.executeScript(jsQueue.poll());
+                    String script = jsQueue.poll();
+                    try {
+                        // 🟢 修复：保护队列任务的执行
+                        webEngine.executeScript(script);
+                    } catch (Exception e) {
+                        System.err.println("WebView JS Queue Exec Warning: " + e.getMessage());
+                    }
                 }
             }
         });
@@ -142,7 +156,11 @@ public class AllianceAnalysisController {
     private void safeExecuteScript(String script) {
         Platform.runLater(() -> {
             if (webEngine.getLoadWorker().getState() == Worker.State.SUCCEEDED) {
-                webEngine.executeScript(script);
+                try {
+                    webEngine.executeScript(script);
+                } catch (Exception e) {
+                    System.err.println("WebView JS Execution Warning: " + e.getMessage() + " | Script: " + script);
+                }
             } else {
                 jsQueue.add(script);
             }
@@ -182,11 +200,24 @@ public class AllianceAnalysisController {
 
     private void initializeChatHtml() {
         String htmlTemplate = "<!DOCTYPE html><html><head><meta charset='UTF-8'>"
-                + "<script src='https://cdn.jsdelivr.net/npm/marked/marked.min.js'></script>"
+                // 🟢 修复：将 JS 函数置顶
+                + "<script>"
+                + "function addSysMsg(text) { const div = document.createElement('div'); div.className='sys-msg'; div.innerText=text; document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); }"
+                + "function addUserMsg(text) { const div = document.createElement('div'); div.className='msg-container user-msg'; const bubble = document.createElement('div'); bubble.className='user-bubble'; bubble.innerText=text; div.appendChild(bubble); document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); }"
+                + "function addAiMsg(mdText, isError) { const div = document.createElement('div'); div.className='msg-container ai-msg'; const header = document.createElement('div'); header.className='ai-header'; header.innerHTML='✨ Gemini'; const content = document.createElement('div'); if(isError) { content.style.color = '#ff6b6b'; content.innerText = mdText; } else { if(typeof marked !== 'undefined') { content.innerHTML = marked.parse(mdText); content.querySelectorAll('pre code').forEach((el) => { if(typeof hljs !== 'undefined') hljs.highlightElement(el); }); } else { content.innerText = mdText; } } div.appendChild(header); div.appendChild(content); document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); }"
+                + "function showThinking() { const div = document.createElement('div'); div.id='thinking-flag'; div.className='msg-container ai-msg thinking'; div.innerHTML='<div class=\"ai-header\">✨ Gemini</div><div>Thinking & analyzing data...</div>'; document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); }"
+                + "function removeThinking() { const el = document.getElementById('thinking-flag'); if(el) el.remove(); }"
+                + "</script>"
+
+                // 🟢 修复：添加 defer 属性防止阻塞
+                + "<script src='https://cdn.jsdelivr.net/npm/marked/marked.min.js' defer></script>"
                 + "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css'>"
-                + "<script src='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js'></script>"
+                + "<script src='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js' defer></script>"
+
                 + "<style>"
-                + "body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #131314; color: #e3e3e3; margin: 0; padding: 15px; font-size: 14px; line-height: 1.6; }"
+                // 🟢 修复：html, body 背景透明，字体更新
+                + "html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: transparent; }"
+                + "body { font-family: 'Oxanium', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e3e3e3; padding: 15px; box-sizing: border-box; font-size: 14px; line-height: 1.6; }"
                 + ".msg-container { margin-bottom: 24px; display: flex; flex-direction: column; }"
                 + ".user-msg { align-items: flex-end; }"
                 + ".user-bubble { background-color: #3b3b3b; color: white; padding: 12px 18px; border-radius: 18px 18px 4px 18px; max-width: 80%; word-wrap: break-word; white-space: pre-wrap; font-size: 15px; }"
@@ -195,7 +226,7 @@ public class AllianceAnalysisController {
                 + ".sys-msg { text-align: center; color: #8ab4f8; font-size: 13px; margin: 10px 0; background: #1e1e1e; padding: 8px; border-radius: 8px; }"
                 + ".thinking { color: #9aa0a6; font-style: italic; animation: pulse 1.5s infinite; }"
                 + "pre { background-color: #1e1e1e; padding: 12px; border-radius: 8px; overflow-x: auto; border: 1px solid #333; }"
-                + "code { font-family: 'Consolas', monospace; font-size: 13px; }"
+                + "code { font-family: 'JetBrains Mono', 'Consolas', monospace; font-size: 13px; }"
                 + "table { border-collapse: collapse; width: 100%; margin: 10px 0; }"
                 + "th, td { border: 1px solid #444; padding: 8px; text-align: left; }"
                 + "th { background-color: #2b2b2b; }"
@@ -203,33 +234,7 @@ public class AllianceAnalysisController {
                 + "@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }"
                 + "</style></head><body>"
                 + "<div id='chat-box'></div>"
-                + "<script>"
-                + "function addSysMsg(text) { "
-                + "  const div = document.createElement('div'); div.className='sys-msg'; div.innerText=text; document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); "
-                + "}"
-                + "function addUserMsg(text) { "
-                + "  const div = document.createElement('div'); div.className='msg-container user-msg'; "
-                + "  const bubble = document.createElement('div'); bubble.className='user-bubble'; bubble.innerText=text; "
-                + "  div.appendChild(bubble); document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); "
-                + "}"
-                + "function addAiMsg(mdText, isError) { "
-                + "  const div = document.createElement('div'); div.className='msg-container ai-msg'; "
-                + "  const header = document.createElement('div'); header.className='ai-header'; header.innerHTML='✨ Gemini'; "
-                + "  const content = document.createElement('div'); "
-                + "  if(isError) { content.style.color = '#ff6b6b'; content.innerText = mdText; } "
-                + "  else { "
-                + "      if(typeof marked !== 'undefined') { content.innerHTML = marked.parse(mdText); content.querySelectorAll('pre code').forEach((el) => hljs.highlightElement(el)); } "
-                + "      else { content.innerText = mdText; } "
-                + "  } "
-                + "  div.appendChild(header); div.appendChild(content); document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); "
-                + "}"
-                + "function showThinking() { "
-                + "  const div = document.createElement('div'); div.id='thinking-flag'; div.className='msg-container ai-msg thinking'; "
-                + "  div.innerHTML='<div class=\"ai-header\">✨ Gemini</div><div>Thinking & analyzing data...</div>'; "
-                + "  document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); "
-                + "}"
-                + "function removeThinking() { const el = document.getElementById('thinking-flag'); if(el) el.remove(); }"
-                + "</script></body></html>";
+                + "</body></html>";
         webEngine.loadContent(htmlTemplate);
     }
 
@@ -238,7 +243,6 @@ public class AllianceAnalysisController {
         return text.replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
     }
 
-    // --- 新增：Java端统一消息记录和全量刷新 ---
     private void addMessageToHistory(String role, String text, boolean isError) {
         chatHistory.add(new ChatMessage(role, text, isError));
         if (role.equals("SYS")) appendSystemMessageJS(text);
@@ -279,8 +283,6 @@ public class AllianceAnalysisController {
         safeExecuteScript("showThinking();");
     }
 
-    // ========== API Chat 工具栏功能区 ==========
-
     @FXML
     private void handleEditLastPrompt() {
         int lastUserIdx = -1;
@@ -290,7 +292,7 @@ public class AllianceAnalysisController {
         if (lastUserIdx != -1) {
             String lastPrompt = chatHistory.get(lastUserIdx).text;
             chatInputField.setText(lastPrompt);
-            chatHistory.subList(lastUserIdx, chatHistory.size()).clear(); // 移除它和之后的AI回答
+            chatHistory.subList(lastUserIdx, chatHistory.size()).clear();
             redrawChat();
         }
     }
@@ -303,7 +305,7 @@ public class AllianceAnalysisController {
         }
         if (lastUserIdx != -1) {
             String lastPrompt = chatHistory.get(lastUserIdx).text;
-            chatHistory.subList(lastUserIdx + 1, chatHistory.size()).clear(); // 只移除AI回答
+            chatHistory.subList(lastUserIdx + 1, chatHistory.size()).clear();
             redrawChat();
             executeGeminiCall(lastPrompt);
         }
@@ -333,20 +335,22 @@ public class AllianceAnalysisController {
 
         VBox vbox = new VBox(15);
         vbox.setPadding(new Insets(20));
-        vbox.setStyle("-fx-background-color: #2b2b2b; -fx-text-fill: white;");
+        vbox.getStyleClass().add("mac-card"); // ✨ 统一风格
 
         Label label = new Label("Enter URL to test proxy connection:");
-        label.setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
+        label.getStyleClass().add("text-bold"); // ✨ 使用全局变量
 
         HBox inputRow = new HBox(10);
         TextField urlField = new TextField("https://www.youtube.com");
         urlField.setPrefWidth(250);
         Button testBtn = new Button("Test");
+        testBtn.getStyleClass().addAll("button", "accent"); // ✨ 金色按钮
         inputRow.getChildren().addAll(urlField, testBtn);
 
         TextArea resultArea = new TextArea();
         resultArea.setEditable(false);
         resultArea.setPrefHeight(120);
+        // 保持文本域的控制内部样式，但移除外部硬编码
         resultArea.setStyle("-fx-control-inner-background: #1e1e1e; -fx-text-fill: #a9b7c6;");
 
         testBtn.setOnAction(e -> {
@@ -364,7 +368,13 @@ public class AllianceAnalysisController {
         });
 
         vbox.getChildren().addAll(label, inputRow, resultArea);
-        testDialog.setScene(new Scene(vbox, 400, 250));
+        Scene scene = new Scene(vbox, 400, 250);
+        // ✨ UI 补丁：注入全局 CSS
+        try {
+            scene.getStylesheets().add(getClass().getResource("/com/bear27570/ftc/scouting/styles/style.css").toExternalForm());
+        } catch (Exception e) {}
+
+        testDialog.setScene(scene);
         testDialog.show();
     }
 
@@ -417,8 +427,6 @@ public class AllianceAnalysisController {
     private int parseProxyPort(String portStr) {
         try { return Integer.parseInt(portStr.trim()); } catch (NumberFormatException e) { return 7890; }
     }
-
-    // ========== 原有分析逻辑保留 ==========
 
     private static class TeamHeatmapProfile {
         int teamNum;

@@ -9,4 +9,5 @@ import java.util.List;
 public interface CompetitionService {
     boolean createCompetition(String name, String creatorUsername);
     List<Competition> getCompetitionsCreatedByUser(String username);
+    boolean deleteCompetition(String name, String requesterUsername);
 }

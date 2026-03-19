@@ -150,6 +150,14 @@ public class TabHistoryController {
 
     private void handleDeleteAction(ScoreEntry selected) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION, "Delete Match " + selected.getMatchNumber() + "?", ButtonType.YES, ButtonType.NO);
+
+        // ✨ UI 补丁
+        DialogPane dialogPane = alert.getDialogPane();
+        try {
+            dialogPane.getStylesheets().add(getClass().getResource("/com/bear27570/ftc/scouting/styles/style.css").toExternalForm());
+            dialogPane.getStyleClass().add("mac-card");
+        } catch (Exception e) {}
+
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.YES) {
                 if (isHost) {

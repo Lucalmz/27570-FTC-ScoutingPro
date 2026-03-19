@@ -1,6 +1,31 @@
 /* ==============================================
+   Font Face Definitions (必须放在最前面)
+   ============================================== */
+@font-face {
+    font-family: 'Audiowide';
+    src: url('../fonts/Audiowide-Regular.ttf');
+}
+
+@font-face {
+    font-family: 'Oxanium';
+    src: url('../fonts/Oxanium-Regular.ttf');
+}
+@font-face {
+    font-family: 'Oxanium';
+    src: url('../fonts/Oxanium-Bold.ttf');
+}
+
+@font-face {
+    font-family: 'Teko';
+    src: url('../fonts/Teko-Regular.ttf');
+}
+@font-face {
+    font-family: 'Teko';
+    src: url('../fonts/Teko-Bold.ttf');
+}
+
+/* ==============================================
    FTC Scouting Pro - Spatial VisionOS / Next-Gen Black & Gold Theme
-   (iOS 27 Concept & OriginOS Fluid Aesthetics)
    ============================================== */
 
 * {
@@ -24,43 +49,51 @@
     -color-glass-edge-top: rgba(255, 255, 255, 0.15);
     -color-glass-edge-bottom: rgba(255, 255, 255, 0.02);
     -color-glass-edge-side: rgba(255, 255, 255, 0.05);
-
-
 }
 
 .root {
     -fx-background-color: -color-bg-root;
-    -fx-font-family: "-apple-system", "BlinkMacSystemFont", "SF Pro Display", "Inter", "Segoe UI", sans-serif;
+    /* 全局主字体：Oxanium 赛博朋克细节 */
+    -fx-font-family: "Oxanium", sans-serif;
     -fx-font-smoothing-type: lcd;
 }
 
-/* 原有背景渐变类保留 */
 .bg-gradient {
     -fx-background-color: radial-gradient(focus-angle 45deg, focus-distance 20%, center 50% 50%, radius 100%, #17140B 0%, #000000 100%);
 }
 
 .mono-text {
-    -fx-font-family: "JetBrains Mono", "SF Mono", "Consolas", monospace;
+    /* 数据/代码/数字 专属紧凑字体 Teko */
+    -fx-font-family: "Teko", monospace;
+    /* Teko 是窄体，所以字号稍微放大一点补偿视觉比例 */
+    -fx-font-size: 22px;
 }
 
 /* ==============================================
-   1. Typography (文字与光效) - 保留所有原有类名
+   1. Typography (文字与光效)
    ============================================== */
 .label { -fx-text-fill: -color-text-normal; }
 
-/* 标题类：加入微弱的文字阴影，模拟屏幕像素发光 */
-.title-2, .title-3, .title-4, .header-label, .sub-header-label {
+/* 顶级标题：Audiowide 扁平硬核数字感 */
+.title-2, .title-3, .header-label {
+    -fx-font-family: "Audiowide", sans-serif;
     -fx-text-fill: -color-text-main;
-    -fx-font-weight: 800;
     -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.1), 5, 0.1, 0, 0);
 }
 .title-2 { -fx-font-size: 26px; }
 .title-3 { -fx-font-size: 20px; }
-.title-4 { -fx-font-size: 16px; }
 .header-label { -fx-font-size: 24px; -fx-text-fill: -color-gold-light; }
+
+/* 次级标题与标签：Oxanium 加粗强化 */
+.title-4, .sub-header-label {
+    -fx-font-family: "Oxanium", sans-serif;
+    -fx-text-fill: -color-text-main;
+    -fx-font-weight: 800;
+    -fx-font-size: 16px;
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.1), 5, 0.1, 0, 0);
+}
 .sub-header-label { -fx-font-size: 18px; -fx-text-fill: -color-gold-base; }
 
-/* 工具文本类 - 一个都不能少 */
 .text-bold { -fx-font-weight: bold; }
 .text-muted { -fx-text-fill: -color-text-muted; }
 .text-warning { -fx-text-fill: #FBBF24; -fx-effect: dropshadow(gaussian, rgba(251,191,36,0.3), 8, 0.3, 0, 0); }
@@ -69,28 +102,24 @@
 .text-accent  { -fx-text-fill: -color-gold-light; -fx-effect: dropshadow(gaussian, -color-gold-glow, 10, 0.4, 0, 0); }
 
 /* ==============================================
-   2. Spatial Cards & Panels (极致拟物玻璃容器)
+   2. Spatial Cards & Panels
    ============================================== */
 .mac-card, .card {
     -fx-background-color: linear-gradient(to bottom right, #1A1A1E, #0A0A0C);
     -fx-background-radius: 16px;
-    /* 核心秘诀 1：多段边框模拟玻璃厚度和切角反光 */
     -fx-border-color: -color-glass-edge-top -color-glass-edge-side -color-glass-edge-bottom -color-glass-edge-side;
     -fx-border-width: 1px;
     -fx-border-radius: 16px;
-    /* 核心秘诀 2：弥散外阴影制造悬浮感 */
     -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.9), 40, 0.15, 0, 20);
 }
 
 .panel-inner {
-    /* 模拟挖空面板：背景变深，顶部产生内阴影 */
     -fx-background-color: rgba(0, 0, 0, 0.4);
     -fx-background-radius: 12px;
     -fx-border-color: rgba(255, 255, 255, 0.04);
     -fx-border-width: 1px;
     -fx-border-radius: 12px;
     -fx-padding: 18px;
-    /* 核心秘诀 3：内阴影模拟下凹立体感 */
     -fx-effect: innershadow(gaussian, rgba(0,0,0,0.8), 10, 0.2, 0, 4);
 }
 
@@ -114,7 +143,7 @@
 }
 
 /* ==============================================
-   3. Inputs & Forms (光影呼吸输入框)
+   3. Inputs & Forms
    ============================================== */
 .text-field, .password-field, .text-area {
     -fx-background-color: rgba(0, 0, 0, 0.5);
@@ -128,8 +157,7 @@
     -fx-effect: innershadow(gaussian, rgba(0,0,0,0.5), 5, 0, 0, 2);
 }
 
-/* 焦点状态：边框变金，且向外辐射光晕 */
-.text-field:focused, .password-field:focused ,text-area:focused {
+.text-field:focused, .password-field:focused , .text-area:focused {
     -fx-border-color: #FDE047;
     -fx-background-color: rgba(0, 0, 0, 0.8);
     -fx-effect: dropshadow(gaussian, rgba(253, 224, 71, 0.4), 10, 0.5, 0, 0);
@@ -138,7 +166,6 @@
 /* ==============================================
    4. Buttons (质感满级的 3D 浮雕交互)
    ============================================== */
-/* 默认普通按钮 */
 .button {
     -fx-background-color: linear-gradient(to bottom, rgba(50,50,55,0.8), rgba(25,25,30,0.8));
     -fx-border-color: rgba(255,255,255,0.15) rgba(255,255,255,0.05) rgba(0,0,0,0.8) rgba(255,255,255,0.05);
@@ -161,24 +188,22 @@
     -fx-background-color: rgba(15,15,18,0.9);
     -fx-border-color: rgba(0,0,0,0.8) rgba(255,255,255,0.05) rgba(255,255,255,0.1) rgba(255,255,255,0.05);
     -fx-translate-y: 2px;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0), 0, 0, 0, 0); /* 按下时阴影消失，体现物理反馈 */
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0), 0, 0, 0, 0);
 }
 
-/* ★ 核心：Accent 主力金按钮（拟真金属反光与光效） */
 .button.accent {
-    -fx-background-color: linear-gradient(to bottom, #FDE047 0%, #D4AF37 100%);
-    -fx-border-color: #FFFDE7 transparent transparent transparent !important; /* 仅顶部纯白高光 */
+    -fx-background-color: linear-gradient(to bottom, rgba(253, 224, 71, 0.15), rgba(212, 175, 55, 0.15));
+    -fx-border-color: rgba(253, 224, 71, 0.6) rgba(253, 224, 71, 0.2) rgba(0,0,0,0.5) rgba(253, 224, 71, 0.2) !important;
     -fx-border-width: 1px !important;
-    -fx-text-fill: #000000 !important;
-    -fx-effect: dropshadow(gaussian, rgba(253, 224, 71, 0.6), 15, 0.4, 0, 0) !important;
+    -fx-text-fill: #FDE047 !important;
+    -fx-effect: dropshadow(gaussian, rgba(253, 224, 71, 0.3), 10, 0.3, 0, 4) !important;
 }
 
 .button.accent:hover {
-    -fx-background-color: linear-gradient(to bottom, #FEF08A 0%, #FDE047 40%, #EAB308 100%);
-    -fx-effect: dropshadow(gaussian, rgba(253, 224, 71, 0.7), 25, 0.4, 0, 8) !important;
+    -fx-background-color: linear-gradient(to bottom, rgba(253, 224, 71, 0.3), rgba(212, 175, 55, 0.3));
+    -fx-effect: dropshadow(gaussian, rgba(253, 224, 71, 0.5), 15, 0.3, 0, 4) !important;
 }
 
-/* 状态按钮（带色彩的玻璃微质感） */
 .button.success {
     -fx-background-color: linear-gradient(to bottom, rgba(16, 185, 129, 0.2), rgba(4, 120, 87, 0.2));
     -fx-border-color: rgba(52, 211, 153, 0.6) rgba(52, 211, 153, 0.2) rgba(0,0,0,0.5) rgba(52, 211, 153, 0.2) !important;
@@ -200,27 +225,33 @@
 }
 .button.warning:hover { -fx-background-color: linear-gradient(to bottom, rgba(245, 158, 11, 0.4), rgba(180, 83, 9, 0.4)); -fx-effect: dropshadow(gaussian, rgba(251,191,36,0.4), 15, 0.3, 0, 4); }
 
-/* TableView 内的按钮调整 */
 .table-view .button {
     -fx-padding: 4px 10px !important;
     -fx-font-size: 11px !important;
-    -fx-effect: none !important; /* 表格里不需要大发光 */
+    -fx-effect: none !important;
 }
 
 /* ==============================================
-   5. Data Views (高级数据图表/列表交互)
+   5. Data Views
    ============================================== */
-.table-view, .list-view, .scroll-pane {
+.table-view, .list-view {
     -fx-background-color: transparent;
     -fx-border-color: rgba(255, 255, 255, 0.08);
     -fx-border-radius: 12px;
     -fx-background-radius: 12px;
 }
+.scroll-pane,
+.scroll-pane .viewport {
+    -fx-background-color: transparent !important;
+    -fx-border-color: transparent !important;
+    -fx-border-width: 0 !important;
+    -fx-background-insets: 0 !important;
+    -fx-padding: 0 !important;
+}
 .edge-to-edge {
     -fx-border-width: 0 !important;
 }
 
-/* 表头：高级深色磨砂感 */
 .table-view .column-header-background {
     -fx-background-color: rgba(0, 0, 0, 0.8);
     -fx-background-radius: 12px 12px 0 0;
@@ -230,7 +261,6 @@
 .table-view .column-header { -fx-background-color: transparent; -fx-border-width: 0; }
 .table-view .column-header .label { -fx-text-fill: -color-gold-base; -fx-font-weight: 800; }
 
-/* 行与斑马纹 (.striped) */
 .table-row-cell, .list-cell {
     -fx-background-color: transparent;
     -fx-table-cell-border-color: transparent;
@@ -243,25 +273,28 @@
     -fx-background-color: rgba(255, 255, 255, 0.02);
 }
 
-/* 列表/表格交互动画体验 */
 .table-row-cell:hover, .list-cell:hover {
     -fx-background-color: rgba(255, 255, 255, 0.08) !important;
     -fx-cursor: hand;
 }
 .table-row-cell:selected, .list-cell:selected {
-    /* 选中时，产生从左侧发出的金属光泽背景 */
     -fx-background-color: linear-gradient(to right, rgba(212, 175, 55, 0.25) 0%, rgba(0,0,0,0) 100%) !important;
     -fx-border-color: transparent transparent transparent -color-gold-light;
     -fx-border-width: 0 0 0 4px;
 }
-.table-view .table-cell { -fx-text-fill: #E4E4E7 !important; }
+/* 表格内容使用 Teko 字体增强数据紧凑感 */
+.table-view .table-cell {
+    -fx-text-fill: #E4E4E7 !important;
+    -fx-font-family: "Teko", sans-serif;
+    -fx-font-size: 16px; /* 表格内字号可以比标准 mono 略小一点 */
+}
 .table-row-cell:selected .table-cell, .list-cell:selected {
     -fx-text-fill: -color-gold-light !important;
     -fx-font-weight: bold;
 }
 
 /* ==============================================
-   6. Toggles, Checkboxes & Tabs (细致入微的控件)
+   6. Toggles, Checkboxes & Tabs
    ============================================== */
 .toggle-button {
     -fx-background-color: rgba(20, 20, 25, 0.8);
@@ -316,29 +349,49 @@
     -fx-effect: dropshadow(gaussian, -color-gold-glow, 6, 0.5, 0, 0);
 }
 
-/* 顶部标签页 (Tabs) 光感 */
-.tab-pane .tab-header-area .tab-header-background { -fx-background-color: transparent; }
+.tab-pane,
+.tab-pane .tab-header-area,
+.tab-pane .tab-header-area .tab-header-background,
+.tab-pane .tab-header-area .headers-region {
+    -fx-background-color: transparent !important;
+    -fx-border-color: transparent !important;
+    -fx-border-width: 0 !important;
+}
+
+/* 2. 单个 Tab 的基础样式 */
 .tab-pane .tab {
-    -fx-background-color: transparent;
-    -fx-border-width: 0;
+    -fx-background-color: transparent !important;
+    -fx-border-width: 0 !important;
     -fx-padding: 10px 25px;
+    -fx-cursor: hand;
 }
-.tab-pane .tab:selected {
-    -fx-border-width: 0;
+
+/* 3. 选中与未选中状态的文字光效 */
+.tab-pane .tab .tab-label {
+    -fx-text-fill: -color-text-muted;
+    -fx-font-weight: 600;
+    -fx-transition: -fx-text-fill 0.3s ease;
 }
+
 .tab-pane .tab:selected .tab-label {
     -fx-text-fill: -color-gold-light;
     -fx-font-weight: 800;
     -fx-effect: dropshadow(gaussian, -color-gold-glow, 8, 0.4, 0, 0);
 }
-.tab-pane .tab .tab-label { -fx-text-fill: -color-text-muted; -fx-font-weight: 600; }
-/* FTC 赛场专属底层背景 */
+
+/* 4. 消除选中 Tab 时 JavaFX 默认自带的虚线焦点框 */
+.tab-pane .tab:selected:focused {
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+
 .heatmap-bg-pane {
     -fx-background-image: url('../images/ftc_bg.jpg');
     -fx-background-size: cover;
     -fx-background-position: center;
 }
-/* 状态胶囊 (Cyber Badges) */
+
 .cyber-badge-success {
     -fx-background-color: rgba(52, 211, 153, 0.15);
     -fx-border-color: #34D399;
@@ -353,28 +406,63 @@
     -fx-padding: 2px 6px; -fx-font-size: 10px; -fx-font-weight: 800;
     -fx-text-fill: #F87171; -fx-effect: dropshadow(gaussian, rgba(248,113,113,0.5), 5, 0.5, 0, 0);
 }
-/* ==============================================
-   7. Custom View Backgrounds (全局视图背景)
-   ============================================== */
 
+/* ==============================================
+   7. Custom View Backgrounds
+   ============================================== */
 .hub-bg-pane {
     -fx-background-image: url('../images/hub_bg.png');
     -fx-background-position: center center;
-    -fx-background-size: cover;
     -fx-background-repeat: no-repeat;
+    -fx-background-size: 100% 100%;
+    -fx-background-color: #000000;
 }
 
 .main-bg-pane {
     -fx-background-image: url('../images/main_bg.png');
     -fx-background-position: center center;
-    -fx-background-size: cover;
     -fx-background-repeat: no-repeat;
+    -fx-background-size: 100% 100%;
+    -fx-background-color: #000000;
 }
-.hub-bg-pane, .main-bg-pane, .heatmap-bg-pane, .login-bg-pane {
-    /* 强制背景从正中心开始对齐 */
-    -fx-background-position: center center;
-    /* 禁止图片重复平铺 */
-    -fx-background-repeat: no-repeat;
 
-    -fx-background-size: cover;
+.heatmap-bg-pane {
+    -fx-background-image: url('../images/ftc_bg.jpg');
+    -fx-background-position: center center;
+    -fx-background-repeat: no-repeat;
+    -fx-background-size: 100% 100%;
+    -fx-background-color: #000000;
+}
+.main-bg-pane .mac-card, .main-bg-pane .card {
+    -fx-background-color: linear-gradient(to bottom right, rgba(26, 26, 30, 0.35), rgba(10, 10, 12, 0.35));
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.9), 40, 0.15, 0, 20);
+}
+.hub-bg-pane .mac-card {
+    -fx-background-color: linear-gradient(to bottom right, rgba(26, 26, 30, 0.7), rgba(10, 10, 12, 0.7));
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.8), 40, 0.15, 0, 20);
+}
+
+.status-pill {
+    -fx-background-color: rgba(10, 10, 12, 0.65);
+    -fx-padding: 8px 24px;
+    -fx-background-radius: 20px;
+    -fx-border-color: rgba(255, 255, 255, 0.15);
+    -fx-border-radius: 20px;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 10, 0.2, 0, 4);
+    -fx-font-size: 14px;
+}
+.main-bg-pane .mac-card, .main-bg-pane .card {
+    -fx-border-color: rgba(255, 255, 255, 0.08) rgba(255, 255, 255, 0.02) rgba(255, 255, 255, 0.01) rgba(255, 255, 255, 0.02);
+}
+/* ==============================================
+   8. WebView 黑暗模式适配 (修复白底问题)
+   ============================================== */
+.web-view {
+    -fx-background-color: transparent;
+}
+
+/* 强制重写 WebView 内部网页的默认白色背景 */
+.web-view .page {
+    -fx-background-color: transparent;
 }

@@ -10,4 +10,5 @@ public interface CompetitionRepository {
     boolean create(String name, String creatorUsername, String ratingFormula);
     void updateEventInfo(String competitionName, int season, String eventCode, String officialName);
     void ensureLocalCompetitionSync(Competition competition);
+    boolean deleteByName(String name);
 }

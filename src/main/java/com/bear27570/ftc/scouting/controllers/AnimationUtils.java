@@ -6,6 +6,7 @@ import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.geometry.Pos;
+import javafx.scene.CacheHint;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.TabPane;
@@ -35,10 +36,16 @@ public class AnimationUtils {
 
     public static void playSmoothEntrance(Node node) {
         if (node == null) return;
+
+        // 初始状态立即设置
         node.setOpacity(0);
         node.setTranslateY(20);
         node.setScaleX(0.98);
         node.setScaleY(0.98);
+
+        // ★ 核心优化 1：开启位图缓存，避免动画期间实时计算复杂的模糊和阴影
+        node.setCache(true);
+        node.setCacheHint(CacheHint.SPEED);
 
         FadeTransition ft = new FadeTransition(Duration.millis(350), node);
         ft.setToValue(1.0);
@@ -53,7 +60,15 @@ public class AnimationUtils {
         st.setInterpolator(Interpolator.EASE_OUT);
 
         ParallelTransition pt = new ParallelTransition(ft, tt, st);
-        pt.play();
+
+        // 动画结束后关闭缓存，恢复文字和矢量图形的最高清晰度
+        pt.setOnFinished(e -> {
+            node.setCache(false);
+            node.setCacheHint(CacheHint.DEFAULT);
+        });
+
+        // ★ 核心优化 2：推迟到 UI 线程空闲时播放，避开 Layout 和 CSS 解析的计算高峰
+        Platform.runLater(pt::play);
     }
 
     public static void attachLightBarAnimation(TabPane tabPane) {
@@ -61,13 +76,11 @@ public class AnimationUtils {
             StackPane headerArea = (StackPane) tabPane.lookup(".tab-header-area");
             if (headerArea == null) return;
 
-            // --- 节点 A：核心高亮光条 ---
             Rectangle lightBar = new Rectangle(0, 3, Color.web("#FDE047"));
             lightBar.setEffect(new DropShadow(8, Color.web("#FDE047")));
             lightBar.setArcWidth(3);
             lightBar.setArcHeight(3);
 
-            // --- 节点 B：下落式弥散光影 (Glow Box) ---
             LinearGradient glowGradient = new LinearGradient(
                     0, 0, 0, 1, true, CycleMethod.NO_CYCLE,
                     new Stop(0, Color.web("#FDE047", 0.35)),
@@ -89,7 +102,6 @@ public class AnimationUtils {
                     if (index >= 0 && index < headersRegion.getChildren().size()) {
                         Node tabNode = headersRegion.getChildren().get(index);
 
-                        // ★ 绝对坐标系转换，解决各种 Padding 导致的错位问题
                         javafx.geometry.Bounds localBounds = tabNode.getBoundsInLocal();
                         javafx.geometry.Bounds sceneBounds = tabNode.localToScene(localBounds);
                         javafx.geometry.Bounds targetBoundsInHeader = headerArea.sceneToLocal(sceneBounds);

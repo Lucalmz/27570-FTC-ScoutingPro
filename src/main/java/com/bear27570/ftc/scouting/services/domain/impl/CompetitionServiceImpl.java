@@ -56,4 +56,15 @@ public class CompetitionServiceImpl implements CompetitionService {
                 .filter(c -> c.getCreatorUsername().equals(username))
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public boolean deleteCompetition(String name, String requesterUsername) {
+        Competition comp = competitionRepository.findByName(name);
+
+        // 业务层规则：比赛存在，且请求删除的人必须是这个比赛的创建者
+        if (comp != null && comp.getCreatorUsername().equals(requesterUsername)) {
+            return competitionRepository.deleteByName(name);
+        }
+        return false;
+    }
 }

@@ -28,7 +28,7 @@
                 </Button>
             </HBox>
 
-            <Label fx:id="statusLabel" styleClass="text-muted" text="Select a mode to begin." />
+            <Label fx:id="statusLabel" styleClass="text-muted, status-pill" text="Select a mode to begin." />
 
             <VBox fx:id="hostPane" spacing="25" alignment="TOP_CENTER" managed="false" visible="false" styleClass="mac-card" maxWidth="800">
                 <padding><Insets top="40" right="40" bottom="40" left="40" /></padding>
@@ -44,6 +44,10 @@
                     </Button>
                     <Button onAction="#handleAllianceAnalysis" text="Analysis" prefWidth="140">
                         <graphic><FontIcon iconLiteral="fth-pie-chart" iconSize="16"/></graphic>
+                    </Button>
+
+                    <Button onAction="#handleDeleteCompetition" text="Delete" styleClass="danger" prefWidth="120">
+                        <graphic><FontIcon iconLiteral="fth-trash-2" iconSize="16" iconColor="#F87171"/></graphic>
                     </Button>
                 </HBox>
 

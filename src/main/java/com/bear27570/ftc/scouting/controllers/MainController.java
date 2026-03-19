@@ -100,12 +100,12 @@ public class MainController {
             startAsClient();
         }
 
-        // ★ 挂载酷炫的滑动光条动效
         AnimationUtils.attachLightBarAnimation(mainTabPane);
 
+        // ★ 这里是处理 Tab 切换的入口，包装在 runLater 里
         mainTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
             if (newTab != null && newTab.getContent() != null) {
-                AnimationUtils.playSmoothEntrance(newTab.getContent());
+                Platform.runLater(() -> AnimationUtils.playSmoothEntrance(newTab.getContent()));
             }
         });
     }
@@ -266,14 +266,38 @@ public class MainController {
         final Stage dialog = new Stage();
         dialog.initOwner(competitionNameLabel.getScene().getWindow());
         dialog.setTitle("Export Data");
-        VBox dialogVbox = new VBox(20); dialogVbox.setAlignment(javafx.geometry.Pos.CENTER); dialogVbox.setPadding(new javafx.geometry.Insets(30));
-        dialogVbox.setStyle("-fx-border-color: #4A5C70; -fx-border-width: 2;");
-        Label headerLabel = new Label("Export CSV Data"); headerLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
-        Button btnHistory = new Button("Export Match History"); btnHistory.setOnAction(e -> { dialog.close(); exportData("Match History"); });
-        Button btnRankings = new Button("Export Team Rankings"); btnRankings.setOnAction(e -> { dialog.close(); exportData("Team Rankings"); });
-        Button btnCancel = new Button("Cancel"); btnCancel.setOnAction(e -> dialog.close());
+
+        // 使用 mac-card 统一风格
+        VBox dialogVbox = new VBox(20);
+        dialogVbox.setAlignment(javafx.geometry.Pos.CENTER);
+        dialogVbox.setPadding(new javafx.geometry.Insets(30));
+        dialogVbox.getStyleClass().add("mac-card"); // ✨ 替换掉原来的硬编码 style
+
+        Label headerLabel = new Label("Export CSV Data");
+        headerLabel.getStyleClass().add("title-3"); // ✨ 应用 Audiowide 标题字体
+
+        Button btnHistory = new Button("Export Match History");
+        btnHistory.getStyleClass().add("button"); // ✨ 应用按钮光效
+        btnHistory.setOnAction(e -> { dialog.close(); exportData("Match History"); });
+
+        Button btnRankings = new Button("Export Team Rankings");
+        btnRankings.getStyleClass().add("button");
+        btnRankings.setOnAction(e -> { dialog.close(); exportData("Team Rankings"); });
+
+        Button btnCancel = new Button("Cancel");
+        btnCancel.getStyleClass().addAll("button", "danger"); // ✨ 取消按钮用红色
+        btnCancel.setOnAction(e -> dialog.close());
+
         dialogVbox.getChildren().addAll(headerLabel, btnHistory, btnRankings, btnCancel);
-        dialog.setScene(new Scene(dialogVbox, 400, 300)); dialog.show();
+
+        Scene scene = new Scene(dialogVbox, 400, 300);
+        // ✨ UI 补丁：注入全局 CSS
+        try {
+            scene.getStylesheets().add(getClass().getResource("/com/bear27570/ftc/scouting/styles/style.css").toExternalForm());
+        } catch (Exception e) {}
+
+        dialog.setScene(scene);
+        dialog.show();
     }
 
     private void exportData(String type) {
