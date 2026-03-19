@@ -51,7 +51,7 @@ public class TabHistoryController {
                 if (empty || item == null) {
                     setText(null); setGraphic(null); setStyle("");
                 } else {
-                    Double weight = submitterReliabilityMap != null ? submitterReliabilityMap.getOrDefault(item, 1.0) : 1.0;
+                    double weight = submitterReliabilityMap != null ? submitterReliabilityMap.getOrDefault(item, 1.0) : 1.0;
                     if (weight < 1.0) {
                         setText(item + " (Low Rel)");
                         setStyle("-fx-text-fill: #F87171 !important; -fx-font-weight: bold;");

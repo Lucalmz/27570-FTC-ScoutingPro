@@ -10,6 +10,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -32,73 +33,74 @@ public class FtcScoutApiClient {
     public void fetchAndSyncEventDataAsync(int season, String eventCode, String competitionName, ApiCallback callback) {
         new Thread(() -> {
             try {
-                HttpClient client = HttpClient.newHttpClient();
-                String gqlUrl = "https://api.ftcscout.org/graphql";
+                try (HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build()) {
+                    String gqlUrl = "https://api.ftcscout.org/graphql";
 
-                // 1. 查询赛事基本信息
-                String infoQuery = String.format(
-                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { name hasMatches } }\"}",
-                        season, eventCode
-                );
+                    // 1. 查询赛事基本信息
+                    String infoQuery = String.format(
+                            "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { name hasMatches } }\"}",
+                            season, eventCode
+                    );
 
-                HttpRequest infoReq = HttpRequest.newBuilder()
-                        .uri(URI.create(gqlUrl))
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(infoQuery))
-                        .build();
-                HttpResponse<String> infoRes = client.send(infoReq, HttpResponse.BodyHandlers.ofString());
-
-                if (infoRes.statusCode() != 200 || infoRes.body().contains("\"errors\"")) {
-                    callback.onError("API Error. Check Season/Event Code.");
-                    return;
-                }
-
-                String eventName = "Unknown Event";
-                boolean hasMatches = false;
-
-                Matcher nameMatcher = Pattern.compile("\"name\"\\s*:\\s*\"([^\"]+)\"").matcher(infoRes.body());
-                if (nameMatcher.find()) eventName = nameMatcher.group(1);
-
-                Matcher hasMatchesMatcher = Pattern.compile("\"hasMatches\"\\s*:\\s*(true|false)").matcher(infoRes.body());
-                if (hasMatchesMatcher.find()) hasMatches = Boolean.parseBoolean(hasMatchesMatcher.group(1));
-
-                callback.onEventFound(eventName, hasMatches);
-
-                if (!hasMatches) {
-                    callback.onSuccess(eventName, 0);
-                    return;
-                }
-
-                // 2. 获取具体比赛数据 (★ 修改点：加入了 totalPoints 字段请求)
-                int matchCount = 0;
-                String[] queriesToTry = {
-                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2025 { red { totalPointsNp majorsCommitted minorsCommitted } blue { totalPointsNp majorsCommitted minorsCommitted } } } } } }\"}",
-                        "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2024 { red { totalPointsNp majorsCommitted minorsCommitted } blue { totalPointsNp majorsCommitted minorsCommitted } } } } } }\"}"
-                };
-
-                for (String qFormat : queriesToTry) {
-                    String query = String.format(qFormat, season, eventCode);
-                    HttpRequest dataReq = HttpRequest.newBuilder()
+                    HttpRequest infoReq = HttpRequest.newBuilder()
                             .uri(URI.create(gqlUrl))
                             .header("Content-Type", "application/json")
-                            .POST(HttpRequest.BodyPublishers.ofString(query))
+                            .POST(HttpRequest.BodyPublishers.ofString(infoQuery))
                             .build();
+                    HttpResponse<String> infoRes = client.send(infoReq, HttpResponse.BodyHandlers.ofString());
 
-                    HttpResponse<String> dataRes = client.send(dataReq, HttpResponse.BodyHandlers.ofString());
-
-                    if (dataRes.statusCode() == 200 && !dataRes.body().contains("\"errors\"")) {
-                        matchCount = parseAndSaveMatchData(dataRes.body(), competitionName);
-                        if (matchCount > 0) break;
+                    if (infoRes.statusCode() != 200 || infoRes.body().contains("\"errors\"")) {
+                        callback.onError("API Error. Check Season/Event Code.");
+                        return;
                     }
+
+                    String eventName = "Unknown Event";
+                    boolean hasMatches = false;
+
+                    Matcher nameMatcher = Pattern.compile("\"name\"\\s*:\\s*\"([^\"]+)\"").matcher(infoRes.body());
+                    if (nameMatcher.find()) eventName = nameMatcher.group(1);
+
+                    Matcher hasMatchesMatcher = Pattern.compile("\"hasMatches\"\\s*:\\s*(true|false)").matcher(infoRes.body());
+                    if (hasMatchesMatcher.find()) hasMatches = Boolean.parseBoolean(hasMatchesMatcher.group(1));
+
+                    callback.onEventFound(eventName, hasMatches);
+
+                    if (!hasMatches) {
+                        callback.onSuccess(eventName, 0);
+                        return;
+                    }
+
+                    // 2. 获取具体比赛数据 (★ 修改点：加入了 totalPoints 字段请求)
+                    int matchCount = 0;
+                    String[] queriesToTry = {
+                            "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2025 { red { totalPointsNp majorsCommitted minorsCommitted } blue { totalPointsNp majorsCommitted minorsCommitted } } } } } }\"}",
+                            "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2024 { red { totalPointsNp majorsCommitted minorsCommitted } blue { totalPointsNp majorsCommitted minorsCommitted } } } } } }\"}"
+                    };
+
+                    for (String qFormat : queriesToTry) {
+                        String query = String.format(qFormat, season, eventCode);
+                        HttpRequest dataReq = HttpRequest.newBuilder()
+                                .uri(URI.create(gqlUrl))
+                                .header("Content-Type", "application/json")
+                                .POST(HttpRequest.BodyPublishers.ofString(query))
+                                .build();
+
+                        HttpResponse<String> dataRes = client.send(dataReq, HttpResponse.BodyHandlers.ofString());
+
+                        if (dataRes.statusCode() == 200 && !dataRes.body().contains("\"errors\"")) {
+                            matchCount = parseAndSaveMatchData(dataRes.body(), competitionName);
+                            if (matchCount > 0) break;
+                        }
+                    }
+
+                    callback.onSuccess(eventName, matchCount);
                 }
-
-                callback.onSuccess(eventName, matchCount);
-
             } catch (Exception e) {
                 callback.onError("Failed: " + e.getMessage());
             }
         }).start();
     }
+
     private int parseAndSaveMatchData(String json, String competitionName) {
         int count = 0;
         try {

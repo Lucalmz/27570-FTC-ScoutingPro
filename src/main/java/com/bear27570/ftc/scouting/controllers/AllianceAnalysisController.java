@@ -126,9 +126,7 @@ public class AllianceAnalysisController {
 
         chatInputField.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.ENTER) {
-                if (event.isShiftDown()) {
-                    // new line
-                } else {
+                if (!event.isShiftDown()) {
                     event.consume();
                     handleSendChat();
                 }

@@ -77,7 +77,10 @@ public class MainApplication extends Application {
     public void init() throws Exception {
         Application.setUserAgentStylesheet(new CupertinoDark().getUserAgentStylesheet());
         String dbFolder = System.getProperty("user.home") + File.separator + ".ftcscoutingpro";
-        new File(dbFolder).mkdirs();
+        File dbDir = new File(dbFolder);
+        if (!dbDir.exists() && !dbDir.mkdirs()) {
+            System.err.println("Warning: Could not create database directory at " + dbFolder);
+        }
         String dbUrl = "jdbc:h2:" + dbFolder + File.separator + "ftc_scouting_master_db";
 
         DatabaseManager.initialize(dbUrl);

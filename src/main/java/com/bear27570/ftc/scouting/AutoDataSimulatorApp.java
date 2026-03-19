@@ -48,7 +48,10 @@ public class AutoDataSimulatorApp {
 
         // 1. 初始化数据库连接
         String dbFolder = System.getProperty("user.home") + File.separator + ".ftcscoutingpro";
-        new File(dbFolder).mkdirs();
+        File dbDir = new File(dbFolder);
+        if (!dbDir.exists() && !dbDir.mkdirs()) {
+            System.err.println("Warning: Could not create database directory at " + dbFolder);
+        }
         String dbUrl = "jdbc:h2:" + dbFolder + File.separator + "ftc_scouting_master_db;AUTO_SERVER=TRUE";
         DatabaseManager.initialize(dbUrl);
 

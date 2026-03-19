@@ -1,11 +1,13 @@
 // File: ScoreEntry.java
 package com.bear27570.ftc.scouting.models;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 public class ScoreEntry implements Serializable {
+    @Serial
     private static final long serialVersionUID = 13L;
 
     public enum Type { ALLIANCE, SINGLE }
