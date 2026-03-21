@@ -137,4 +137,5 @@ This project stands on the shoulders of open-source giants:
 * **Networking & API:** Standard Java Sockets (TCP/UDP), [Javalin](https://www.google.com/search?q=https://javalin.io/) for lightweight HTTP/WebSocket services, and Google [Gson](https://www.google.com/search?q=https://github.com/google/gson) for JSON serialization.
 * **Math Engine:** [exp4j](https://www.google.com/search?q=https://www.objecthunter.net/exp4j/) for parsing dynamic scouting formulas.
 
+Developed and maintained by Lucalmz (Committing as BEAR27570).
 Architected and developed with ❤️ for the FIRST Tech Challenge global community.
