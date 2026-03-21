@@ -125,44 +125,63 @@ public class TabRankingsController {
                 }
             }
         });
-
         rankTrendCol.setCellValueFactory(new PropertyValueFactory<>("recentRatings"));
         rankTrendCol.setCellFactory(tc -> new TableCell<>() {
-            private final javafx.scene.canvas.Canvas canvas = new javafx.scene.canvas.Canvas(60, 20);
+            // 优化 1：稍微放大画布 (70x30)，给四周的发光阴影留出安全空间，防止被切断或清理不净
+            private final javafx.scene.canvas.Canvas canvas = new javafx.scene.canvas.Canvas(70, 30);
+
+            {
+                // 优化 2：将发光特效在初始化时只施加给 Canvas 节点，不要在 updateItem 里施加给 gc
+                canvas.setEffect(new javafx.scene.effect.DropShadow(4, javafx.scene.paint.Color.web("#D4AF37")));
+            }
+
             @Override
             protected void updateItem(List<Double> ratings, boolean empty) {
                 super.updateItem(ratings, empty);
+
                 if (empty || ratings == null || ratings.size() < 2) {
                     setGraphic(null);
                 } else {
                     javafx.scene.canvas.GraphicsContext gc = canvas.getGraphicsContext2D();
-                    gc.clearRect(0, 0, 60, 20);
+
+                    // 彻底清空整个画布的当前状态
+                    gc.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
 
                     // 计算最大最小值以自适应缩放
                     double max = ratings.stream().max(Double::compareTo).orElse(1.0);
                     double min = ratings.stream().min(Double::compareTo).orElse(0.0);
                     double range = max - min == 0 ? 1 : max - min;
 
+                    // 基础绘制配置
                     gc.setStroke(javafx.scene.paint.Color.web("#FDE047")); // 金色高亮线
                     gc.setLineWidth(1.5);
-                    // 给线条加一点发光效果
-                    gc.setEffect(new javafx.scene.effect.DropShadow(4, javafx.scene.paint.Color.web("#D4AF37")));
 
-                    double xStep = 60.0 / (ratings.size() - 1);
+                    // 绘图区域配置：留出 5px 的 Padding 用于居中
+                    double drawWidth = 60.0;
+                    double drawHeight = 20.0;
+                    double paddingX = 5.0;
+                    double paddingY = 5.0;
+
+                    double xStep = drawWidth / (ratings.size() - 1);
+
                     gc.beginPath();
                     for (int i = 0; i < ratings.size(); i++) {
-                        double x = i * xStep;
-                        // Y轴翻转，数值越高Y越小 (顶部)
-                        double y = 18 - ((ratings.get(i) - min) / range) * 16;
+                        double x = paddingX + (i * xStep);
+                        // 优化 3：Y轴翻转，并处理 max == min (全部分数相同) 时画在正中间的情况
+                        double y = paddingY + ((max == min) ? (drawHeight / 2) : (drawHeight - ((ratings.get(i) - min) / range) * drawHeight));
+
                         if (i == 0) gc.moveTo(x, y);
                         else gc.lineTo(x, y);
                     }
                     gc.stroke();
 
-                    // 最后一个点画个发光小圆
-                    double lastY = 18 - ((ratings.get(ratings.size()-1) - min) / range) * 16;
+                    // 最后一个点画个发光小白圆，精准对齐线段末端
+                    double lastX = paddingX + drawWidth;
+                    double lastY = paddingY + ((max == min) ? (drawHeight / 2) : (drawHeight - ((ratings.get(ratings.size()-1) - min) / range) * drawHeight));
+
                     gc.setFill(javafx.scene.paint.Color.WHITE);
-                    gc.fillOval(56, lastY - 2, 4, 4);
+                    // 减去半径 2.5 确保圆心严格对齐
+                    gc.fillOval(lastX - 2.5, lastY - 2.5, 5, 5);
 
                     setGraphic(canvas);
                     setAlignment(javafx.geometry.Pos.CENTER);

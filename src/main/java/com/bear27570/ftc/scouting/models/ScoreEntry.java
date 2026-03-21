@@ -97,7 +97,9 @@ public class ScoreEntry implements Serializable {
         this.team2Broken = team2Broken;
         this.clickLocations = clickLocations;
         this.submitter = submitter;
-        this.submissionTime = existingTimestamp;
+        this.submissionTime = (existingTimestamp == null || existingTimestamp.trim().isEmpty())
+                ? LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                : existingTimestamp;
         this.syncStatus = syncStatus != null ? syncStatus : SyncStatus.UNSYNCED;
         this.totalScore = calculateTotalScore();
     }

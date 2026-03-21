@@ -39,7 +39,7 @@ public class TeamRanking implements Serializable {
     }
 
     public void addMatchResult(double autoScore, double teleop, boolean sequence, boolean climb, int hits, int shots,
-                               int penaltyCommitted, int penaltyFromOpponent, double weight) {
+                               int penaltyCommitted, int penaltyFromOpponent, double weight,double matchRating) {
         matchesPlayed++;
         totalWeight += weight;
 
@@ -65,7 +65,7 @@ public class TeamRanking implements Serializable {
         } else {
             avgAutoArtifacts = 0;
         }
-
+        recentRatings.add(matchRating);
         if (sequence) this.canSequence = true;
         if (climb) this.l2Capable = true;
         recentRatings.add(rating);

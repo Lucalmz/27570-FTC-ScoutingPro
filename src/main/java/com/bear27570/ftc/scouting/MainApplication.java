@@ -72,24 +72,21 @@ public class MainApplication extends Application {
             System.err.println("WARNING: Failed to load application icon: " + e.getMessage());
         }
     }
-
     @Override
     public void init() throws Exception {
         Application.setUserAgentStylesheet(new CupertinoDark().getUserAgentStylesheet());
         String dbFolder = System.getProperty("user.home") + File.separator + ".ftcscoutingpro";
-        File dbDir = new File(dbFolder);
-        if (!dbDir.exists() && !dbDir.mkdirs()) {
-            System.err.println("Warning: Could not create database directory at " + dbFolder);
-        }
-        String dbUrl = "jdbc:h2:" + dbFolder + File.separator + "ftc_scouting_master_db";
+        String dbUrl = "jdbc:h2:" + dbFolder + File.separator + "ftc_scouting_master_db;AUTO_SERVER=TRUE";
 
+        // 只保留这一行初始化
         DatabaseManager.initialize(dbUrl);
 
-        userRepository = new UserRepositoryJdbcImpl(dbUrl);
-        membershipRepository = new MembershipRepositoryJdbcImpl(dbUrl);
-        competitionRepository = new CompetitionRepositoryJdbcImpl(dbUrl);
-        scoreRepository = new ScoreRepositoryJdbcImpl(dbUrl);
-        penaltyRepository = new PenaltyRepositoryJdbcImpl(dbUrl);
+        // 👇 彻底告别旧 JDBC，全部换装 JDBI 实现
+        userRepository = new UserRepositoryJdbiImpl();
+        membershipRepository = new MembershipRepositoryJdbiImpl();
+        competitionRepository = new CompetitionRepositoryJdbiImpl();
+        scoreRepository = new ScoreRepositoryJdbiImpl(); // 这是上次发给你的那个
+        penaltyRepository = new PenaltyRepositoryJdbiImpl();
 
         userService = new UserServiceImpl(userRepository);
         competitionService = new CompetitionServiceImpl(competitionRepository, membershipRepository, userRepository);

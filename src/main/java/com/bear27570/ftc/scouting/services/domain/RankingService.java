@@ -167,7 +167,7 @@ public class RankingService {
         boolean seq = isTeam1 ? score.isTeam1CanSequence() : score.isTeam2CanSequence();
         boolean climb = isTeam1 ? score.isTeam1L2Climb() : score.isTeam2L2Climb();
 
-        tr.addMatchResult(autoVal, teleopVal, seq, climb, hits, shots, penComm, penRec, weight);
+        tr.addMatchResult(autoVal, teleopVal, seq, climb, hits, shots, penComm, penRec, weight, matchRating);
 
         totalRatingPoints.put(teamNum, totalRatingPoints.getOrDefault(teamNum, 0.0) + matchRating);
     }

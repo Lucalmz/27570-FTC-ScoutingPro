@@ -8,10 +8,10 @@ import com.bear27570.ftc.scouting.repository.DatabaseManager;
 import com.bear27570.ftc.scouting.repository.PenaltyRepository;
 import com.bear27570.ftc.scouting.repository.ScoreRepository;
 import com.bear27570.ftc.scouting.repository.UserRepository;
-import com.bear27570.ftc.scouting.repository.impl.CompetitionRepositoryJdbcImpl;
-import com.bear27570.ftc.scouting.repository.impl.PenaltyRepositoryJdbcImpl;
-import com.bear27570.ftc.scouting.repository.impl.ScoreRepositoryJdbcImpl;
-import com.bear27570.ftc.scouting.repository.impl.UserRepositoryJdbcImpl;
+import com.bear27570.ftc.scouting.repository.impl.CompetitionRepositoryJdbiImpl;
+import com.bear27570.ftc.scouting.repository.impl.PenaltyRepositoryJdbiImpl;
+import com.bear27570.ftc.scouting.repository.impl.ScoreRepositoryJdbiImpl;
+import com.bear27570.ftc.scouting.repository.impl.UserRepositoryJdbiImpl;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -24,6 +24,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale; // 👈 新增引入
 import java.util.Random;
 
 public class AutoDataSimulatorApp {
@@ -31,22 +32,26 @@ public class AutoDataSimulatorApp {
     private static final String API_URL = "https://api.ftcscout.org/graphql";
     private static final String COMPETITION_NAME = "Simulated_Championship_2025";
 
-    // ★ 已经为你修改：将其设为 Lucalmz，这样他在软件里就是这场比赛的 Host 了
     private static final String SUBMITTER_NAME = "Lucalmz";
 
-    // 假设场地绘图板尺寸
     private static final double FIELD_WIDTH = 650.0;
     private static final double FIELD_HEIGHT = 650.0;
     private static final double DIVIDER_Y = FIELD_HEIGHT * (2.0 / 3.0);
 
     private static final Random random = new Random();
 
+    // 💡 新增：构建一个随机池，模拟真实的赛场情况（有些队伍偏科，有些队伍全能）
+    private static final String[] PRESET_ROUTINES = {
+            "R1", "R1", "R2", "R2", "R3", "R3", "R3", // 单行比较常见
+            "R1 R2", "R2 R3", "R1 R3",                // 双行混合
+            "R1 R2 R3", "NONE", "NONE"                // 满分大佬或自动阶段翻车的
+    };
+
     public static void main(String[] args) {
         System.out.println("==================================================");
         System.out.println("🚀 启动 FTCScout 真实数据拉取与 AI 热力图模拟引擎");
         System.out.println("==================================================");
 
-        // 1. 初始化数据库连接
         String dbFolder = System.getProperty("user.home") + File.separator + ".ftcscoutingpro";
         File dbDir = new File(dbFolder);
         if (!dbDir.exists() && !dbDir.mkdirs()) {
@@ -55,12 +60,11 @@ public class AutoDataSimulatorApp {
         String dbUrl = "jdbc:h2:" + dbFolder + File.separator + "ftc_scouting_master_db;AUTO_SERVER=TRUE";
         DatabaseManager.initialize(dbUrl);
 
-        ScoreRepository scoreRepo = new ScoreRepositoryJdbcImpl(dbUrl);
-        PenaltyRepository penaltyRepo = new PenaltyRepositoryJdbcImpl(dbUrl);
-        UserRepository userRepo = new UserRepositoryJdbcImpl(dbUrl);
-        CompetitionRepository compRepo = new CompetitionRepositoryJdbcImpl(dbUrl);
+        ScoreRepository scoreRepo = new ScoreRepositoryJdbiImpl();
+        PenaltyRepository penaltyRepo = new PenaltyRepositoryJdbiImpl();
+        UserRepository userRepo = new UserRepositoryJdbiImpl();
+        CompetitionRepository compRepo = new CompetitionRepositoryJdbiImpl();
 
-        // ★ 在插入分数前，确保数据库里已经有 Lucalmz 这个用户和这场比赛！
         userRepo.ensureUserExists(SUBMITTER_NAME);
         if (compRepo.findByName(COMPETITION_NAME) == null) {
             compRepo.create(COMPETITION_NAME, SUBMITTER_NAME, "total");
@@ -70,11 +74,9 @@ public class AutoDataSimulatorApp {
             System.out.println("⚡ 虚拟赛事已存在，准备追加数据...");
         }
 
-        // 2. 配置你要抓取的赛事
         int season = 2025;
         String eventCode = "CNCMPLB";
 
-        // 3. 构建 GraphQL 查询
         String query = String.format("""
             {"query": "query Matches { eventByCode(season: %d, code: \\"%s\\") { matches { matchNum actualStartTime scores { ... on MatchScores2024 { red { totalPointsNp majorsCommitted minorsCommitted } blue { totalPointsNp majorsCommitted minorsCommitted } } ... on MatchScores2025 { red { totalPointsNp minorsCommitted majorsCommitted } blue { totalPointsNp minorsCommitted majorsCommitted } } } teams { alliance teamNumber } } } }" }
             """, season, eventCode).replace("\n", " ");
@@ -176,6 +178,12 @@ public class AutoDataSimulatorApp {
 
         String clickLocations = generateHeatmapData(nearHits, farHits);
 
+        // 💡 随机指派自动阶段战术
+        String t1Proj = random.nextBoolean() ? "NEAR" : "FAR";
+        String t2Proj = random.nextBoolean() ? "NEAR" : "FAR";
+        String t1Row = PRESET_ROUTINES[random.nextInt(PRESET_ROUTINES.length)];
+        String t2Row = PRESET_ROUTINES[random.nextInt(PRESET_ROUTINES.length)];
+
         ScoreEntry entry = new ScoreEntry(
                 ScoreEntry.Type.ALLIANCE,
                 matchNum,
@@ -183,13 +191,13 @@ public class AutoDataSimulatorApp {
                 team1,
                 team2,
                 t1Auto, t2Auto,
-                "NEAR", "FAR",
-                "R1", "R3",
+                t1Proj, t2Proj,
+                t1Row, t2Row, // 👈 使用随机生成的组合
                 totalTeleopHits,
                 t1Seq, t2Seq, t1Climb, t2Climb,
                 false, false, false, false,
                 clickLocations,
-                SUBMITTER_NAME // ★ 这里的记录也会挂在 Lucalmz 名下
+                SUBMITTER_NAME
         );
         entry.setSyncStatus(ScoreEntry.SyncStatus.SYNCED);
 
@@ -200,20 +208,20 @@ public class AutoDataSimulatorApp {
         StringBuilder sb = new StringBuilder();
         long baseTimestamp = System.currentTimeMillis() - 120000;
 
-        // Team 1：近战区
         for (int i = 0; i < nearHits; i++) {
             double x = clamp(325 + random.nextGaussian() * 80, 50, FIELD_WIDTH - 50);
             double y = clamp(216 + random.nextGaussian() * 100, 50, DIVIDER_Y - 10);
             baseTimestamp += random.nextInt(4000) + 1000;
-            sb.append(String.format("1:%.1f,%.1f,0,%d;", x, y, baseTimestamp));
+            // 💡 强制 Locale.US 防止双浮点数逗号污染
+            sb.append(String.format(Locale.US, "1:%.1f,%.1f,0,%d;", x, y, baseTimestamp));
         }
 
-        // Team 2：远战区
         for (int i = 0; i < farHits; i++) {
             double x = clamp(325 + random.nextGaussian() * 60, 100, FIELD_WIDTH - 100);
             double y = clamp(540 + random.nextGaussian() * 50, DIVIDER_Y + 10, FIELD_HEIGHT - 30);
             baseTimestamp += random.nextInt(5000) + 1500;
-            sb.append(String.format("2:%.1f,%.1f,0,%d;", x, y, baseTimestamp));
+            // 💡 强制 Locale.US
+            sb.append(String.format(Locale.US, "2:%.1f,%.1f,0,%d;", x, y, baseTimestamp));
         }
 
         return sb.toString();

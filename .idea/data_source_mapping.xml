@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourcePerFileMappings">
+    <file url="file://$PROJECT_DIR$/src/main/java/com/bear27570/ftc/scouting/repository/dao/ScoreDao.java" value="723517e7-279d-486a-a952-3eac1c45b8b6" />
+    <file url="file://$PROJECT_DIR$/src/main/java/com/bear27570/ftc/scouting/repository/dao/UserDao.java" value="723517e7-279d-486a-a952-3eac1c45b8b6" />
+  </component>
+</project>

@@ -5,37 +5,53 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.canvas.Canvas?>
 
-<ScrollPane fitToWidth="true" style="-fx-background-color: transparent;" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.HeatmapController">
+<ScrollPane fitToWidth="true" style="-fx-background-color: transparent;" stylesheets="@../styles/style.css"
+            xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.bear27570.ftc.scouting.controllers.HeatmapController">
 
     <StackPane styleClass="heatmap-bg-pane">
 
         <Region style="-fx-background-color: rgba(0, 0, 0, 0.75);"/>
 
         <VBox spacing="40" alignment="TOP_CENTER" maxWidth="1200">
-            <padding><Insets top="40" right="50" bottom="60" left="50"/></padding>
+            <padding>
+                <Insets top="40" right="50" bottom="60" left="50"/>
+            </padding>
 
-            <HBox alignment="CENTER" styleClass="top-bar" style="-fx-background-color: transparent; -fx-border-color: transparent transparent rgba(255,255,255,0.1) transparent;">
-                <padding><Insets bottom="20"/></padding>
-                <Label fx:id="teamTitleLabel" styleClass="title-2" text="Team Analytics" style="-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 10, 0.5, 0, 0);"/>
+            <HBox alignment="CENTER" styleClass="top-bar"
+                  style="-fx-background-color: transparent; -fx-border-color: transparent transparent rgba(255,255,255,0.1) transparent;">
+                <padding>
+                    <Insets bottom="20"/>
+                </padding>
+                <Label fx:id="teamTitleLabel" styleClass="title-2" text="Team Analytics"
+                       style="-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 10, 0.5, 0, 0);"/>
             </HBox>
 
             <HBox spacing="40" alignment="CENTER">
 
-                <StackPane fx:id="mapPane" styleClass="mac-card" style="-fx-padding: 30; -fx-background-color: rgba(10,10,12,0.6);">
+                <StackPane fx:id="mapPane" styleClass="mac-card"
+                           style="-fx-padding: 30; -fx-background-color: rgba(10,10,12,0.6);">
                     <StackPane style="-fx-padding: 0; -fx-background-color: transparent;">
                         <ImageView fx:id="fieldImageView" fitHeight="500" fitWidth="500" preserveRatio="true">
-                            <image><Image url="@../images/field.png"/></image>
+                            <image>
+                                <Image url="@../images/field.png"/>
+                            </image>
                         </ImageView>
                         <Canvas fx:id="heatmapCanvas" height="500" width="500"/>
                     </StackPane>
                 </StackPane>
 
-                <VBox spacing="20" styleClass="mac-card" style="-fx-background-color: rgba(10,10,12,0.6);" prefWidth="350">
-                    <padding><Insets top="30" right="30" bottom="30" left="30"/></padding>
+                <VBox spacing="20" styleClass="mac-card" style="-fx-background-color: rgba(10,10,12,0.6);"
+                      prefWidth="350">
+                    <padding>
+                        <Insets top="30" right="30" bottom="30" left="30"/>
+                    </padding>
 
-                    <VBox fx:id="statusBox" spacing="10" styleClass="panel-inner" style="-fx-background-color: rgba(0,0,0,0.4);">
+                    <VBox fx:id="statusBox" spacing="10" styleClass="panel-inner"
+                          style="-fx-background-color: rgba(0,0,0,0.4);">
                         <Label text="Team Status" styleClass="title-4"/>
-                        <Label fx:id="statusTextLabel" text="Loading..." styleClass="text-success" style="-fx-font-size: 20px; -fx-font-weight: 800;"/>
+                        <Label fx:id="statusTextLabel" text="Loading..." styleClass="text-success"
+                               style="-fx-font-size: 20px; -fx-font-weight: 800;"/>
                         <Label text="Broken Matches:" styleClass="text-muted"/>
                         <Label fx:id="brokenTextLabel" text="None" styleClass="text-danger" wrapText="true"/>
                     </VBox>
@@ -45,17 +61,21 @@
                     <VBox spacing="15" styleClass="panel-inner" style="-fx-background-color: rgba(0,0,0,0.4);">
                         <VBox spacing="5">
                             <Label text="Play Style" styleClass="text-muted"/>
-                            <Label fx:id="playStyleLabel" text="Analyzing..." styleClass="text-accent" style="-fx-font-size: 22px; -fx-font-weight: bold;"/>
+                            <Label fx:id="playStyleLabel" text="Analyzing..." styleClass="text-accent"
+                                   style="-fx-font-size: 22px; -fx-font-weight: bold;"/>
                         </VBox>
                         <Region style="-fx-background-color: rgba(255,255,255,0.05); -fx-pref-height: 1px;"/>
                         <VBox spacing="5">
                             <Label text="Efficiency" styleClass="text-muted"/>
-                            <Label fx:id="efficiencyLabel" text="0.0 PPS" styleClass="text-warning, mono-text" style="-fx-font-size: 26px; -fx-font-weight: bold;"/>
+                            <Label fx:id="efficiencyLabel" text="0.0 PPS" styleClass="text-warning, mono-text"
+                                   style="-fx-font-size: 26px; -fx-font-weight: bold;"/>
                         </VBox>
                     </VBox>
 
                     <HBox spacing="15">
-                        <VBox spacing="10" styleClass="panel-inner" style="-fx-border-color: rgba(251, 191, 36, 0.4); -fx-background-color: rgba(0,0,0,0.4);" HBox.hgrow="ALWAYS">
+                        <VBox spacing="10" styleClass="panel-inner"
+                              style="-fx-border-color: rgba(251, 191, 36, 0.4); -fx-background-color: rgba(0,0,0,0.4);"
+                              HBox.hgrow="ALWAYS">
                             <Label text="Far Zone" styleClass="text-warning" style="-fx-font-weight: bold;"/>
                             <HBox spacing="10">
                                 <Label text="Avg Hits:" styleClass="text-muted"/>
@@ -67,7 +87,9 @@
                             </HBox>
                         </VBox>
 
-                        <VBox spacing="10" styleClass="panel-inner" style="-fx-border-color: rgba(52, 211, 153, 0.4); -fx-background-color: rgba(0,0,0,0.4);" HBox.hgrow="ALWAYS">
+                        <VBox spacing="10" styleClass="panel-inner"
+                              style="-fx-border-color: rgba(52, 211, 153, 0.4); -fx-background-color: rgba(0,0,0,0.4);"
+                              HBox.hgrow="ALWAYS">
                             <Label text="Near Zone" styleClass="text-success" style="-fx-font-weight: bold;"/>
                             <HBox spacing="10">
                                 <Label text="Avg Hits:" styleClass="text-muted"/>
@@ -79,11 +101,20 @@
                             </HBox>
                         </VBox>
                     </HBox>
+
+                    <Label text="Auto Routines" styleClass="title-4" style="-fx-padding: 10 0 0 0;"/>
+                    <VBox fx:id="routinesBox" spacing="12" styleClass="panel-inner"
+                          style="-fx-background-color: rgba(0,0,0,0.4);">
+                        <Label text="Analyzing Routines..." styleClass="text-muted"/>
+                    </VBox>
+
                 </VBox>
             </HBox>
 
             <VBox spacing="15" styleClass="mac-card" style="-fx-background-color: rgba(10,10,12,0.6);" maxWidth="900">
-                <padding><Insets top="25" right="30" bottom="25" left="30"/></padding>
+                <padding>
+                    <Insets top="25" right="30" bottom="25" left="30"/>
+                </padding>
                 <Label text="Match Log &amp; Advanced Detail" styleClass="title-4"/>
 
                 <TableView fx:id="matchTable" prefHeight="250" style="-fx-background-color: transparent;">
@@ -96,7 +127,9 @@
                         <TableColumn fx:id="colScore" text="Total Score" prefWidth="100"/>
                         <TableColumn fx:id="colStatus" text="Robot Status" prefWidth="120"/>
                     </columns>
-                    <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
+                    <columnResizePolicy>
+                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
+                    </columnResizePolicy>
                 </TableView>
             </VBox>
         </VBox>

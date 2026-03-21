@@ -22,6 +22,7 @@ import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Stack;
 
 public class FieldInputController {
@@ -37,7 +38,7 @@ public class FieldInputController {
     private MainController parentController;
 
     private final List<TeamPoint> points = new ArrayList<>();
-    // 新增：用于存放历史记录的栈，实现撤销功能
+    // 用于存放历史记录的栈，实现撤销功能
     private final Stack<List<TeamPoint>> undoStack = new Stack<>();
 
     private boolean isAllianceMode = true;
@@ -103,7 +104,6 @@ public class FieldInputController {
         dialogStage.getScene().setOnKeyReleased(this::handleKeyReleased);
     }
 
-    // --- 新增：保存当前状态到撤销栈 ---
     private void saveState() {
         List<TeamPoint> snapshot = new ArrayList<>();
         for (TeamPoint p : points) {
@@ -112,7 +112,6 @@ public class FieldInputController {
         undoStack.push(snapshot);
     }
 
-    // --- 新增：处理撤销逻辑 ---
     @FXML
     private void handleUndo() {
         if (!undoStack.isEmpty()) {
@@ -123,7 +122,6 @@ public class FieldInputController {
     }
 
     private void handleKeyPressed(KeyEvent event) {
-        // 新增：拦截 Ctrl + Z
         if (event.isControlDown() && event.getCode() == KeyCode.Z) {
             handleUndo();
             return;
@@ -147,6 +145,7 @@ public class FieldInputController {
         if (removeModeBtn.isSelected()) inputPane.setCursor(Cursor.CROSSHAIR);
         else inputPane.setCursor(Cursor.HAND);
     }
+
     @FXML
     private void handleCanvasClick(MouseEvent event) {
         if (!event.isControlDown()) {
@@ -154,7 +153,6 @@ public class FieldInputController {
             return;
         }
 
-        // 修改：在修改数组之前，保存快照到撤销栈
         saveState();
 
         double x = event.getX();
@@ -165,28 +163,22 @@ public class FieldInputController {
             boolean isMiss = (event.getButton() == MouseButton.SECONDARY);
             points.add(new TeamPoint(x, y, currentTeam, isMiss, System.currentTimeMillis()));
 
-            // ====== 修复后的声纳波纹动效 ======
-            // 1. 创建圆（初始半径为1，不设置初始中心系，默认为0,0）
+            // ====== 声纳波纹动效 ======
             javafx.scene.shape.Circle ripple = new javafx.scene.shape.Circle(1);
             ripple.setStroke(currentTeam == 1 ? Color.web("#00BCD4") : Color.web("#E91E63"));
             ripple.setFill(Color.TRANSPARENT);
             ripple.setStrokeWidth(2);
 
-            // 2. ★ 核心修复：解除 StackPane 的自动居中强制束缚
             ripple.setManaged(false);
             ripple.setMouseTransparent(true);
-            // 3. ★ 核心修复：坐标系跃迁转换
-            // 将 Canvas 的内部坐标系(x,y) -> 转换到整个窗口场景的绝对坐标 -> 再转换到外层 inputPane 的局部坐标
             javafx.geometry.Point2D sceneCoords = drawCanvas.localToScene(x, y);
             javafx.geometry.Point2D paneCoords = inputPane.sceneToLocal(sceneCoords);
 
-            // 精确设置波纹的绝对原点
             ripple.setLayoutX(paneCoords.getX());
             ripple.setLayoutY(paneCoords.getY());
 
             inputPane.getChildren().add(ripple);
 
-            // 4. 动效播放
             javafx.animation.ScaleTransition st = new javafx.animation.ScaleTransition(Duration.millis(250), ripple);
             st.setToX(15);
             st.setToY(15);
@@ -195,18 +187,17 @@ public class FieldInputController {
             ft.setFromValue(1.0);
             ft.setToValue(0);
 
-            // 动画结束后，自动把波纹对象从内存/UI树中安全移除，防止内存泄漏
             ft.setOnFinished(e -> inputPane.getChildren().remove(ripple));
 
             st.play();
             ft.play();
-            // ============================
 
         } else {
             removeClosestPoint(x, y);
         }
         updateUI();
     }
+
     private void removeClosestPoint(double x, double y) {
         TeamPoint closest = null;
         double minDesc = Double.MAX_VALUE;
@@ -280,21 +271,40 @@ public class FieldInputController {
 
     private void loadExistingPoints(String locationStr) {
         points.clear();
-        undoStack.clear(); // 加载已有数据时清空撤销栈，防止撤销到空白
+        undoStack.clear();
 
         String[] entries = locationStr.split(";");
         for (String entry : entries) {
+            // 🌟 修复：严谨拦截所有解析异常并记录脏数据上下文
+            if (entry == null || entry.trim().isEmpty()) continue;
             try {
                 String[] parts = entry.split(":");
-                if (parts.length < 2) continue;
+                if (parts.length < 2) {
+                    System.err.println("⚠️ [FieldInput] 坐标片段缺少冒号分隔符，已跳过: " + entry);
+                    continue;
+                }
+
                 int teamIdx = Integer.parseInt(parts[0]);
                 String[] coords = parts[1].split(",");
+
+                if (coords.length < 3) {
+                    System.err.println("⚠️ [FieldInput] 坐标数据不完整(需 x,y,state)，已跳过: " + entry);
+                    continue;
+                }
+
                 double x = Double.parseDouble(coords[0]);
                 double y = Double.parseDouble(coords[1]);
                 int state = Integer.parseInt(coords[2]);
                 long ts = (coords.length > 3) ? Long.parseLong(coords[3]) : 0;
+
                 points.add(new TeamPoint(x, y, teamIdx, state == 1, ts));
-            } catch (Exception e) { }
+
+            } catch (NumberFormatException e) {
+                System.err.println("❌ [FieldInput] 坐标数字解析失败，存在非法字符: '" + entry + "' | 详情: " + e.getMessage());
+            } catch (Exception e) {
+                System.err.println("❌ [FieldInput] 坐标解析发生未知异常: '" + entry + "' | 详情: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
         updateUI();
     }
@@ -304,14 +314,14 @@ public class FieldInputController {
         for (TeamPoint p : points) {
             int missInt = p.isMiss ? 1 : 0;
             sb.append(p.teamIndex).append(":")
-                    .append(String.format("%.1f,%.1f,%d,%d;", p.x, p.y, missInt, p.timestamp));
+                    .append(String.format(Locale.US,"%.1f,%.1f,%d,%d;", p.x, p.y, missInt, p.timestamp));
         }
         return sb.toString();
     }
 
     @FXML
     private void handleClear() {
-        saveState(); // 清空前保存快照，允许撤销清空操作
+        saveState();
         points.clear();
         updateUI();
     }

@@ -195,45 +195,20 @@ public class AllianceAnalysisController {
         styleCol.setCellValueFactory(new PropertyValueFactory<>("styleDesc"));
         styleCol.setStyle("-fx-alignment: CENTER_LEFT;");
     }
-
     private void initializeChatHtml() {
-        String htmlTemplate = "<!DOCTYPE html><html><head><meta charset='UTF-8'>"
-                // 🟢 修复：将 JS 函数置顶
-                + "<script>"
-                + "function addSysMsg(text) { const div = document.createElement('div'); div.className='sys-msg'; div.innerText=text; document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); }"
-                + "function addUserMsg(text) { const div = document.createElement('div'); div.className='msg-container user-msg'; const bubble = document.createElement('div'); bubble.className='user-bubble'; bubble.innerText=text; div.appendChild(bubble); document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); }"
-                + "function addAiMsg(mdText, isError) { const div = document.createElement('div'); div.className='msg-container ai-msg'; const header = document.createElement('div'); header.className='ai-header'; header.innerHTML='✨ Gemini'; const content = document.createElement('div'); if(isError) { content.style.color = '#ff6b6b'; content.innerText = mdText; } else { if(typeof marked !== 'undefined') { content.innerHTML = marked.parse(mdText); content.querySelectorAll('pre code').forEach((el) => { if(typeof hljs !== 'undefined') hljs.highlightElement(el); }); } else { content.innerText = mdText; } } div.appendChild(header); div.appendChild(content); document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); }"
-                + "function showThinking() { const div = document.createElement('div'); div.id='thinking-flag'; div.className='msg-container ai-msg thinking'; div.innerHTML='<div class=\"ai-header\">✨ Gemini</div><div>Thinking & analyzing data...</div>'; document.getElementById('chat-box').appendChild(div); window.scrollTo(0, document.body.scrollHeight); }"
-                + "function removeThinking() { const el = document.getElementById('thinking-flag'); if(el) el.remove(); }"
-                + "</script>"
-
-                // 🟢 修复：添加 defer 属性防止阻塞
-                + "<script src='https://cdn.jsdelivr.net/npm/marked/marked.min.js' defer></script>"
-                + "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css'>"
-                + "<script src='https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js' defer></script>"
-
-                + "<style>"
-                // 🟢 修复：html, body 背景透明，字体更新
-                + "html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: transparent; }"
-                + "body { font-family: 'Oxanium', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e3e3e3; padding: 15px; box-sizing: border-box; font-size: 14px; line-height: 1.6; }"
-                + ".msg-container { margin-bottom: 24px; display: flex; flex-direction: column; }"
-                + ".user-msg { align-items: flex-end; }"
-                + ".user-bubble { background-color: #3b3b3b; color: white; padding: 12px 18px; border-radius: 18px 18px 4px 18px; max-width: 80%; word-wrap: break-word; white-space: pre-wrap; font-size: 15px; }"
-                + ".ai-msg { align-items: flex-start; max-width: 95%; }"
-                + ".ai-header { font-weight: 600; color: #a8c7fa; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }"
-                + ".sys-msg { text-align: center; color: #8ab4f8; font-size: 13px; margin: 10px 0; background: #1e1e1e; padding: 8px; border-radius: 8px; }"
-                + ".thinking { color: #9aa0a6; font-style: italic; animation: pulse 1.5s infinite; }"
-                + "pre { background-color: #1e1e1e; padding: 12px; border-radius: 8px; overflow-x: auto; border: 1px solid #333; }"
-                + "code { font-family: 'JetBrains Mono', 'Consolas', monospace; font-size: 13px; }"
-                + "table { border-collapse: collapse; width: 100%; margin: 10px 0; }"
-                + "th, td { border: 1px solid #444; padding: 8px; text-align: left; }"
-                + "th { background-color: #2b2b2b; }"
-                + "a { color: #8ab4f8; text-decoration: none; }"
-                + "@keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }"
-                + "</style></head><body>"
-                + "<div id='chat-box'></div>"
-                + "</body></html>";
-        webEngine.loadContent(htmlTemplate);
+        try {
+            // 获取资源文件的绝对 URL
+            java.net.URL htmlUrl = getClass().getResource("/com/bear27570/ftc/scouting/html/chat_template.html");
+            if (htmlUrl != null) {
+                webEngine.load(htmlUrl.toExternalForm());
+            } else {
+                System.err.println("❌ 严重错误: 找不到 chat_template.html 文件");
+                // 兜底方案：显示一个报错网页
+                webEngine.loadContent("<html><body style='color:red;'>Failed to load AI Chat UI. Resource missing.</body></html>");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private String escapeJsString(String text) {

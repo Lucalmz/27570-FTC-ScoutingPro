@@ -6,6 +6,7 @@ import com.bear27570.ftc.scouting.models.NetworkPacket;
 import com.bear27570.ftc.scouting.models.ScoreEntry;
 import com.bear27570.ftc.scouting.services.network.NetworkDataHandler;
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import io.javalin.Javalin;
 import io.javalin.websocket.WsContext;
 import javafx.application.Platform;
@@ -280,8 +281,8 @@ public class NetworkService {
                         // 使用 Java 14+ 推荐的现代 API 加入多播组
                         socket.joinGroup(groupAddress, ni);
                         System.out.println(" - 成功绑定监听网卡: " + ni.getDisplayName());
-                    } catch (Exception e) {
-                        // 忽略不能绑定多播的特定网卡（如某些 VPN 虚拟网卡）
+                    } catch (JsonSyntaxException e) {
+                        System.err.println("⚠️ 收到 FTC_SCOUTER 广播，但 JSON 解析失败，可能是版本不匹配！");
                     }
                 }
 
