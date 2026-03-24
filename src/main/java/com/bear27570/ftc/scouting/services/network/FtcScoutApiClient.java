@@ -1,3 +1,4 @@
+// File: src/main/java/com/bear27570/ftc/scouting/services/network/FtcScoutApiClient.java
 package com.bear27570.ftc.scouting.services.network;
 
 import com.bear27570.ftc.scouting.models.PenaltyEntry;
@@ -6,6 +7,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -13,98 +17,90 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 public class FtcScoutApiClient {
 
-    public interface ApiCallback {
-        void onEventFound(String eventName, boolean hasMatches);
-        void onSuccess(String eventName, int syncedMatchCount);
-        void onError(String errorMessage);
-    }
+    public record FtcEventInfo(String name, boolean hasMatches) {}
 
     private final MatchDataService matchDataService;
-
+    private final HttpClient client;
+    private static final Logger log = LoggerFactory.getLogger(FtcEventInfo.class);
     public FtcScoutApiClient(MatchDataService matchDataService) {
         this.matchDataService = matchDataService;
+        this.client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build();
     }
 
-    public void fetchAndSyncEventDataAsync(int season, String eventCode, String competitionName, ApiCallback callback) {
-        new Thread(() -> {
-            try {
-                try (HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build()) {
-                    String gqlUrl = "https://api.ftcscout.org/graphql";
+    public CompletableFuture<Integer> fetchAndSyncEventDataAsync(int season, String eventCode, String competitionName, Consumer<FtcEventInfo> onProgress) {
+        String gqlUrl = "https://api.ftcscout.org/graphql";
 
-                    // 1. 查询赛事基本信息
-                    String infoQuery = String.format(
-                            "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { name hasMatches } }\"}",
-                            season, eventCode
-                    );
+        // 💡 架构师级做法：GraphQL 查询体依然拼接，但外层的 JSON Wrapper 让 Gson 处理转义
+        String rawQuery = String.format("query { eventByCode(season: %d, code: \"%s\") { name hasMatches } }", season, eventCode);
+        JsonObject infoPayload = new JsonObject();
+        infoPayload.addProperty("query", rawQuery);
 
-                    HttpRequest infoReq = HttpRequest.newBuilder()
-                            .uri(URI.create(gqlUrl))
-                            .header("Content-Type", "application/json")
-                            .POST(HttpRequest.BodyPublishers.ofString(infoQuery))
-                            .build();
-                    HttpResponse<String> infoRes = client.send(infoReq, HttpResponse.BodyHandlers.ofString());
+        HttpRequest infoReq = HttpRequest.newBuilder()
+                .uri(URI.create(gqlUrl))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(infoPayload.toString()))
+                .build();
 
+        return client.sendAsync(infoReq, HttpResponse.BodyHandlers.ofString())
+                .thenCompose(infoRes -> {
                     if (infoRes.statusCode() != 200 || infoRes.body().contains("\"errors\"")) {
-                        callback.onError("API Error. Check Season/Event Code.");
-                        return;
+                        throw new RuntimeException("API Error. Check Season/Event Code.");
                     }
 
                     String eventName = "Unknown Event";
                     boolean hasMatches = false;
 
-                    Matcher nameMatcher = Pattern.compile("\"name\"\\s*:\\s*\"([^\"]+)\"").matcher(infoRes.body());
-                    if (nameMatcher.find()) eventName = nameMatcher.group(1);
+                    // 替换正则，使用 Gson 解析来获取名称和状态
+                    try {
+                        JsonObject root = JsonParser.parseString(infoRes.body()).getAsJsonObject();
+                        JsonObject eventData = root.getAsJsonObject("data").getAsJsonObject("eventByCode");
+                        if (eventData != null && !eventData.isJsonNull()) {
+                            if (eventData.has("name") && !eventData.get("name").isJsonNull()) {
+                                eventName = eventData.get("name").getAsString();
+                            }
+                            if (eventData.has("hasMatches") && !eventData.get("hasMatches").isJsonNull()) {
+                                hasMatches = eventData.get("hasMatches").getAsBoolean();
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.error("Failed to parse event metadata: " + e.getMessage());
+                    }
 
-                    Matcher hasMatchesMatcher = Pattern.compile("\"hasMatches\"\\s*:\\s*(true|false)").matcher(infoRes.body());
-                    if (hasMatchesMatcher.find()) hasMatches = Boolean.parseBoolean(hasMatchesMatcher.group(1));
-
-                    callback.onEventFound(eventName, hasMatches);
+                    if (onProgress != null) onProgress.accept(new FtcEventInfo(eventName, hasMatches));
 
                     if (!hasMatches) {
-                        callback.onSuccess(eventName, 0);
-                        return;
+                        return CompletableFuture.completedFuture(0);
                     }
 
-                    // 2. 获取具体比赛数据 (★ 修改点：加入了 totalPoints 字段请求)
-                    int matchCount = 0;
-                    String[] queriesToTry = {
-                            "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2025 { red { totalPointsNp majorsCommitted minorsCommitted } blue { totalPointsNp majorsCommitted minorsCommitted } } } } } }\"}",
-                            "{\"query\": \"query { eventByCode(season: %d, code: \\\"%s\\\") { matches { matchNum scores { ... on MatchScores2024 { red { totalPointsNp majorsCommitted minorsCommitted } blue { totalPointsNp majorsCommitted minorsCommitted } } } } } }\"}"
-                    };
+                    // 第二阶段：拉取具体比赛数据
+                    String rawDataQuery = String.format("query { eventByCode(season: %d, code: \"%s\") { matches { matchNum scores { ... on MatchScores2025 { red { totalPointsNp majorsCommitted minorsCommitted } blue { totalPointsNp majorsCommitted minorsCommitted } } ... on MatchScores2024 { red { totalPointsNp majorsCommitted minorsCommitted } blue { totalPointsNp majorsCommitted minorsCommitted } } } } } }", season, eventCode);
+                    JsonObject dataPayload = new JsonObject();
+                    dataPayload.addProperty("query", rawDataQuery);
 
-                    for (String qFormat : queriesToTry) {
-                        String query = String.format(qFormat, season, eventCode);
-                        HttpRequest dataReq = HttpRequest.newBuilder()
-                                .uri(URI.create(gqlUrl))
-                                .header("Content-Type", "application/json")
-                                .POST(HttpRequest.BodyPublishers.ofString(query))
-                                .build();
+                    HttpRequest dataReq = HttpRequest.newBuilder()
+                            .uri(URI.create(gqlUrl))
+                            .header("Content-Type", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofString(dataPayload.toString()))
+                            .build();
 
-                        HttpResponse<String> dataRes = client.send(dataReq, HttpResponse.BodyHandlers.ofString());
-
-                        if (dataRes.statusCode() == 200 && !dataRes.body().contains("\"errors\"")) {
-                            matchCount = parseAndSaveMatchData(dataRes.body(), competitionName);
-                            if (matchCount > 0) break;
-                        }
-                    }
-
-                    callback.onSuccess(eventName, matchCount);
-                }
-            } catch (Exception e) {
-                callback.onError("Failed: " + e.getMessage());
-            }
-        }).start();
+                    return client.sendAsync(dataReq, HttpResponse.BodyHandlers.ofString())
+                            .thenApply(dataRes -> {
+                                if (dataRes.statusCode() == 200 && !dataRes.body().contains("\"errors\"")) {
+                                    return parseAndSaveMatchData(dataRes.body(), competitionName);
+                                }
+                                throw new RuntimeException("Failed to fetch detailed match scores.");
+                            });
+                });
     }
 
     private int parseAndSaveMatchData(String json, String competitionName) {
         int count = 0;
         try {
-            // 安全地将字符串解析为 JSON 树
             JsonObject root = JsonParser.parseString(json).getAsJsonObject();
             JsonObject data = root.getAsJsonObject("data");
             if (data == null || data.isJsonNull()) return 0;
@@ -116,12 +112,11 @@ public class FtcScoutApiClient {
             if (matches == null || matches.isJsonNull()) return 0;
 
             Set<String> processedMatches = new HashSet<>();
-
-            // 遍历每一场比赛
             for (JsonElement matchElem : matches) {
                 JsonObject matchObj = matchElem.getAsJsonObject();
-                int matchNum = matchObj.get("matchNum").getAsInt();
+                if (!matchObj.has("matchNum") || matchObj.get("matchNum").isJsonNull()) continue;
 
+                int matchNum = matchObj.get("matchNum").getAsInt();
                 JsonObject scores = matchObj.getAsJsonObject("scores");
                 if (scores == null || scores.isJsonNull()) continue;
 
@@ -129,7 +124,6 @@ public class FtcScoutApiClient {
                 JsonObject blue = scores.getAsJsonObject("blue");
 
                 if (red != null && blue != null) {
-                    // 安全提取字段，如果官方以后加了别的字段，这里绝对不会越界崩溃
                     int rMin = extractSafeInt(red, "minorsCommitted");
                     int rMaj = extractSafeInt(red, "majorsCommitted");
                     int rScore = extractSafeInt(red, "totalPointsNp");
@@ -162,17 +156,13 @@ public class FtcScoutApiClient {
                 }
             }
         } catch (Exception e) {
-            System.err.println("JSON 解析异常: " + e.getMessage());
-            e.printStackTrace();
+            log.error("JSON parse error: " + e.getMessage(), e);
+            throw new RuntimeException("Parse Error", e);
         }
         return count;
     }
 
-    // 替代原有的 Regex extractValue 方法
     private int extractSafeInt(JsonObject obj, String key) {
-        if (obj.has(key) && !obj.get(key).isJsonNull()) {
-            return obj.get(key).getAsInt();
-        }
-        return 0;
+        return (obj.has(key) && !obj.get(key).isJsonNull()) ? obj.get(key).getAsInt() : 0;
     }
 }

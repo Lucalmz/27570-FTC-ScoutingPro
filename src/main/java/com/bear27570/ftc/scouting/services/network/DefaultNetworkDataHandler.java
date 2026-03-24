@@ -8,6 +8,8 @@ import com.bear27570.ftc.scouting.repository.MembershipRepository;
 import com.bear27570.ftc.scouting.repository.UserRepository;
 import com.bear27570.ftc.scouting.services.domain.MatchDataService;
 import com.bear27570.ftc.scouting.services.domain.RankingService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -17,7 +19,7 @@ public class DefaultNetworkDataHandler implements NetworkDataHandler {
     private final UserRepository userRepository; // ★ 新增字段
     private final MatchDataService matchDataService;
     private final RankingService rankingService;
-
+    private static final Logger log = LoggerFactory.getLogger(DefaultNetworkDataHandler.class);
     // ★ 修改构造函数：增加 UserRepository 参数
     public DefaultNetworkDataHandler(MembershipRepository membershipRepository,
                                      UserRepository userRepository,
@@ -50,7 +52,7 @@ public class DefaultNetworkDataHandler implements NetworkDataHandler {
         if (userRepository != null) {
             userRepository.ensureUserExists(username);
         } else {
-            System.err.println("CRITICAL: UserRepository is null in DataHandler");
+            log.error("CRITICAL: UserRepository is null in DataHandler");
         }
     }
 

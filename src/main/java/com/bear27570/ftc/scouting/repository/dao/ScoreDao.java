@@ -47,6 +47,8 @@ public interface ScoreDao {
 
     @SqlQuery("SELECT * FROM scores WHERE competitionName = :compName AND syncStatus IN ('UNSYNCED', 'EXPORTED')")
     List<ScoreEntry> findPendingExports(@Bind("compName") String compName);
+    @SqlQuery("SELECT * FROM scores WHERE competitionName = :compName AND matchNumber = :matchNum AND alliance = :alliance")
+    ScoreEntry findByMatchAndAlliance(@Bind("compName") String compName, @Bind("matchNum") int matchNum, @Bind("alliance") String alliance);
 
     // 优雅的批量更新，无需手动拼接问号
     @SqlUpdate("UPDATE scores SET syncStatus = :status WHERE id IN (<ids>)")

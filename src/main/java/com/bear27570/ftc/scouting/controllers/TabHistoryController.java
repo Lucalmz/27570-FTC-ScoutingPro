@@ -4,7 +4,7 @@ package com.bear27570.ftc.scouting.controllers;
 import com.bear27570.ftc.scouting.models.Competition;
 import com.bear27570.ftc.scouting.models.ScoreEntry;
 import com.bear27570.ftc.scouting.services.domain.MatchDataService;
-import javafx.collections.FXCollections;
+import com.bear27570.ftc.scouting.viewmodels.SharedDataViewModel;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.fxml.FXML;
@@ -12,11 +12,7 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
 import org.kordamp.ikonli.javafx.FontIcon;
-
-import java.util.List;
-import java.util.Map;
 
 public class TabHistoryController {
 
@@ -27,14 +23,13 @@ public class TabHistoryController {
     @FXML private TableColumn<ScoreEntry, String> histAllianceCol, histTeamsCol, histSubmitterCol, histTimeCol;
     @FXML private TableColumn<ScoreEntry, Void> histActionsCol;
 
-    private ObservableList<ScoreEntry> scoreHistoryList = FXCollections.observableArrayList();
-    private Map<String, Double> submitterReliabilityMap;
-
     private MainController mainController;
     private MatchDataService matchDataService;
     private Competition currentCompetition;
     private String currentUsername;
     private boolean isHost;
+
+    private SharedDataViewModel viewModel;
 
     @FXML
     public void initialize() {
@@ -51,7 +46,7 @@ public class TabHistoryController {
                 if (empty || item == null) {
                     setText(null); setGraphic(null); setStyle("");
                 } else {
-                    double weight = submitterReliabilityMap != null ? submitterReliabilityMap.getOrDefault(item, 1.0) : 1.0;
+                    double weight = viewModel != null ? viewModel.getReliabilities().getOrDefault(item, 1.0) : 1.0;
                     if (weight < 1.0) {
                         setText(item + " (Low Rel)");
                         setStyle("-fx-text-fill: #F87171 !important; -fx-font-weight: bold;");
@@ -115,8 +110,19 @@ public class TabHistoryController {
                 }
             }
         });
+    }
 
-        FilteredList<ScoreEntry> filtered = new FilteredList<>(scoreHistoryList, p -> true);
+    public void setDependencies(MainController mainController, MatchDataService matchDataService,
+                                Competition competition, String username, boolean isHost, SharedDataViewModel viewModel) {
+        this.mainController = mainController;
+        this.matchDataService = matchDataService;
+        this.currentCompetition = competition;
+        this.currentUsername = username;
+        this.isHost = isHost;
+        this.viewModel = viewModel;
+
+        // 使用 ViewModel 的 ObservableList 创建过滤器，数据变动 UI 自动刷新
+        FilteredList<ScoreEntry> filtered = new FilteredList<>(viewModel.getHistoryList(), p -> true);
         searchField.textProperty().addListener((o, old, newVal) -> filtered.setPredicate(s -> {
             if (newVal == null || newVal.isEmpty()) return true;
             String low = newVal.toLowerCase();
@@ -125,23 +131,8 @@ public class TabHistoryController {
         historyTableView.setItems(filtered);
     }
 
-    public void setDependencies(MainController mainController, MatchDataService matchDataService,
-                                Competition competition, String username, boolean isHost) {
-        this.mainController = mainController;
-        this.matchDataService = matchDataService;
-        this.currentCompetition = competition;
-        this.currentUsername = username;
-        this.isHost = isHost;
-    }
-
-    public void updateData(List<ScoreEntry> history, Map<String, Double> reliabilities) {
-        this.submitterReliabilityMap = reliabilities;
-        scoreHistoryList.setAll(history);
-        historyTableView.refresh();
-    }
-
     public ObservableList<ScoreEntry> getScoreHistoryList() {
-        return scoreHistoryList;
+        return viewModel != null ? viewModel.getHistoryList() : javafx.collections.FXCollections.emptyObservableList();
     }
 
     private void handleEditAction(ScoreEntry selected) {
@@ -151,7 +142,6 @@ public class TabHistoryController {
     private void handleDeleteAction(ScoreEntry selected) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION, "Delete Match " + selected.getMatchNumber() + "?", ButtonType.YES, ButtonType.NO);
 
-        // ✨ UI 补丁
         DialogPane dialogPane = alert.getDialogPane();
         try {
             dialogPane.getStylesheets().add(getClass().getResource("/com/bear27570/ftc/scouting/styles/style.css").toExternalForm());

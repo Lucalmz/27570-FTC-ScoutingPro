@@ -9,6 +9,8 @@ import com.bear27570.ftc.scouting.services.domain.MatchDataService;
 import com.bear27570.ftc.scouting.services.domain.RankingService;
 import com.bear27570.ftc.scouting.services.domain.UserService;
 import com.bear27570.ftc.scouting.services.network.FtcScoutApiClient;
+import com.bear27570.ftc.scouting.utils.FxThread;
+import com.bear27570.ftc.scouting.viewmodels.SharedDataViewModel;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
@@ -16,10 +18,14 @@ import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class MainController {
@@ -46,6 +52,9 @@ public class MainController {
     private FtcScoutApiClient ftcScoutApiClient;
 
     private String officialEventName = null;
+    private static final Logger log = LoggerFactory.getLogger(MainController.class);
+    // 核心注入：全局共享数据模型
+    private final SharedDataViewModel sharedViewModel = new SharedDataViewModel();
 
     public void setDependencies(MainApplication mainApp, Competition competition, String username, boolean isHost,
                                 MatchDataService matchDataService, RankingService rankingService,
@@ -80,8 +89,10 @@ public class MainController {
 
         tabScoringController.setDependencies(this, matchDataService, currentCompetition, username, isHost);
         tabFtcScoutController.setDependencies(this, ftcScoutApiClient, currentCompetition, isHost);
-        tabRankingsController.setDependencies(this, mainApp, currentCompetition, isHost);
-        tabHistoryController.setDependencies(this, matchDataService, currentCompetition, username, isHost);
+
+        // 传入 ViewModel 进行数据绑定
+        tabRankingsController.setDependencies(this, mainApp, currentCompetition, isHost, sharedViewModel);
+        tabHistoryController.setDependencies(this, matchDataService, currentCompetition, username, isHost, sharedViewModel);
 
         if (isHost) {
             manageMembersBtn.setVisible(true);
@@ -102,21 +113,22 @@ public class MainController {
 
         AnimationUtils.attachLightBarAnimation(mainTabPane);
 
-        // ★ 这里是处理 Tab 切换的入口，包装在 runLater 里
         mainTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
             if (newTab != null && newTab.getContent() != null) {
-                Platform.runLater(() -> AnimationUtils.playSmoothEntrance(newTab.getContent()));
+                FxThread.run(() -> AnimationUtils.playSmoothEntrance(newTab.getContent()));
             }
         });
     }
 
     private void updateTopLabel() {
         String role = isHost ? " [HOST]" : " [CLIENT]";
-        if (officialEventName != null && !officialEventName.trim().isEmpty()) {
-            competitionNameLabel.setText(officialEventName + role);
-        } else {
-            competitionNameLabel.setText(currentCompetition.getName() + role);
-        }
+        FxThread.run(() -> {
+            if (officialEventName != null && !officialEventName.trim().isEmpty()) {
+                competitionNameLabel.setText(officialEventName + role);
+            } else {
+                competitionNameLabel.setText(currentCompetition.getName() + role);
+            }
+        });
     }
 
     private void startAsHost() {
@@ -127,12 +139,18 @@ public class MainController {
     private void startAsClient() {
         refreshAllDataFromDatabase();
         tabScoringController.setUIEnabled(true);
-        try {
-            NetworkService.getInstance().connectToHost(currentCompetition.getHostAddress(), currentUsername, this::handleUpdateReceivedFromHost);
-            tabScoringController.setStatusText("Authenticating with Host...", "#89dceb");
-        } catch (IOException e) {
-            tabScoringController.setStatusText("Working Offline (Caching Locally)", "#FFB340");
-        }
+        tabScoringController.getViewModel().setStatus("Authenticating with Host...", "#89dceb");
+
+        NetworkService.getInstance().connectToHost(currentCompetition.getHostAddress(), currentUsername, this::handleUpdateReceivedFromHost)
+                .thenAccept(connected -> {
+                    if (!connected) {
+                        tabScoringController.getViewModel().setStatus("Working Offline (Caching Locally)", "#FFB340");
+                    }
+                })
+                .exceptionally(ex -> {
+                    tabScoringController.getViewModel().setStatus("Working Offline (Host unreachable)", "#FFB340");
+                    return null;
+                });
     }
 
     public void triggerDataRefreshAndBroadcast() {
@@ -151,10 +169,9 @@ public class MainController {
             currentCompetition = competitionRepository.findByName(currentCompetition.getName());
         }
 
-        Platform.runLater(() -> {
-            tabHistoryController.updateData(fullHistory, reliabilities);
-            tabRankingsController.updateData(newRankings, currentCompetition);
-        });
+        // 💥 ViewModel 底层会自动使用 FxThread 处理，直接调用即可
+        sharedViewModel.updateData(fullHistory, newRankings, reliabilities);
+        tabRankingsController.updateCompetition(currentCompetition);
     }
 
     private void broadcastUpdate() {
@@ -170,38 +187,49 @@ public class MainController {
     }
 
     private void handleUpdateReceivedFromHost(NetworkPacket packet) {
-        Platform.runLater(() -> {
-            if (packet.getType() == NetworkPacket.PacketType.UPDATE_DATA) {
-                if (packet.getOfficialEventName() != null && !packet.getOfficialEventName().isEmpty()) {
-                    updateOfficialEventName(packet.getOfficialEventName());
-                }
-                matchDataService.syncWithHostData(currentCompetition.getName(), packet.getScoreHistory());
-                List<ScoreEntry> pending = matchDataService.getPendingExports(currentCompetition.getName());
-                if (!pending.isEmpty()) {
-                    int syncCount = 0;
-                    for (ScoreEntry s : pending) {
-                        int localId = s.getId();
-                        s.setId(0);
+        if (packet.getType() == NetworkPacket.PacketType.UPDATE_DATA) {
+            if (packet.getOfficialEventName() != null && !packet.getOfficialEventName().isEmpty()) {
+                FxThread.run(() -> updateOfficialEventName(packet.getOfficialEventName()));
+            }
 
-                        if (NetworkService.getInstance().sendScoreToServer(s)) {
+            matchDataService.syncWithHostData(currentCompetition.getName(), packet.getScoreHistory());
+            List<ScoreEntry> pending = matchDataService.getPendingExports(currentCompetition.getName());
+
+            if (!pending.isEmpty()) {
+                AtomicInteger syncCount = new AtomicInteger(0);
+
+                // 💥 收集所有的异步上传任务
+                List<CompletableFuture<Void>> futures = pending.stream().map(s -> {
+                    int localId = s.getId();
+                    s.setId(0); // 准备发往服务器
+                    return NetworkService.getInstance().sendScoreToServer(s).thenAccept(sent -> {
+                        if (sent) {
                             matchDataService.deleteScore(localId);
-                            syncCount++;
+                            syncCount.incrementAndGet();
                         }
-                    }
-                    if (syncCount > 0) {
-                        tabScoringController.setStatusText("Auto-synced " + syncCount + " local records to host.", "#32D74B");
-                    }
-                } else {
-                    tabScoringController.setStatusText("Connected & Synced.", "#32D74B");
-                }
+                    });
+                }).collect(Collectors.toList());
+
+                // 💥 等所有离线数据上传完毕后，统一更新 UI 和刷新本地数据
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                        .thenRun(() -> FxThread.run(() -> {
+                            if (syncCount.get() > 0) {
+                                tabScoringController.getViewModel().setStatus("Auto-synced " + syncCount.get() + " local records to host.", "#32D74B");
+                            }
+                            refreshAllDataFromDatabase();
+                        }));
+            } else {
+                tabScoringController.getViewModel().setStatus("Connected & Synced.", "#32D74B");
                 refreshAllDataFromDatabase();
             }
-        });
+        }
     }
 
     public void requestEditScore(ScoreEntry entry) {
-        mainTabPane.getSelectionModel().select(0);
-        tabScoringController.loadScoreForEdit(entry);
+        FxThread.run(() -> {
+            mainTabPane.getSelectionModel().select(0);
+            tabScoringController.loadScoreForEdit(entry);
+        });
     }
 
     public void onFieldInputConfirmed(int totalHits, String clickLocations) {
@@ -218,9 +246,9 @@ public class MainController {
     }
 
     public void openFieldInputView(boolean isAllianceMode, String existingLocations) {
-        try {
-            mainApp.showFieldInputView(this, isAllianceMode, existingLocations);
-        } catch (IOException e) { e.printStackTrace(); }
+        try { mainApp.showFieldInputView(this, isAllianceMode, existingLocations); } catch (IOException e) {
+            log.error("Failed to open field input view", e);
+        }
     }
 
     @FXML private void handleOfflineSync() {
@@ -240,12 +268,12 @@ public class MainController {
                         matchDataService.submitScore(currentCompetition.getName(), s);
                     }
                     triggerDataRefreshAndBroadcast();
-                    tabScoringController.setStatusText("Imported " + importedScores.size() + " records!", "#32D74B");
-                } catch (Exception e) { tabScoringController.setErrorText("Import Failed."); }
+                    tabScoringController.getViewModel().setStatus("Imported " + importedScores.size() + " records!", "#32D74B");
+                } catch (Exception e) { tabScoringController.getViewModel().setError("Import Failed."); }
             }
         } else {
             List<ScoreEntry> pending = matchDataService.getPendingExports(currentCompetition.getName());
-            if (pending.isEmpty()) { tabScoringController.setStatusText("No pending offline data to export.", "#FF9F0A"); return; }
+            if (pending.isEmpty()) { tabScoringController.getViewModel().setStatus("No pending offline data to export.", "#FF9F0A"); return; }
 
             fileChooser.setTitle("Export Offline Data");
             fileChooser.setInitialFileName("OfflineSync_" + currentUsername + "_" + System.currentTimeMillis() + ".ftcsync");
@@ -256,8 +284,8 @@ public class MainController {
                     out.writeObject(pending);
                     matchDataService.markAsExported(pending.stream().map(ScoreEntry::getId).collect(Collectors.toList()));
                     refreshAllDataFromDatabase();
-                    tabScoringController.setStatusText("Exported successfully!", "#32D74B");
-                } catch (Exception e) { tabScoringController.setErrorText("Export Failed."); }
+                    tabScoringController.getViewModel().setStatus("Exported successfully!", "#32D74B");
+                } catch (Exception e) { tabScoringController.getViewModel().setError("Export Failed."); }
             }
         }
     }
@@ -267,17 +295,16 @@ public class MainController {
         dialog.initOwner(competitionNameLabel.getScene().getWindow());
         dialog.setTitle("Export Data");
 
-        // 使用 mac-card 统一风格
         VBox dialogVbox = new VBox(20);
         dialogVbox.setAlignment(javafx.geometry.Pos.CENTER);
         dialogVbox.setPadding(new javafx.geometry.Insets(30));
-        dialogVbox.getStyleClass().add("mac-card"); // ✨ 替换掉原来的硬编码 style
+        dialogVbox.getStyleClass().add("mac-card");
 
         Label headerLabel = new Label("Export CSV Data");
-        headerLabel.getStyleClass().add("title-3"); // ✨ 应用 Audiowide 标题字体
+        headerLabel.getStyleClass().add("title-3");
 
         Button btnHistory = new Button("Export Match History");
-        btnHistory.getStyleClass().add("button"); // ✨ 应用按钮光效
+        btnHistory.getStyleClass().add("button");
         btnHistory.setOnAction(e -> { dialog.close(); exportData("Match History"); });
 
         Button btnRankings = new Button("Export Team Rankings");
@@ -285,13 +312,12 @@ public class MainController {
         btnRankings.setOnAction(e -> { dialog.close(); exportData("Team Rankings"); });
 
         Button btnCancel = new Button("Cancel");
-        btnCancel.getStyleClass().addAll("button", "danger"); // ✨ 取消按钮用红色
+        btnCancel.getStyleClass().addAll("button", "danger");
         btnCancel.setOnAction(e -> dialog.close());
 
         dialogVbox.getChildren().addAll(headerLabel, btnHistory, btnRankings, btnCancel);
 
         Scene scene = new Scene(dialogVbox, 400, 300);
-        // ✨ UI 补丁：注入全局 CSS
         try {
             scene.getStylesheets().add(getClass().getResource("/com/bear27570/ftc/scouting/styles/style.css").toExternalForm());
         } catch (Exception e) {}
@@ -309,8 +335,8 @@ public class MainController {
         if (file != null) {
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
                 if (type.equals("Match History")) writeMatchHistoryCSV(writer); else writeRankingsCSV(writer);
-                tabScoringController.setStatusText("Exported successfully to " + file.getName(), "#32D74B");
-            } catch (IOException e) { tabScoringController.setErrorText("Export Failed: " + e.getMessage()); }
+                tabScoringController.getViewModel().setStatus("Exported successfully to " + file.getName(), "#32D74B");
+            } catch (IOException e) { tabScoringController.getViewModel().setError("Export Failed: " + e.getMessage()); }
         }
     }
 

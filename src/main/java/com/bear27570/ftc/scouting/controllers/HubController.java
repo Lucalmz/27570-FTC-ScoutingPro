@@ -6,11 +6,14 @@ import com.bear27570.ftc.scouting.models.Competition;
 import com.bear27570.ftc.scouting.models.NetworkPacket;
 import com.bear27570.ftc.scouting.services.NetworkService;
 import com.bear27570.ftc.scouting.services.domain.CompetitionService;
+import com.bear27570.ftc.scouting.utils.FxThread;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
@@ -26,6 +29,8 @@ public class HubController {
     private MainApplication mainApp;
     private String currentUsername;
     private CompetitionService competitionService;
+
+    private static final Logger log = LoggerFactory.getLogger(HubController.class);
 
     private ObservableList<Competition> discoveredCompetitions = FXCollections.observableArrayList();
 
@@ -118,24 +123,29 @@ public class HubController {
 
         statusLabel.setStyle("-fx-text-fill: #89dceb;");
         statusLabel.setText("Connecting to " + selected.getName() + "...");
+        joinModeButton.setDisable(true); // 防抖
 
-        try {
-            NetworkService.getInstance().connectToHost(selected.getHostAddress(), currentUsername, (packet) -> {
-                if (packet.getType() == NetworkPacket.PacketType.JOIN_RESPONSE) {
-                    if (packet.isApproved()) {
-                        try {
-                            mainApp.showScoringView(selected, currentUsername, false);
-                        } catch (IOException e) { e.printStackTrace(); }
-                    } else {
-                        statusLabel.setStyle("-fx-text-fill: #f38ba8;");
-                        statusLabel.setText("Join request denied by host.");
-                    }
-                }
+        // 💥 异步连接
+        NetworkService.getInstance().connectToHost(selected.getHostAddress(), currentUsername, (packet) -> {
+            if (packet.getType() == NetworkPacket.PacketType.JOIN_RESPONSE && !packet.isApproved()) {
+                FxThread.run(() -> {
+                    statusLabel.setStyle("-fx-text-fill: #f38ba8;");
+                    statusLabel.setText("Join request denied or pending host approval.");
+                });
+            }
+        }).thenAccept(connected -> FxThread.run(() -> {
+            joinModeButton.setDisable(false);
+            if (connected) {
+                try { mainApp.showScoringView(selected, currentUsername, false); } catch (Exception e) {}
+            }
+        })).exceptionally(ex -> {
+            FxThread.run(() -> {
+                joinModeButton.setDisable(false);
+                statusLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold;");
+                statusLabel.setText("Connection failed: Host may be offline.");
             });
-        } catch (IOException e) {
-            statusLabel.setStyle("-fx-text-fill: #f38ba8; -fx-font-weight: bold;");
-            statusLabel.setText("Connection failed: Host may be offline or closed.");
-        }
+            return null;
+        });
     }
 
     @FXML
@@ -154,7 +164,7 @@ public class HubController {
         try {
             mainApp.showAllianceAnalysisView(selected, currentUsername);
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("Failed to open analysis window", e);
             statusLabel.setText("Failed to open analysis window.");
         }
     }
@@ -169,7 +179,7 @@ public class HubController {
         }
         try {
             mainApp.showCoordinatorView(selected);
-        } catch (IOException e) { e.printStackTrace(); }
+        } catch (IOException e) {log.error("Failed to open coordinator window", e); }
     }
 
     @FXML
@@ -198,7 +208,7 @@ public class HubController {
             dialogPane.getStylesheets().add(getClass().getResource("/com/bear27570/ftc/scouting/styles/style.css").toExternalForm());
             dialogPane.getStyleClass().add("mac-card");
         } catch (Exception e) {
-            System.err.println("CSS 加载失败，采用降级样式");
+            log.error("CSS 加载失败，采用降级样式");
         }
 
         alert.showAndWait().ifPresent(response -> {

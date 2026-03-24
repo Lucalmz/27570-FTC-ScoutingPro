@@ -1,19 +1,24 @@
+// File: src/main/java/com/bear27570/ftc/scouting/models/Competition.java
 package com.bear27570.ftc.scouting.models;
 
 import java.io.Serializable;
 
 public class Competition implements Serializable {
-    private static final long serialVersionUID = 4L; // 更新版本号
+    private static final long serialVersionUID = 5L;
 
-    private final String name;
-    private final String creatorUsername;
+    // 1. 去掉 final 修饰符，以便 JDBI 反射写入
+    private String name;
+    private String creatorUsername;
     private String ratingFormula;
     private String hostAddress;
 
-    // 新增：FTCScout 绑定信息
     private int eventSeason;
     private String eventCode;
     private String officialEventName;
+
+    // 2. 必须添加的无参构造函数 (供 JDBI / JSON 序列化框架使用)
+    public Competition() {
+    }
 
     public Competition(String name, String creatorUsername, String ratingFormula) {
         this.name = name;
@@ -25,19 +30,22 @@ public class Competition implements Serializable {
         this(name, creatorUsername, "total");
     }
 
+    // --- Getters ---
     public String getName() { return name; }
     public String getCreatorUsername() { return creatorUsername; }
     public String getHostAddress() { return hostAddress; }
-    public void setHostAddress(String hostAddress) { this.hostAddress = hostAddress; }
     public String getRatingFormula() { return ratingFormula; }
-    public void setRatingFormula(String ratingFormula) { this.ratingFormula = ratingFormula; }
-
-    // --- 新增的 Getters & Setters ---
     public int getEventSeason() { return eventSeason; }
-    public void setEventSeason(int eventSeason) { this.eventSeason = eventSeason; }
     public String getEventCode() { return eventCode; }
-    public void setEventCode(String eventCode) { this.eventCode = eventCode; }
     public String getOfficialEventName() { return officialEventName; }
+
+    // --- Setters (3. 补全之前因为 final 缺失的 Setters) ---
+    public void setName(String name) { this.name = name; }
+    public void setCreatorUsername(String creatorUsername) { this.creatorUsername = creatorUsername; }
+    public void setHostAddress(String hostAddress) { this.hostAddress = hostAddress; }
+    public void setRatingFormula(String ratingFormula) { this.ratingFormula = ratingFormula; }
+    public void setEventSeason(int eventSeason) { this.eventSeason = eventSeason; }
+    public void setEventCode(String eventCode) { this.eventCode = eventCode; }
     public void setOfficialEventName(String officialEventName) { this.officialEventName = officialEventName; }
 
     @Override

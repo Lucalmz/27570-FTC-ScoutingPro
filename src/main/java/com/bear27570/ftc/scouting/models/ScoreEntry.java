@@ -1,4 +1,4 @@
-// File: ScoreEntry.java
+// File: src/main/java/com/bear27570/ftc/scouting/models/ScoreEntry.java
 package com.bear27570.ftc.scouting.models;
 
 import java.io.Serial;
@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter;
 
 public class ScoreEntry implements Serializable {
     @Serial
-    private static final long serialVersionUID = 13L;
+    private static final long serialVersionUID = 14L;
 
     public enum Type { ALLIANCE, SINGLE }
     public enum SyncStatus { UNSYNCED, EXPORTED, SYNCED }
@@ -20,15 +20,14 @@ public class ScoreEntry implements Serializable {
     private int team1;
     private int team2;
 
-    // --- 新增的 Auto 精细化记录字段 ---
     private int team1AutoScore;
     private int team2AutoScore;
-    private String team1AutoProj; // "NEAR", "FAR", "NONE"
+    private String team1AutoProj;
     private String team2AutoProj;
-    private String team1AutoRow;  // "ROW1", "ROW2", "ROW3", "NONE"
+    private String team1AutoRow;
     private String team2AutoRow;
 
-    private int autoArtifacts; // 保持兼容性，作为两者得分之和
+    private int autoArtifacts;
     private int teleopArtifacts;
 
     private boolean team1CanSequence;
@@ -45,6 +44,12 @@ public class ScoreEntry implements Serializable {
     private String clickLocations;
 
     private SyncStatus syncStatus;
+
+    // ==========================================
+    // 1. 必须新增的无参构造函数 (供 JDBI 反射使用)
+    // ==========================================
+    public ScoreEntry() {
+    }
 
     // 用于新建提交的构造函数
     public ScoreEntry(Type scoreType, int matchNumber, String alliance, int team1, int team2,
@@ -63,7 +68,7 @@ public class ScoreEntry implements Serializable {
                 SyncStatus.UNSYNCED);
     }
 
-    // 用于数据库加载的完整构造函数
+    // 用于带历史数据的完整构造函数
     public ScoreEntry(int id, Type scoreType, int matchNumber, String alliance, int team1, int team2,
                       int team1AutoScore, int team2AutoScore, String team1AutoProj, String team2AutoProj,
                       String team1AutoRow, String team2AutoRow, int teleopArtifacts,
@@ -84,7 +89,7 @@ public class ScoreEntry implements Serializable {
         this.team2AutoProj = team2AutoProj;
         this.team1AutoRow = team1AutoRow;
         this.team2AutoRow = team2AutoRow;
-        this.autoArtifacts = team1AutoScore + team2AutoScore; // 聚合
+        this.autoArtifacts = team1AutoScore + team2AutoScore;
 
         this.teleopArtifacts = teleopArtifacts;
         this.team1CanSequence = team1CanSequence;
@@ -105,7 +110,6 @@ public class ScoreEntry implements Serializable {
     }
 
     private int calculateTotalScore() {
-        // 自动得分由用户直接记录真实分数，直接相加
         int score = team1AutoScore + team2AutoScore + (teleopArtifacts * 3);
         if (team1CanSequence) score += 10;
         if (team2CanSequence) score += 10;
@@ -114,23 +118,22 @@ public class ScoreEntry implements Serializable {
         return score;
     }
 
-    // Getters and Setters
+    // ==========================================
+    // 2. 原有的 Getters
+    // ==========================================
     public int getId() { return id; }
-    public void setId(int id) { this.id = id; }
     public Type getScoreType() { return scoreType; }
     public int getMatchNumber() { return matchNumber; }
     public String getAlliance() { return alliance; }
     public int getTeam1() { return team1; }
     public int getTeam2() { return team2; }
     public String getTeams() { return scoreType == Type.SINGLE ? String.valueOf(team1) : team1 + " & " + team2; }
-
     public int getTeam1AutoScore() { return team1AutoScore; }
     public int getTeam2AutoScore() { return team2AutoScore; }
     public String getTeam1AutoProj() { return team1AutoProj; }
     public String getTeam2AutoProj() { return team2AutoProj; }
     public String getTeam1AutoRow() { return team1AutoRow; }
     public String getTeam2AutoRow() { return team2AutoRow; }
-
     public int getAutoArtifacts() { return autoArtifacts; }
     public int getTeleopArtifacts() { return teleopArtifacts; }
     public int getTotalScore() { return totalScore; }
@@ -146,5 +149,35 @@ public class ScoreEntry implements Serializable {
     public boolean isTeam2Broken() { return team2Broken; }
     public String getClickLocations() { return clickLocations; }
     public SyncStatus getSyncStatus() { return syncStatus; }
+
+    // ==========================================
+    // 3. 补齐 JDBI 反射所需的 Setters
+    // ==========================================
+    public void setId(int id) { this.id = id; }
+    public void setScoreType(Type scoreType) { this.scoreType = scoreType; }
+    public void setMatchNumber(int matchNumber) { this.matchNumber = matchNumber; }
+    public void setAlliance(String alliance) { this.alliance = alliance; }
+    public void setTeam1(int team1) { this.team1 = team1; }
+    public void setTeam2(int team2) { this.team2 = team2; }
+    public void setTeam1AutoScore(int team1AutoScore) { this.team1AutoScore = team1AutoScore; }
+    public void setTeam2AutoScore(int team2AutoScore) { this.team2AutoScore = team2AutoScore; }
+    public void setTeam1AutoProj(String team1AutoProj) { this.team1AutoProj = team1AutoProj; }
+    public void setTeam2AutoProj(String team2AutoProj) { this.team2AutoProj = team2AutoProj; }
+    public void setTeam1AutoRow(String team1AutoRow) { this.team1AutoRow = team1AutoRow; }
+    public void setTeam2AutoRow(String team2AutoRow) { this.team2AutoRow = team2AutoRow; }
+    public void setAutoArtifacts(int autoArtifacts) { this.autoArtifacts = autoArtifacts; }
+    public void setTeleopArtifacts(int teleopArtifacts) { this.teleopArtifacts = teleopArtifacts; }
+    public void setTeam1CanSequence(boolean team1CanSequence) { this.team1CanSequence = team1CanSequence; }
+    public void setTeam2CanSequence(boolean team2CanSequence) { this.team2CanSequence = team2CanSequence; }
+    public void setTeam1L2Climb(boolean team1L2Climb) { this.team1L2Climb = team1L2Climb; }
+    public void setTeam2L2Climb(boolean team2L2Climb) { this.team2L2Climb = team2L2Climb; }
+    public void setTeam1Ignored(boolean team1Ignored) { this.team1Ignored = team1Ignored; }
+    public void setTeam2Ignored(boolean team2Ignored) { this.team2Ignored = team2Ignored; }
+    public void setTeam1Broken(boolean team1Broken) { this.team1Broken = team1Broken; }
+    public void setTeam2Broken(boolean team2Broken) { this.team2Broken = team2Broken; }
+    public void setTotalScore(int totalScore) { this.totalScore = totalScore; }
+    public void setSubmitter(String submitter) { this.submitter = submitter; }
+    public void setSubmissionTime(String submissionTime) { this.submissionTime = submissionTime; }
+    public void setClickLocations(String clickLocations) { this.clickLocations = clickLocations; }
     public void setSyncStatus(SyncStatus syncStatus) { this.syncStatus = syncStatus; }
 }

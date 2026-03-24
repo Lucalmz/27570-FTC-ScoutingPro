@@ -5,11 +5,13 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.flywaydb.core.Flyway;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DatabaseManager {
     private static HikariDataSource dataSource;
     private static Jdbi jdbi;
-
+    private static final Logger log = LoggerFactory.getLogger(DatabaseManager.class);
     public static synchronized void initialize(String dbUrl) {
         if (dataSource == null) {
             // 1. 初始化高性能连接池
@@ -29,12 +31,12 @@ public class DatabaseManager {
                     .baselineOnMigrate(true)
                     .load();
             flyway.migrate();
-            System.out.println("[DB] Flyway executed schema migrations successfully.");
+            log.info("[DB] Flyway executed schema migrations successfully.");
 
             // 3. 初始化 JDBI 并安装 SQL Object 插件
             jdbi = Jdbi.create(dataSource);
             jdbi.installPlugin(new SqlObjectPlugin());
-            System.out.println("[DB] HikariCP & JDBI Initialized successfully.");
+            log.info("[DB] HikariCP & JDBI Initialized successfully.");
         }
     }
 
@@ -47,7 +49,7 @@ public class DatabaseManager {
     public static void close() {
         if (dataSource != null && !dataSource.isClosed()) {
             dataSource.close();
-            System.out.println("[DB] Connections safely closed.");
+            log.info("[DB] Connections safely closed.");
         }
     }
 }

@@ -12,6 +12,8 @@ import javafx.fxml.FXML;
 import javafx.scene.control.ListView;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -25,19 +27,21 @@ public class CoordinatorController {
     private Competition competition;
     private MembershipRepository membershipRepository;
 
+    private static final Logger log = LoggerFactory.getLogger(CoordinatorController.class);
+
     public void setDependencies(Stage dialogStage, Competition competition, MembershipRepository membershipRepository) {
         this.dialogStage = dialogStage;
         this.competition = competition;
         this.membershipRepository = membershipRepository;
 
-        System.out.println("【UI调试】管理窗口初始化: " + competition.getName());
+        log.info("【UI调试】管理窗口初始化: {}", competition.getName());
 
         refreshLists();
         startAutoRefresh();
 
         // 绑定网络回调
         NetworkService.getInstance().setOnMemberJoinCallback(() -> {
-            System.out.println("【UI调试】收到新成员加入通知，正在刷新UI...");
+            log.info("【UI调试】收到新成员加入通知，正在刷新UI...");
             Platform.runLater(this::refreshLists);
         });
 
@@ -76,12 +80,11 @@ public class CoordinatorController {
 
             // 简单调试日志
             if (pendingNames != null && !pendingNames.isEmpty()) {
-                System.out.println("【UI调试】刷新列表，待批准: " + pendingNames);
+                log.info("【UI调试】刷新列表，待批准: " + pendingNames);
             }
 
         } catch (Exception e) {
-            System.err.println("【UI调试】列表刷新失败: " + e.getMessage());
-            e.printStackTrace();
+            log.error("【UI调试】列表刷新失败: {}", e.getMessage(), e);
         }
     }
 
@@ -89,7 +92,7 @@ public class CoordinatorController {
     private void handleApprove() {
         String username = pendingListView.getSelectionModel().getSelectedItem();
         if (username != null) {
-            System.out.println("【UI调试】批准: " + username);
+            log.info("【UI调试】批准: {}", username);
             membershipRepository.updateMembershipStatus(username, competition.getName(), Membership.Status.APPROVED);
             NetworkService.getInstance().approveClient(username);
             refreshLists();
@@ -100,7 +103,7 @@ public class CoordinatorController {
     private void handleDeny() {
         String username = pendingListView.getSelectionModel().getSelectedItem();
         if (username != null) {
-            System.out.println("【UI调试】拒绝: " + username);
+            log.info("【UI调试】拒绝: {}", username);
             membershipRepository.removeMembership(username, competition.getName());
             refreshLists();
         }
@@ -110,7 +113,7 @@ public class CoordinatorController {
     private void handleKick() {
         String username = approvedListView.getSelectionModel().getSelectedItem();
         if (username != null) {
-            System.out.println("【UI调试】踢出: " + username);
+            log.info("【UI调试】踢出: {}", username);
             membershipRepository.removeMembership(username, competition.getName());
             refreshLists();
         }

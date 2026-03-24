@@ -7,6 +7,7 @@ import com.bear27570.ftc.scouting.services.domain.MatchDataService;
 import com.bear27570.ftc.scouting.services.domain.RankingService;
 import com.bear27570.ftc.scouting.services.domain.UserService;
 import com.bear27570.ftc.scouting.services.network.GeminiApiClient;
+import com.bear27570.ftc.scouting.utils.FxThread;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.concurrent.Worker;
@@ -23,6 +24,8 @@ import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebView;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -35,24 +38,40 @@ import java.util.stream.Collectors;
 
 public class AllianceAnalysisController {
 
-    @FXML private TextField mainTeamField;
-    @FXML private Label mainTeamStatsLabel;
-    @FXML private TableView<AnalysisResult> analysisTable;
-    @FXML private TableColumn<AnalysisResult, Integer> partnerCol;
-    @FXML private TableColumn<AnalysisResult, Double> totalEffCol;
-    @FXML private TableColumn<AnalysisResult, Double> combinedAccCol;
-    @FXML private TableColumn<AnalysisResult, Double> stabilityCol;
-    @FXML private TableColumn<AnalysisResult, String> styleCol;
+    @FXML
+    private TextField mainTeamField;
+    @FXML
+    private Label mainTeamStatsLabel;
+    @FXML
+    private TableView<AnalysisResult> analysisTable;
+    @FXML
+    private TableColumn<AnalysisResult, Integer> partnerCol;
+    @FXML
+    private TableColumn<AnalysisResult, Double> totalEffCol;
+    @FXML
+    private TableColumn<AnalysisResult, Double> combinedAccCol;
+    @FXML
+    private TableColumn<AnalysisResult, Double> stabilityCol;
+    @FXML
+    private TableColumn<AnalysisResult, String> styleCol;
 
-    @FXML private PasswordField apiKeyField;
-    @FXML private WebView chatWebView;
-    @FXML private TextArea chatInputField;
+    @FXML
+    private PasswordField apiKeyField;
+    @FXML
+    private WebView chatWebView;
+    @FXML
+    private TextArea chatInputField;
 
-    @FXML private ComboBox<String> modelComboBox;
-    @FXML private CheckBox useProxyCheck;
-    @FXML private TextField proxyHostField;
-    @FXML private TextField proxyPortField;
+    @FXML
+    private ComboBox<String> modelComboBox;
+    @FXML
+    private CheckBox useProxyCheck;
+    @FXML
+    private TextField proxyHostField;
+    @FXML
+    private TextField proxyPortField;
 
+    private static final Logger log = LoggerFactory.getLogger(AllianceAnalysisController.class);
     private WebEngine webEngine;
     private final Queue<String> jsQueue = new LinkedList<>();
 
@@ -71,10 +90,14 @@ public class AllianceAnalysisController {
         String role; // "SYS", "USER", "AI"
         String text;
         boolean isError;
+
         ChatMessage(String role, String text, boolean isError) {
-            this.role = role; this.text = text; this.isError = isError;
+            this.role = role;
+            this.text = text;
+            this.isError = isError;
         }
     }
+
     private List<ChatMessage> chatHistory = new ArrayList<>();
 
     public void setDependencies(Stage dialogStage, Competition competition, RankingService rankingService, MatchDataService matchDataService, UserService userService, String currentUsername) {
@@ -96,7 +119,8 @@ public class AllianceAnalysisController {
         }
     }
 
-    @FXML public void initialize() {
+    @FXML
+    public void initialize() {
         webEngine = chatWebView.getEngine();
 
         // 🟢 修复：无内容时的占位符
@@ -116,7 +140,7 @@ public class AllianceAnalysisController {
                         // 🟢 修复：保护队列任务的执行
                         webEngine.executeScript(script);
                     } catch (Exception e) {
-                        System.err.println("WebView JS Queue Exec Warning: " + e.getMessage());
+                        log.error("WebView JS Queue Exec Warning: " + e.getMessage());
                     }
                 }
             }
@@ -157,7 +181,7 @@ public class AllianceAnalysisController {
                 try {
                     webEngine.executeScript(script);
                 } catch (Exception e) {
-                    System.err.println("WebView JS Execution Warning: " + e.getMessage() + " | Script: " + script);
+                    log.error("WebView JS Execution Warning: " + e.getMessage() + " | Script: " + script);
                 }
             } else {
                 jsQueue.add(script);
@@ -170,7 +194,8 @@ public class AllianceAnalysisController {
         partnerCol.setStyle("-fx-alignment: CENTER;");
         totalEffCol.setCellValueFactory(new PropertyValueFactory<>("totalEfficiency"));
         totalEffCol.setCellFactory(tc -> new TableCell<>() {
-            @Override protected void updateItem(Double item, boolean empty) {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
                 super.updateItem(item, empty);
                 setText(empty || item == null ? null : String.format("%.1f", item));
             }
@@ -178,7 +203,8 @@ public class AllianceAnalysisController {
         totalEffCol.setStyle("-fx-alignment: CENTER;");
         combinedAccCol.setCellValueFactory(new PropertyValueFactory<>("combinedAccuracy"));
         combinedAccCol.setCellFactory(tc -> new TableCell<>() {
-            @Override protected void updateItem(Double item, boolean empty) {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
                 super.updateItem(item, empty);
                 setText(empty || item == null ? null : String.format("%.1f%%", item));
             }
@@ -186,7 +212,8 @@ public class AllianceAnalysisController {
         combinedAccCol.setStyle("-fx-alignment: CENTER;");
         stabilityCol.setCellValueFactory(new PropertyValueFactory<>("stability"));
         stabilityCol.setCellFactory(tc -> new TableCell<>() {
-            @Override protected void updateItem(Double item, boolean empty) {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
                 super.updateItem(item, empty);
                 setText(empty || item == null ? null : String.format("±%.1f", item));
             }
@@ -195,6 +222,7 @@ public class AllianceAnalysisController {
         styleCol.setCellValueFactory(new PropertyValueFactory<>("styleDesc"));
         styleCol.setStyle("-fx-alignment: CENTER_LEFT;");
     }
+
     private void initializeChatHtml() {
         try {
             // 获取资源文件的绝对 URL
@@ -202,7 +230,7 @@ public class AllianceAnalysisController {
             if (htmlUrl != null) {
                 webEngine.load(htmlUrl.toExternalForm());
             } else {
-                System.err.println("❌ 严重错误: 找不到 chat_template.html 文件");
+                log.error("❌ 严重错误: 找不到 chat_template.html 文件");
                 // 兜底方案：显示一个报错网页
                 webEngine.loadContent("<html><body style='color:red;'>Failed to load AI Chat UI. Resource missing.</body></html>");
             }
@@ -260,7 +288,10 @@ public class AllianceAnalysisController {
     private void handleEditLastPrompt() {
         int lastUserIdx = -1;
         for (int i = chatHistory.size() - 1; i >= 0; i--) {
-            if (chatHistory.get(i).role.equals("USER")) { lastUserIdx = i; break; }
+            if (chatHistory.get(i).role.equals("USER")) {
+                lastUserIdx = i;
+                break;
+            }
         }
         if (lastUserIdx != -1) {
             String lastPrompt = chatHistory.get(lastUserIdx).text;
@@ -274,7 +305,10 @@ public class AllianceAnalysisController {
     private void handleRegenerate() {
         int lastUserIdx = -1;
         for (int i = chatHistory.size() - 1; i >= 0; i--) {
-            if (chatHistory.get(i).role.equals("USER")) { lastUserIdx = i; break; }
+            if (chatHistory.get(i).role.equals("USER")) {
+                lastUserIdx = i;
+                break;
+            }
         }
         if (lastUserIdx != -1) {
             String lastPrompt = chatHistory.get(lastUserIdx).text;
@@ -334,10 +368,14 @@ public class AllianceAnalysisController {
 
             resultArea.setText("Testing connection to " + targetUrl + "...\n");
 
-            geminiApiClient.testGenericNetworkAsync(targetUrl, useProxy, host, port, new GeminiApiClient.GeminiCallback() {
-                @Override public void onSuccess(String response) { Platform.runLater(() -> resultArea.appendText("✅ " + response + "\n")); }
-                @Override public void onError(String errorMessage) { Platform.runLater(() -> resultArea.appendText("❌ Failed:\n" + errorMessage + "\n")); }
-            });
+            geminiApiClient.testGenericNetworkAsync(targetUrl, useProxyCheck.isSelected(), proxyHostField.getText(), parseProxyPort(proxyPortField.getText()))
+                    .thenAccept(response ->
+                            FxThread.run(() -> resultArea.appendText("✅ " + response + "\n"))
+                    )
+                    .exceptionally(ex -> {
+                        FxThread.run(() -> resultArea.appendText("❌ Failed:\n" + ex.getCause().getMessage() + "\n"));
+                        return null;
+                    });
         });
 
         vbox.getChildren().addAll(label, inputRow, resultArea);
@@ -345,7 +383,8 @@ public class AllianceAnalysisController {
         // ✨ UI 补丁：注入全局 CSS
         try {
             scene.getStylesheets().add(getClass().getResource("/com/bear27570/ftc/scouting/styles/style.css").toExternalForm());
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
 
         testDialog.setScene(scene);
         testDialog.show();
@@ -385,20 +424,23 @@ public class AllianceAnalysisController {
         String host = proxyHostField.getText();
         int port = parseProxyPort(proxyPortField.getText());
 
-        geminiApiClient.sendChatRequestAsync(apiKey, model, context.toString(), prompt, useProxy, host, port, new GeminiApiClient.GeminiCallback() {
-            @Override
-            public void onSuccess(String response) {
-                Platform.runLater(() -> addMessageToHistory("AI", response, false));
-            }
-            @Override
-            public void onError(String errorMessage) {
-                Platform.runLater(() -> addMessageToHistory("AI", errorMessage, true));
-            }
-        });
+        geminiApiClient.sendChatRequestAsync(apiKey, model, context.toString(), prompt, useProxy, host, port)
+                .thenAccept(response ->
+                        FxThread.run(() -> addMessageToHistory("AI", response, false))
+                )
+                .exceptionally(ex -> {
+                    // .exceptionally 会自动捕获网络超时、404、以及 thenApply 里抛出的所有异常
+                    FxThread.run(() -> addMessageToHistory("AI", "Error: " + ex.getMessage(), true));
+                    return null;
+                });
     }
 
     private int parseProxyPort(String portStr) {
-        try { return Integer.parseInt(portStr.trim()); } catch (NumberFormatException e) { return 7890; }
+        try {
+            return Integer.parseInt(portStr.trim());
+        } catch (NumberFormatException e) {
+            return 7890;
+        }
     }
 
     private static class TeamHeatmapProfile {
@@ -495,17 +537,29 @@ public class AllianceAnalysisController {
                         String[] coords = parts[1].split(",");
                         double y = Double.parseDouble(coords[1]);
                         boolean isHit = (Integer.parseInt(coords[2]) == 0);
-                        if (y < ZONE_DIVIDER_Y) { mNearShots++; if (isHit) mNearHits++; }
-                        else { mFarShots++; if (isHit) mFarHits++; }
+                        if (y < ZONE_DIVIDER_Y) {
+                            mNearShots++;
+                            if (isHit) mNearHits++;
+                        } else {
+                            mFarShots++;
+                            if (isHit) mFarHits++;
+                        }
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
-            globalNearShots += mNearShots; globalFarShots += mFarShots;
+            globalNearShots += mNearShots;
+            globalFarShots += mFarShots;
             int totalShots = mNearShots + mFarShots;
             if (totalShots > 0) {
                 double farRatio = (double) mFarShots / totalShots;
-                if (farRatio > 0.65) { sumHitsWhenFar += (mNearHits + mFarHits); countFarGames++; }
-                else if (farRatio < 0.35) { sumHitsWhenNear += (mNearHits + mFarHits); countNearGames++; }
+                if (farRatio > 0.65) {
+                    sumHitsWhenFar += (mNearHits + mFarHits);
+                    countFarGames++;
+                } else if (farRatio < 0.35) {
+                    sumHitsWhenNear += (mNearHits + mFarHits);
+                    countNearGames++;
+                }
             }
         }
 
@@ -525,14 +579,18 @@ public class AllianceAnalysisController {
 
         TeamRanking tr = rankings.stream().filter(r -> r.getTeamNumber() == teamNum).findFirst().orElse(null);
         profile.accuracy = (tr != null) ? parseAcc(tr.getAccuracyFormatted()) : 0;
-        List<Double> scores = validMatches.stream().map(m -> (double)m.getTotalScore() / (m.getScoreType() == ScoreEntry.Type.ALLIANCE ? 2.0 : 1.0)).collect(Collectors.toList());
+        List<Double> scores = validMatches.stream().map(m -> (double) m.getTotalScore() / (m.getScoreType() == ScoreEntry.Type.ALLIANCE ? 2.0 : 1.0)).collect(Collectors.toList());
         profile.stability = calculateStdDev(scores);
         return profile;
     }
 
     private double parseAcc(String accStr) {
         if (accStr == null || accStr.equals("N/A")) return 0.0;
-        try { return Double.parseDouble(accStr.replace("%", "")); } catch (Exception e) { return 0.0; }
+        try {
+            return Double.parseDouble(accStr.replace("%", ""));
+        } catch (Exception e) {
+            return 0.0;
+        }
     }
 
     private double calculateStdDev(List<Double> data) {
@@ -547,14 +605,33 @@ public class AllianceAnalysisController {
         private final double combinedAccuracy;
         private final double stability;
         private final String styleDesc;
+
         public AnalysisResult(int partnerTeam, double totalEfficiency, double combinedAccuracy, double stability, String styleDesc) {
-            this.partnerTeam = partnerTeam; this.totalEfficiency = totalEfficiency; this.combinedAccuracy = combinedAccuracy;
-            this.stability = stability; this.styleDesc = styleDesc;
+            this.partnerTeam = partnerTeam;
+            this.totalEfficiency = totalEfficiency;
+            this.combinedAccuracy = combinedAccuracy;
+            this.stability = stability;
+            this.styleDesc = styleDesc;
         }
-        public int getPartnerTeam() { return partnerTeam; }
-        public double getTotalEfficiency() { return totalEfficiency; }
-        public double getCombinedAccuracy() { return combinedAccuracy; }
-        public double getStability() { return stability; }
-        public String getStyleDesc() { return styleDesc; }
+
+        public int getPartnerTeam() {
+            return partnerTeam;
+        }
+
+        public double getTotalEfficiency() {
+            return totalEfficiency;
+        }
+
+        public double getCombinedAccuracy() {
+            return combinedAccuracy;
+        }
+
+        public double getStability() {
+            return stability;
+        }
+
+        public String getStyleDesc() {
+            return styleDesc;
+        }
     }
 }

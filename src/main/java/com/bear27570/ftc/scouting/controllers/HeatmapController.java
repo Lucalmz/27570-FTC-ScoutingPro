@@ -1,6 +1,8 @@
 package com.bear27570.ftc.scouting.controllers;
 
 import com.bear27570.ftc.scouting.models.ScoreEntry;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import com.bear27570.ftc.scouting.repository.PenaltyRepository;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -51,7 +53,7 @@ public class HeatmapController {
     @FXML private TableColumn<MatchDetailRow, String> colPenalties;
     @FXML private TableColumn<MatchDetailRow, Integer> colScore;
     @FXML private TableColumn<MatchDetailRow, String> colStatus;
-
+    private static final Logger log = LoggerFactory.getLogger(HeatmapController.class);
     private int currentTeamNumber;
     private static final double ZONE_DIVIDER_Y = 400.0;
     private static final int POINTS_PER_HIT = 3;
@@ -190,7 +192,7 @@ public class HeatmapController {
                 try {
                     String[] parts = p.split(":");
                     if (parts.length < 2) {
-                        System.err.println("⚠️ [Heatmap] Match " + m.getMatchNumber() + " 缺少队标映射，已跳过: " + p);
+                        log.error("⚠️ [Heatmap] Match " + m.getMatchNumber() + " 缺少队标映射，已跳过: " + p);
                         continue;
                     }
 
@@ -200,7 +202,7 @@ public class HeatmapController {
                     if (actualTeamNum == teamNumber) {
                         String[] coords = parts[1].split(",");
                         if (coords.length < 2) {
-                            System.err.println("⚠️ [Heatmap] Match " + m.getMatchNumber() + " 缺少 X/Y 轴数据，已跳过: " + p);
+                            log.error("⚠️ [Heatmap] Match " + m.getMatchNumber() + " 缺少 X/Y 轴数据，已跳过: " + p);
                             continue;
                         }
 
@@ -217,9 +219,9 @@ public class HeatmapController {
                         else { mFarShots++; if (isHit) globalFarHits++; }
                     }
                 } catch (NumberFormatException e) {
-                    System.err.println("❌ [Heatmap] 坐标数据非数字 (Match " + m.getMatchNumber() + "): '" + p + "' | 详情: " + e.getMessage());
+                    log.error("❌ [Heatmap] 坐标数据非数字 (Match " + m.getMatchNumber() + "): '" + p + "' | 详情: " + e.getMessage());
                 } catch (Exception e) {
-                    System.err.println("❌ [Heatmap] 解析坐标流发生异常 (Match " + m.getMatchNumber() + "): '" + p + "' | 详情: " + e.getMessage());
+                    log.error("❌ [Heatmap] 解析坐标流发生异常 (Match " + m.getMatchNumber() + "): '" + p + "' | 详情: " + e.getMessage());
                     e.printStackTrace();
                 }
             }

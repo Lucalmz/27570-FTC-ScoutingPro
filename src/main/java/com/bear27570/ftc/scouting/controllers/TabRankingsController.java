@@ -4,8 +4,9 @@ package com.bear27570.ftc.scouting.controllers;
 import com.bear27570.ftc.scouting.MainApplication;
 import com.bear27570.ftc.scouting.models.Competition;
 import com.bear27570.ftc.scouting.models.TeamRanking;
+import com.bear27570.ftc.scouting.utils.FxThread;
+import com.bear27570.ftc.scouting.viewmodels.SharedDataViewModel;
 import javafx.beans.property.SimpleObjectProperty;
-import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -16,6 +17,8 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.util.Callback;
 import org.kordamp.ikonli.javafx.FontIcon;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
@@ -23,8 +26,6 @@ import java.util.List;
 public class TabRankingsController {
 
     @FXML private Label rankingLegendLabel;
-
-    // ★ 从 MainController 转移过来的“修改公式”按钮
     @FXML private Button editRatingButton;
 
     @FXML private TableView<TeamRanking> rankingsTableView;
@@ -41,6 +42,8 @@ public class TabRankingsController {
     private MainApplication mainApp;
     private Competition currentCompetition;
     private boolean isHost;
+    private static final Logger log = LoggerFactory.getLogger(TabRankingsController.class);
+    private SharedDataViewModel viewModel;
 
     @FXML
     public void initialize() {
@@ -95,11 +98,11 @@ public class TabRankingsController {
             {
                 btn.getStyleClass().addAll("button", "accent");
 
-                 FontIcon icon = new FontIcon("fth-map");
-                 icon.setIconSize(12);
-                 icon.setIconColor(javafx.scene.paint.Color.valueOf("#111111")); // 金底配极黑图标
-                 btn.setGraphic(icon);
-                 btn.setText("");
+                FontIcon icon = new FontIcon("fth-map");
+                icon.setIconSize(12);
+                icon.setIconColor(javafx.scene.paint.Color.valueOf("#111111"));
+                btn.setGraphic(icon);
+                btn.setText("");
 
                 btn.setOnAction(e -> {
                     try {
@@ -116,7 +119,6 @@ public class TabRankingsController {
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
-
                 if (empty || getTableRow() == null || getTableRow().getItem() == null) {
                     setGraphic(null);
                 } else {
@@ -125,16 +127,13 @@ public class TabRankingsController {
                 }
             }
         });
+
         rankTrendCol.setCellValueFactory(new PropertyValueFactory<>("recentRatings"));
         rankTrendCol.setCellFactory(tc -> new TableCell<>() {
-            // 优化 1：稍微放大画布 (70x30)，给四周的发光阴影留出安全空间，防止被切断或清理不净
             private final javafx.scene.canvas.Canvas canvas = new javafx.scene.canvas.Canvas(70, 30);
-
             {
-                // 优化 2：将发光特效在初始化时只施加给 Canvas 节点，不要在 updateItem 里施加给 gc
                 canvas.setEffect(new javafx.scene.effect.DropShadow(4, javafx.scene.paint.Color.web("#D4AF37")));
             }
-
             @Override
             protected void updateItem(List<Double> ratings, boolean empty) {
                 super.updateItem(ratings, empty);
@@ -143,31 +142,24 @@ public class TabRankingsController {
                     setGraphic(null);
                 } else {
                     javafx.scene.canvas.GraphicsContext gc = canvas.getGraphicsContext2D();
-
-                    // 彻底清空整个画布的当前状态
                     gc.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
 
-                    // 计算最大最小值以自适应缩放
                     double max = ratings.stream().max(Double::compareTo).orElse(1.0);
                     double min = ratings.stream().min(Double::compareTo).orElse(0.0);
                     double range = max - min == 0 ? 1 : max - min;
 
-                    // 基础绘制配置
-                    gc.setStroke(javafx.scene.paint.Color.web("#FDE047")); // 金色高亮线
+                    gc.setStroke(javafx.scene.paint.Color.web("#FDE047"));
                     gc.setLineWidth(1.5);
 
-                    // 绘图区域配置：留出 5px 的 Padding 用于居中
                     double drawWidth = 60.0;
                     double drawHeight = 20.0;
                     double paddingX = 5.0;
                     double paddingY = 5.0;
-
                     double xStep = drawWidth / (ratings.size() - 1);
 
                     gc.beginPath();
                     for (int i = 0; i < ratings.size(); i++) {
                         double x = paddingX + (i * xStep);
-                        // 优化 3：Y轴翻转，并处理 max == min (全部分数相同) 时画在正中间的情况
                         double y = paddingY + ((max == min) ? (drawHeight / 2) : (drawHeight - ((ratings.get(i) - min) / range) * drawHeight));
 
                         if (i == 0) gc.moveTo(x, y);
@@ -175,12 +167,9 @@ public class TabRankingsController {
                     }
                     gc.stroke();
 
-                    // 最后一个点画个发光小白圆，精准对齐线段末端
                     double lastX = paddingX + drawWidth;
                     double lastY = paddingY + ((max == min) ? (drawHeight / 2) : (drawHeight - ((ratings.get(ratings.size()-1) - min) / range) * drawHeight));
-
                     gc.setFill(javafx.scene.paint.Color.WHITE);
-                    // 减去半径 2.5 确保圆心严格对齐
                     gc.fillOval(lastX - 2.5, lastY - 2.5, 5, 5);
 
                     setGraphic(canvas);
@@ -191,43 +180,44 @@ public class TabRankingsController {
         rankingLegendLabel.setText("Penalty: Major=15, Minor=5. Auto Score now correctly skips matches with 0 points from average calculation.");
     }
 
-    public void setDependencies(MainController mainController, MainApplication mainApp, Competition competition, boolean isHost) {
+    public void setDependencies(MainController mainController, MainApplication mainApp, Competition competition, boolean isHost, SharedDataViewModel viewModel) {
         this.mainController = mainController;
         this.mainApp = mainApp;
         this.currentCompetition = competition;
         this.isHost = isHost;
+        this.viewModel = viewModel;
 
-        // ★ 核心修复：根据当前用户是否为主机动态显示公式修改按钮
         if (editRatingButton != null) {
             editRatingButton.setVisible(isHost);
             editRatingButton.setManaged(isHost);
         }
+
+        rankingsTableView.setItems(viewModel.getRankingsList());
     }
 
-    // ★ 从 MainController 转移过来的按钮事件
     @FXML
     private void handleEditRating() {
         if (isHost) {
             try {
                 mainApp.showFormulaEditView(currentCompetition);
-                // 关闭编辑窗口后，通知 MainController 刷新整站数据（因为可能影响了排行榜计算）
                 mainController.triggerDataRefreshAndBroadcast();
             } catch (IOException e) {
-                e.printStackTrace();
+                log.error("Failed to open formula edit view", e);
             }
         }
     }
 
-    public void updateData(List<TeamRanking> rankings, Competition comp) {
+    public void updateCompetition(Competition comp) {
         this.currentCompetition = comp;
-        rankingsTableView.setItems(FXCollections.observableArrayList(rankings));
-        if (currentCompetition != null && isHost) {
-            rankRatingCol.setText(currentCompetition.getRatingFormula().equals("total") ? "Rating" : "Rating *");
-        }
+        FxThread.run(() -> {
+            if (currentCompetition != null && isHost) {
+                rankRatingCol.setText(currentCompetition.getRatingFormula().equals("total") ? "Rating" : "Rating *");
+            }
+        });
     }
 
     public ObservableList<TeamRanking> getRankingsList() {
-        return rankingsTableView.getItems();
+        return viewModel != null ? viewModel.getRankingsList() : javafx.collections.FXCollections.emptyObservableList();
     }
 
     private <T> Callback<TableColumn<T, Double>, TableCell<T, Double>> createNumberCellFactory(String format) {

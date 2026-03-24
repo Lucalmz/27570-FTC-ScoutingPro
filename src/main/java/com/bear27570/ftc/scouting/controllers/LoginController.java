@@ -20,6 +20,8 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
@@ -31,7 +33,7 @@ public class LoginController {
 
     private MainApplication mainApp;
     private UserService userService;
-
+    private static final Logger log = LoggerFactory.getLogger(LoginController.class);
     public void setDependencies(MainApplication mainApp, UserService userService) {
         this.mainApp = mainApp;
         this.userService = userService;
@@ -120,12 +122,12 @@ public class LoginController {
                             );
                         } else {
                             // 极端情况：文件存在但无法作为字体加载
-                            System.err.println("❌ 字体文件格式错误或已损坏 (Font format invalid): " + fontUrlString);
+                            log.error("❌ 字体文件格式错误或已损坏 (Font format invalid): " + fontUrlString);
                             welcomeLabel.setStyle("-fx-font-size: 68px; -fx-font-style: italic; -fx-text-fill: #FDE047;");
                         }
                     } else {
                         // 根本情况：文件根本不存在
-                        System.err.println("⚠️ 资源未找到 (Resource not found)! 请再次确认 'src/main/resources' 结构: " + fontPath);
+                        log.error("⚠️ 资源未找到 (Resource not found)! 请再次确认 'src/main/resources' 结构: " + fontPath);
                         welcomeLabel.setStyle("-fx-font-size: 68px; -fx-font-style: italic; -fx-text-fill: #FDE047;");
                     }
                     // 赛博朋克风金色弥散发光特效

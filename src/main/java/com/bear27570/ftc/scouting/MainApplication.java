@@ -21,6 +21,8 @@ import javafx.scene.image.Image;
 import javafx.scene.text.Font;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -43,7 +45,7 @@ public class MainApplication extends Application {
     private CompetitionService competitionService;
     private MatchDataService matchDataService;
     private RankingService rankingService;
-
+    private static final Logger log = LoggerFactory.getLogger(MainApplication.class);
     private void applyTheme(Scene scene) {
         URL cssUrl = getClass().getResource("styles/style.css");
         if (cssUrl == null) {
@@ -52,7 +54,7 @@ public class MainApplication extends Application {
         if (cssUrl != null) {
             scene.getStylesheets().add(cssUrl.toExternalForm());
         } else {
-            System.err.println("WARNING: Could not find 'styles/style.css'. Check your resource folder structure.");
+            log.warn("Could not find 'styles/style.css'. Check your resource folder structure.");
         }
     }
 
@@ -66,10 +68,10 @@ public class MainApplication extends Application {
             if (iconStream != null) {
                 stage.getIcons().add(new Image(iconStream));
             } else {
-                System.err.println("WARNING: logo.png not found in 'images/' folder.");
+                log.warn("logo.png not found in 'images/' folder.");
             }
         } catch (Exception e) {
-            System.err.println("WARNING: Failed to load application icon: " + e.getMessage());
+            log.warn("WARNING: Failed to load application icon: {}", e.getMessage(),e);
         }
     }
     @Override

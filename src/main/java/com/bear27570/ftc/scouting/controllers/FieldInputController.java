@@ -1,5 +1,6 @@
 package com.bear27570.ftc.scouting.controllers;
 
+import com.bear27570.ftc.scouting.services.NetworkService;
 import javafx.animation.PauseTransition;
 import javafx.fxml.FXML;
 import javafx.scene.Cursor;
@@ -19,6 +20,8 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,7 +46,7 @@ public class FieldInputController {
 
     private boolean isAllianceMode = true;
     private Label warningLabel;
-
+    private static final Logger log = LoggerFactory.getLogger(FieldInputController.class);
     private static final double ZONE_DIVIDER_Y = 400.0;
 
     public static class TeamPoint {
@@ -280,7 +283,7 @@ public class FieldInputController {
             try {
                 String[] parts = entry.split(":");
                 if (parts.length < 2) {
-                    System.err.println("⚠️ [FieldInput] 坐标片段缺少冒号分隔符，已跳过: " + entry);
+                    log.error("⚠️ [FieldInput] 坐标片段缺少冒号分隔符，已跳过: {}", entry);
                     continue;
                 }
 
@@ -288,7 +291,7 @@ public class FieldInputController {
                 String[] coords = parts[1].split(",");
 
                 if (coords.length < 3) {
-                    System.err.println("⚠️ [FieldInput] 坐标数据不完整(需 x,y,state)，已跳过: " + entry);
+                    log.error("⚠️ [FieldInput] 坐标数据不完整(需 x,y,state)，已跳过:  {}", entry);
                     continue;
                 }
 
@@ -300,10 +303,9 @@ public class FieldInputController {
                 points.add(new TeamPoint(x, y, teamIdx, state == 1, ts));
 
             } catch (NumberFormatException e) {
-                System.err.println("❌ [FieldInput] 坐标数字解析失败，存在非法字符: '" + entry + "' | 详情: " + e.getMessage());
+                log.error("❌ [FieldInput] 坐标数字解析失败，存在非法字符: '" + entry + "' | 详情: " + e.getMessage());
             } catch (Exception e) {
-                System.err.println("❌ [FieldInput] 坐标解析发生未知异常: '" + entry + "' | 详情: " + e.getMessage());
-                e.printStackTrace();
+                log.error("❌ [FieldInput] 坐标解析发生未知异常: '" + entry + "' | 详情: " + e.getMessage(),e);
             }
         }
         updateUI();

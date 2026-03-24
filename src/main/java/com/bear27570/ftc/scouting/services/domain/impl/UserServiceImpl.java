@@ -2,12 +2,14 @@ package com.bear27570.ftc.scouting.services.domain.impl;
 
 import com.bear27570.ftc.scouting.repository.UserRepository;
 import com.bear27570.ftc.scouting.services.domain.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
-
+    private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
     public UserServiceImpl(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
@@ -24,11 +26,11 @@ public class UserServiceImpl implements UserService {
     public boolean register(String username, String password) {
         // 核心修改：移除了密码长度限制，只校验非空
         if (username == null || username.trim().isEmpty()) {
-            System.err.println("DEBUG: Register failed - Username is empty");
+            log.error("DEBUG: Register failed - Username is empty");
             return false;
         }
         if (password == null || password.isEmpty()) {
-            System.err.println("DEBUG: Register failed - Password is empty");
+            log.error("DEBUG: Register failed - Password is empty");
             return false;
         }
 
