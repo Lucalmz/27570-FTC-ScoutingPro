@@ -11,6 +11,7 @@ import com.bear27570.ftc.scouting.services.domain.UserService;
 import com.bear27570.ftc.scouting.services.network.FtcScoutApiClient;
 import com.bear27570.ftc.scouting.utils.FxThread;
 import com.bear27570.ftc.scouting.viewmodels.SharedDataViewModel;
+import com.google.gson.Gson;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
@@ -22,11 +23,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public class MainController {
 
@@ -53,8 +59,16 @@ public class MainController {
 
     private String officialEventName = null;
     private static final Logger log = LoggerFactory.getLogger(MainController.class);
-    // 核心注入：全局共享数据模型
     private final SharedDataViewModel sharedViewModel = new SharedDataViewModel();
+
+    public static class SyncPayload implements Serializable {
+        public String exportId;
+        public String competitionName;
+        public String submitter;
+        public int exportSequence;
+        public int maxMatchNumber;
+        public List<ScoreEntry> data;
+    }
 
     public void setDependencies(MainApplication mainApp, Competition competition, String username, boolean isHost,
                                 MatchDataService matchDataService, RankingService rankingService,
@@ -90,7 +104,6 @@ public class MainController {
         tabScoringController.setDependencies(this, matchDataService, currentCompetition, username, isHost);
         tabFtcScoutController.setDependencies(this, ftcScoutApiClient, currentCompetition, isHost);
 
-        // 传入 ViewModel 进行数据绑定
         tabRankingsController.setDependencies(this, mainApp, currentCompetition, isHost, sharedViewModel);
         tabHistoryController.setDependencies(this, matchDataService, currentCompetition, username, isHost, sharedViewModel);
 
@@ -169,7 +182,6 @@ public class MainController {
             currentCompetition = competitionRepository.findByName(currentCompetition.getName());
         }
 
-        // 💥 ViewModel 底层会自动使用 FxThread 处理，直接调用即可
         sharedViewModel.updateData(fullHistory, newRankings, reliabilities);
         tabRankingsController.updateCompetition(currentCompetition);
     }
@@ -197,11 +209,9 @@ public class MainController {
 
             if (!pending.isEmpty()) {
                 AtomicInteger syncCount = new AtomicInteger(0);
-
-                // 💥 收集所有的异步上传任务
                 List<CompletableFuture<Void>> futures = pending.stream().map(s -> {
                     int localId = s.getId();
-                    s.setId(0); // 准备发往服务器
+                    s.setId(0);
                     return NetworkService.getInstance().sendScoreToServer(s).thenAccept(sent -> {
                         if (sent) {
                             matchDataService.deleteScore(localId);
@@ -210,7 +220,6 @@ public class MainController {
                     });
                 }).collect(Collectors.toList());
 
-                // 💥 等所有离线数据上传完毕后，统一更新 UI 和刷新本地数据
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                         .thenRun(() -> FxThread.run(() -> {
                             if (syncCount.get() > 0) {
@@ -253,39 +262,93 @@ public class MainController {
 
     @FXML private void handleOfflineSync() {
         FileChooser fileChooser = new FileChooser();
-        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("FTC Sync Data (*.ftcsync)", "*.ftcsync"));
+        Gson gson = new Gson();
+        Preferences prefs = Preferences.userNodeForPackage(MainController.class);
 
         if (isHost) {
-            fileChooser.setTitle("Import Client Offline Data");
+            fileChooser.setTitle("Import Scouter Data (.ftcsync)");
+            fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Scouter Sync Data (*.ftcsync)", "*.ftcsync"));
             File file = fileChooser.showOpenDialog(competitionNameLabel.getScene().getWindow());
+
             if (file != null) {
-                try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
-                    @SuppressWarnings("unchecked")
-                    List<ScoreEntry> importedScores = (List<ScoreEntry>) in.readObject();
-                    for(ScoreEntry s : importedScores) {
-                        s.setId(0);
-                        s.setSyncStatus(ScoreEntry.SyncStatus.SYNCED);
-                        matchDataService.submitScore(currentCompetition.getName(), s);
+                try (FileInputStream fis = new FileInputStream(file);
+                     GZIPInputStream gis = new GZIPInputStream(fis);
+                     InputStreamReader reader = new InputStreamReader(gis, StandardCharsets.UTF_8)) {
+
+                    SyncPayload payload = gson.fromJson(reader, SyncPayload.class);
+
+                    if (payload == null || payload.data == null || payload.data.isEmpty()) {
+                        tabScoringController.getViewModel().setStatus("No data found in file.", "#FF9F0A");
+                        return;
                     }
+
+                    String importedPrefsKey = "imported_sync_ids_" + currentCompetition.getName();
+                    String importedIds = prefs.get(importedPrefsKey, "");
+
+                    if (importedIds.contains(payload.exportId)) {
+                        FxThread.run(() -> {
+                            Alert alert = new Alert(Alert.AlertType.WARNING, "防呆拦截：这个文件你之前已经成功导入过了，无需重复操作！", ButtonType.OK);
+                            alert.setHeaderText("重复导入警告");
+                            try { alert.getDialogPane().getStylesheets().add(getClass().getResource("/com/bear27570/ftc/scouting/styles/style.css").toExternalForm()); alert.getDialogPane().getStyleClass().add("mac-card"); } catch (Exception ignored) {}
+                            alert.showAndWait();
+                        });
+                        return;
+                    }
+
+                    matchDataService.syncWithHostData(currentCompetition.getName(), payload.data);
+                    prefs.put(importedPrefsKey, importedIds + payload.exportId + ";");
+
                     triggerDataRefreshAndBroadcast();
-                    tabScoringController.getViewModel().setStatus("Imported " + importedScores.size() + " records!", "#32D74B");
-                } catch (Exception e) { tabScoringController.getViewModel().setError("Import Failed."); }
+                    tabScoringController.getViewModel().setStatus("Imported " + payload.data.size() + " records from " + payload.submitter + "!", "#32D74B");
+
+                } catch (Exception e) {
+                    log.error("Import Failed", e);
+                    tabScoringController.getViewModel().setError("Import Failed. File might be corrupted or outdated.");
+                }
             }
         } else {
             List<ScoreEntry> pending = matchDataService.getPendingExports(currentCompetition.getName());
-            if (pending.isEmpty()) { tabScoringController.getViewModel().setStatus("No pending offline data to export.", "#FF9F0A"); return; }
+            if (pending.isEmpty()) {
+                tabScoringController.getViewModel().setStatus("No pending offline data to export.", "#FF9F0A");
+                return;
+            }
 
-            fileChooser.setTitle("Export Offline Data");
-            fileChooser.setInitialFileName("OfflineSync_" + currentUsername + "_" + System.currentTimeMillis() + ".ftcsync");
+            String prefKey = "export_seq_" + currentCompetition.getName() + "_" + currentUsername;
+            int seq = prefs.getInt(prefKey, 1);
+            int maxMatch = pending.stream().mapToInt(ScoreEntry::getMatchNumber).max().orElse(0);
+
+            SyncPayload payload = new SyncPayload();
+            payload.exportId = UUID.randomUUID().toString();
+            payload.competitionName = currentCompetition.getName();
+            payload.submitter = currentUsername;
+            payload.exportSequence = seq;
+            payload.maxMatchNumber = maxMatch;
+            payload.data = pending;
+
+            fileChooser.setTitle("Export Data to Host (.ftcsync)");
+            fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Scouter Sync Data (*.ftcsync)", "*.ftcsync"));
+
+            String defaultName = String.format("[交回主机]侦查数据_%s_第%d次导出_至Match%d.ftcsync", currentUsername, seq, maxMatch);
+            fileChooser.setInitialFileName(defaultName);
+
             File file = fileChooser.showSaveDialog(competitionNameLabel.getScene().getWindow());
 
             if (file != null) {
-                try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file))) {
-                    out.writeObject(pending);
+                try (FileOutputStream fos = new FileOutputStream(file);
+                     GZIPOutputStream gos = new GZIPOutputStream(fos);
+                     OutputStreamWriter writer = new OutputStreamWriter(gos, StandardCharsets.UTF_8)) {
+
+                    gson.toJson(payload, writer);
+
+                    prefs.putInt(prefKey, seq + 1);
                     matchDataService.markAsExported(pending.stream().map(ScoreEntry::getId).collect(Collectors.toList()));
                     refreshAllDataFromDatabase();
-                    tabScoringController.getViewModel().setStatus("Exported successfully!", "#32D74B");
-                } catch (Exception e) { tabScoringController.getViewModel().setError("Export Failed."); }
+
+                    tabScoringController.getViewModel().setStatus("Exported successfully! Send this to Host.", "#32D74B");
+                } catch (Exception e) {
+                    log.error("Export Failed", e);
+                    tabScoringController.getViewModel().setError("Export Failed: " + e.getMessage());
+                }
             }
         }
     }
@@ -365,6 +428,6 @@ public class MainController {
 
     @FXML private void handleManageMembers() throws IOException { mainApp.showCoordinatorView(currentCompetition); }
     @FXML private void handleAllianceAnalysis() throws IOException { mainApp.showAllianceAnalysisView(currentCompetition, currentUsername); }
-    @FXML private void handleBackButton() throws IOException { mainApp.showHubView(currentUsername); }
+    @FXML private void handleBackButton() throws IOException { mainApp.showHubView(currentUsername,false); }
     @FXML private void handleLogout() throws IOException { NetworkService.getInstance().stop(); mainApp.showLoginView(); }
 }

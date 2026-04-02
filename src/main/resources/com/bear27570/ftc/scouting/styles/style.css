@@ -1,5 +1,7 @@
+/* File: src/main/resources/com/bear27570/ftc/scouting/styles/style.css */
+
 /* ==============================================
-   Font Face Definitions (必须放在最前面)
+   Font Face Definitions
    ============================================== */
 @font-face {
     font-family: 'Audiowide';
@@ -25,27 +27,25 @@
 }
 
 /* ==============================================
-   FTC Scouting Pro - Spatial VisionOS / Next-Gen Black & Gold Theme
+   Core Variables
    ============================================== */
-
 * {
-    /* 核心调色板：深空 OLED 黑与空间香槟金 */
     -color-bg-root: #000000;
-    -color-bg-card: rgba(20, 20, 24, 0.65); /* 空间毛玻璃底色 */
-    -color-bg-panel: rgba(10, 10, 12, 0.5); /* 凹陷面板底色 */
+    -color-bg-card: rgba(20, 20, 24, 0.65);
+    -color-bg-panel: rgba(10, 10, 12, 0.5);
 
-    /* 黄金层级 */
     -color-gold-base: #D4AF37;
     -color-gold-light: #FDE047;
     -color-gold-dark: #8B7322;
     -color-gold-glow: rgba(253, 224, 71, 0.4);
 
-    /* 文本层级 */
+    /* 修复了此处缺失的 accent 变量，消除控制台警告 */
+    -color-accent: #FDE047;
+
     -color-text-main: #FFFFFF;
     -color-text-normal: #E4E4E7;
     -color-text-muted: #A1A1AA;
 
-    /* 空间计算边缘光 (模拟玻璃切角折射) */
     -color-glass-edge-top: rgba(255, 255, 255, 0.15);
     -color-glass-edge-bottom: rgba(255, 255, 255, 0.02);
     -color-glass-edge-side: rgba(255, 255, 255, 0.05);
@@ -53,7 +53,6 @@
 
 .root {
     -fx-background-color: -color-bg-root;
-    /* 全局主字体：Oxanium 赛博朋克细节 */
     -fx-font-family: "Oxanium", sans-serif;
     -fx-font-smoothing-type: lcd;
 }
@@ -63,18 +62,15 @@
 }
 
 .mono-text {
-    /* 数据/代码/数字 专属紧凑字体 Teko */
     -fx-font-family: "Teko", monospace;
-    /* Teko 是窄体，所以字号稍微放大一点补偿视觉比例 */
     -fx-font-size: 22px;
 }
 
 /* ==============================================
-   1. Typography (文字与光效)
+   1. Typography
    ============================================== */
 .label { -fx-text-fill: -color-text-normal; }
 
-/* 顶级标题：Audiowide 扁平硬核数字感 */
 .title-2, .title-3, .header-label {
     -fx-font-family: "Audiowide", sans-serif;
     -fx-text-fill: -color-text-main;
@@ -84,7 +80,6 @@
 .title-3 { -fx-font-size: 20px; }
 .header-label { -fx-font-size: 24px; -fx-text-fill: -color-gold-light; }
 
-/* 次级标题与标签：Oxanium 加粗强化 */
 .title-4, .sub-header-label {
     -fx-font-family: "Oxanium", sans-serif;
     -fx-text-fill: -color-text-main;
@@ -102,15 +97,65 @@
 .text-accent  { -fx-text-fill: -color-gold-light; -fx-effect: dropshadow(gaussian, -color-gold-glow, 10, 0.4, 0, 0); }
 
 /* ==============================================
-   2. Spatial Cards & Panels
+   2. Spatial Cards & Panels (高级玻璃态)
    ============================================== */
+/* 修改原有的 mac-card 样式，变为淡黄色半透明玻璃材质 */
 .mac-card, .card {
-    -fx-background-color: linear-gradient(to bottom right, #1A1A1E, #0A0A0C);
+    -fx-background-color: linear-gradient(from 0% 0% to 100% 100%,
+    rgb(30, 31, 34, 0.7) 0%,
+    rgba(80, 68, 10, 0.8) 40%,
+    rgba(0, 0, 0, 0.26) 100%
+    );
     -fx-background-radius: 16px;
-    -fx-border-color: -color-glass-edge-top -color-glass-edge-side -color-glass-edge-bottom -color-glass-edge-side;
-    -fx-border-width: 1px;
     -fx-border-radius: 16px;
-    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.9), 40, 0.15, 0, 20);
+    -fx-border-width: 1.2;
+    -fx-border-color: linear-gradient(from 0% 0% to 100% 100%,
+    rgba(80, 71, 27, 0.7) 0%,
+    rgba(80, 60, 10, 0.7) 30%,
+    rgba(255, 255, 255, 0.05) 100%
+    );
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 35, 0.1, 0, 10);
+}
+
+/* ==============================================
+   新增：绿色胶囊动画样式
+   ============================================== */
+.toast-capsule {
+    -fx-background-color: #32D74B;
+    -fx-background-radius: 30px;
+    -fx-border-radius: 30px;
+    -fx-padding: 12px 25px;
+    -fx-effect: dropshadow(gaussian, rgba(50, 215, 75, 0.5), 15, 0.3, 0, 5);
+}
+
+.toast-text {
+    -fx-text-fill: #000000;
+    -fx-font-family: "Oxanium", sans-serif;
+    -fx-font-weight: 800;
+    -fx-font-size: 16px;
+}
+
+/* 核心：为动态流光边框准备的底层材质 */
+.cyber-glass-card {
+    -fx-background-color: linear-gradient(
+            to bottom right,
+            rgba(255, 255, 255, 0.08) 0%,
+            rgba(255, 255, 255, 0.02) 30%,
+            rgba(10, 10, 15, 0.6) 80%,
+            rgba(255, 255, 255, 0.05) 100%
+    );
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
+
+    -fx-border-width: 1px;
+    -fx-border-color: linear-gradient(
+            to bottom right,
+            rgba(255, 255, 255, 0.3) 0%,
+            rgba(255, 255, 255, 0.05) 40%,
+            rgba(0, 0, 0, 0.5) 80%,
+            rgba(255, 255, 255, 0.1) 100%
+    );
+    -fx-effect: dropshadow(two-pass-box, rgba(0, 0, 0, 0.6), 25, 0.1, 0, 10);
 }
 
 .panel-inner {
@@ -129,32 +174,21 @@
     -fx-border-width: 0 0 1px 0;
 }
 
-.sidebar {
-    -fx-background-color: rgba(10, 10, 12, 0.3);
-    -fx-border-color: transparent transparent transparent rgba(255, 255, 255, 0.05);
-    -fx-border-width: 0 0 0 1px;
-}
-
-.separator *.line {
-    -fx-border-color: linear-gradient(to right, transparent, rgba(212,175,55,0.5), transparent);
-    -fx-border-width: 1px 0 0 0;
-    -fx-border-style: solid;
-    -fx-background-color: transparent;
-}
-
 /* ==============================================
    3. Inputs & Forms
    ============================================== */
 .text-field, .password-field, .text-area {
-    -fx-background-color: rgba(0, 0, 0, 0.5);
-    -fx-text-fill: -color-text-main;
-    -fx-prompt-text-fill: #52525B;
-    -fx-border-color: rgba(255, 255, 255, 0.1);
-    -fx-border-width: 1.5px;
+    -fx-background-color: linear-gradient(to bottom right, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+    -fx-border-color: linear-gradient(to bottom right, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 100%);
+    -fx-border-width: 1.2px;
     -fx-border-radius: 8px;
     -fx-background-radius: 8px;
-    -fx-padding: 10px 14px;
-    -fx-effect: innershadow(gaussian, rgba(0,0,0,0.5), 5, 0, 0, 2);
+    -fx-padding: 8px 12px;
+    -fx-text-fill: -color-text-main;
+    -fx-prompt-text-fill: rgba(255,255,255,0.4);
+    -fx-highlight-fill: -color-accent;
+    -fx-highlight-text-fill: #18181B;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 8, 0.2, 0, 4);
 }
 
 .text-field:focused, .password-field:focused , .text-area:focused {
@@ -164,66 +198,84 @@
 }
 
 /* ==============================================
-   4. Buttons (质感满级的 3D 浮雕交互)
+   4. Buttons (Refined Glass & Precise Light Spot)
    ============================================== */
 .button {
-    -fx-background-color: linear-gradient(to bottom, rgba(50,50,55,0.8), rgba(25,25,30,0.8));
-    -fx-border-color: rgba(255,255,255,0.15) rgba(255,255,255,0.05) rgba(0,0,0,0.8) rgba(255,255,255,0.05);
-    -fx-text-fill: -color-text-main !important;
+    -fx-background-color: linear-gradient(to bottom right, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01));
+    -fx-border-color: linear-gradient(to bottom right, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 50%, transparent 100%);
     -fx-border-width: 1px !important;
     -fx-border-radius: 8px !important;
     -fx-background-radius: 8px !important;
+    -fx-text-fill: -color-text-main !important;
     -fx-padding: 8px 18px !important;
     -fx-cursor: hand !important;
     -fx-font-weight: 700 !important;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 8, 0.2, 0, 4);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 8, 0.2, 0, 4);
 }
 
 .button:hover {
-    -fx-background-color: linear-gradient(to bottom, rgba(70,70,75,0.9), rgba(35,35,40,0.9));
-    -fx-border-color: rgba(255,255,255,0.25) rgba(255,255,255,0.1) rgba(0,0,0,0.8) rgba(255,255,255,0.1);
+    -fx-background-color:
+            radial-gradient(center 15% 15%, radius 30%, rgba(255, 255, 255, 0.25), transparent),
+            linear-gradient(to bottom right, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
+    -fx-border-color: linear-gradient(to bottom right, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%);
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.15), 10, 0.3, 0, 0);
 }
 
 .button:pressed {
-    -fx-background-color: rgba(15,15,18,0.9);
-    -fx-border-color: rgba(0,0,0,0.8) rgba(255,255,255,0.05) rgba(255,255,255,0.1) rgba(255,255,255,0.05);
+    -fx-background-color: rgba(255, 255, 255, 0.02);
+    -fx-border-color: rgba(255, 255, 255, 0.1) transparent transparent rgba(255, 255, 255, 0.05);
     -fx-translate-y: 2px;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0), 0, 0, 0, 0);
+    -fx-effect: none;
 }
 
 .button.accent {
-    -fx-background-color: linear-gradient(to bottom, rgba(253, 224, 71, 0.15), rgba(212, 175, 55, 0.15));
-    -fx-border-color: rgba(253, 224, 71, 0.6) rgba(253, 224, 71, 0.2) rgba(0,0,0,0.5) rgba(253, 224, 71, 0.2) !important;
-    -fx-border-width: 1px !important;
+    -fx-background-color: linear-gradient(to bottom right, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.05));
+    -fx-border-color: linear-gradient(to bottom right, rgba(253, 224, 71, 0.5) 0%, rgba(212, 175, 55, 0.1) 50%, transparent 100%) !important;
     -fx-text-fill: #FDE047 !important;
-    -fx-effect: dropshadow(gaussian, rgba(253, 224, 71, 0.3), 10, 0.3, 0, 4) !important;
+    -fx-effect: dropshadow(gaussian, rgba(212, 175, 55, 0.2), 8, 0.2, 0, 3) !important;
 }
-
 .button.accent:hover {
-    -fx-background-color: linear-gradient(to bottom, rgba(253, 224, 71, 0.3), rgba(212, 175, 55, 0.3));
-    -fx-effect: dropshadow(gaussian, rgba(253, 224, 71, 0.5), 15, 0.3, 0, 4) !important;
+    -fx-background-color:
+            radial-gradient(center 15% 15%, radius 35%, rgba(255, 255, 255, 0.35), transparent),
+            linear-gradient(to bottom right, rgba(212, 175, 55, 0.35), rgba(212, 175, 55, 0.1));
+    -fx-effect: dropshadow(gaussian, rgba(253, 224, 71, 0.3), 15, 0.3, 0, 0) !important;
 }
 
 .button.success {
-    -fx-background-color: linear-gradient(to bottom, rgba(16, 185, 129, 0.2), rgba(4, 120, 87, 0.2));
-    -fx-border-color: rgba(52, 211, 153, 0.6) rgba(52, 211, 153, 0.2) rgba(0,0,0,0.5) rgba(52, 211, 153, 0.2) !important;
+    -fx-background-color: linear-gradient(to bottom right, rgba(52, 211, 153, 0.18), rgba(4, 120, 87, 0.05));
+    -fx-border-color: linear-gradient(to bottom right, rgba(167, 243, 208, 0.5) 0%, rgba(52, 211, 153, 0.15) 50%, transparent 100%) !important;
     -fx-text-fill: #A7F3D0 !important;
 }
-.button.success:hover { -fx-background-color: linear-gradient(to bottom, rgba(16, 185, 129, 0.4), rgba(4, 120, 87, 0.4)); -fx-effect: dropshadow(gaussian, rgba(52,211,153,0.4), 15, 0.3, 0, 4); }
+.button.success:hover {
+    -fx-background-color:
+            radial-gradient(center 15% 15%, radius 35%, rgba(255, 255, 255, 0.3), transparent),
+            linear-gradient(to bottom right, rgba(52, 211, 153, 0.3), rgba(4, 120, 87, 0.1));
+    -fx-effect: dropshadow(gaussian, rgba(52, 211, 153, 0.3), 15, 0.3, 0, 0) !important;
+}
 
 .button.danger {
-    -fx-background-color: linear-gradient(to bottom, rgba(239, 68, 68, 0.2), rgba(185, 28, 28, 0.2));
-    -fx-border-color: rgba(248, 113, 113, 0.6) rgba(248, 113, 113, 0.2) rgba(0,0,0,0.5) rgba(248, 113, 113, 0.2) !important;
+    -fx-background-color: linear-gradient(to bottom right, rgba(248, 113, 113, 0.18), rgba(185, 28, 28, 0.05));
+    -fx-border-color: linear-gradient(to bottom right, rgba(254, 202, 202, 0.5) 0%, rgba(248, 113, 113, 0.15) 50%, transparent 100%) !important;
     -fx-text-fill: #FECACA !important;
 }
-.button.danger:hover { -fx-background-color: linear-gradient(to bottom, rgba(239, 68, 68, 0.4), rgba(185, 28, 28, 0.4)); -fx-effect: dropshadow(gaussian, rgba(248,113,113,0.4), 15, 0.3, 0, 4); }
+.button.danger:hover {
+    -fx-background-color:
+            radial-gradient(center 15% 15%, radius 35%, rgba(255, 255, 255, 0.3), transparent),
+            linear-gradient(to bottom right, rgba(248, 113, 113, 0.3), rgba(185, 28, 28, 0.1));
+    -fx-effect: dropshadow(gaussian, rgba(248, 113, 113, 0.3), 15, 0.3, 0, 0) !important;
+}
 
 .button.warning {
-    -fx-background-color: linear-gradient(to bottom, rgba(245, 158, 11, 0.2), rgba(180, 83, 9, 0.2));
-    -fx-border-color: rgba(251, 191, 36, 0.6) rgba(251, 191, 36, 0.2) rgba(0,0,0,0.5) rgba(251, 191, 36, 0.2) !important;
+    -fx-background-color: linear-gradient(to bottom right, rgba(251, 191, 36, 0.18), rgba(180, 83, 9, 0.05));
+    -fx-border-color: linear-gradient(to bottom right, rgba(253, 230, 138, 0.5) 0%, rgba(251, 191, 36, 0.15) 50%, transparent 100%) !important;
     -fx-text-fill: #FDE68A !important;
 }
-.button.warning:hover { -fx-background-color: linear-gradient(to bottom, rgba(245, 158, 11, 0.4), rgba(180, 83, 9, 0.4)); -fx-effect: dropshadow(gaussian, rgba(251,191,36,0.4), 15, 0.3, 0, 4); }
+.button.warning:hover {
+    -fx-background-color:
+            radial-gradient(center 15% 15%, radius 35%, rgba(255, 255, 255, 0.3), transparent),
+            linear-gradient(to bottom right, rgba(251, 191, 36, 0.3), rgba(180, 83, 9, 0.1));
+    -fx-effect: dropshadow(gaussian, rgba(251, 191, 36, 0.3), 15, 0.3, 0, 0) !important;
+}
 
 .table-view .button {
     -fx-padding: 4px 10px !important;
@@ -248,9 +300,7 @@
     -fx-background-insets: 0 !important;
     -fx-padding: 0 !important;
 }
-.edge-to-edge {
-    -fx-border-width: 0 !important;
-}
+.edge-to-edge { -fx-border-width: 0 !important; }
 
 .table-view .column-header-background {
     -fx-background-color: rgba(0, 0, 0, 0.8);
@@ -269,9 +319,7 @@
     -fx-padding: 10px 8px;
     -fx-text-fill: -color-text-main !important;
 }
-.striped .table-row-cell:odd, .list-cell:odd {
-    -fx-background-color: rgba(255, 255, 255, 0.02);
-}
+.striped .table-row-cell:odd, .list-cell:odd { -fx-background-color: rgba(255, 255, 255, 0.02); }
 
 .table-row-cell:hover, .list-cell:hover {
     -fx-background-color: rgba(255, 255, 255, 0.08) !important;
@@ -282,11 +330,10 @@
     -fx-border-color: transparent transparent transparent -color-gold-light;
     -fx-border-width: 0 0 0 4px;
 }
-/* 表格内容使用 Teko 字体增强数据紧凑感 */
 .table-view .table-cell {
     -fx-text-fill: #E4E4E7 !important;
     -fx-font-family: "Teko", sans-serif;
-    -fx-font-size: 16px; /* 表格内字号可以比标准 mono 略小一点 */
+    -fx-font-size: 16px;
 }
 .table-row-cell:selected .table-cell, .list-cell:selected {
     -fx-text-fill: -color-gold-light !important;
@@ -333,7 +380,10 @@
     -fx-text-fill: -color-gold-light;
     -fx-effect: dropshadow(gaussian, -color-gold-glow, 12, 0.4, 0, 0);
 }
-
+.radio-button, .check-box {
+    -fx-background-color: transparent !important;
+    -fx-text-fill: -color-text-normal;
+}
 .check-box .box, .radio-button .radio {
     -fx-background-color: rgba(0, 0, 0, 0.5);
     -fx-border-color: rgba(255,255,255,0.2);
@@ -358,7 +408,6 @@
     -fx-border-width: 0 !important;
 }
 
-/* 2. 单个 Tab 的基础样式 */
 .tab-pane .tab {
     -fx-background-color: transparent !important;
     -fx-border-width: 0 !important;
@@ -366,7 +415,6 @@
     -fx-cursor: hand;
 }
 
-/* 3. 选中与未选中状态的文字光效 */
 .tab-pane .tab .tab-label {
     -fx-text-fill: -color-text-muted;
     -fx-font-weight: 600;
@@ -379,17 +427,9 @@
     -fx-effect: dropshadow(gaussian, -color-gold-glow, 8, 0.4, 0, 0);
 }
 
-/* 4. 消除选中 Tab 时 JavaFX 默认自带的虚线焦点框 */
 .tab-pane .tab:selected:focused {
     -fx-focus-color: transparent;
     -fx-faint-focus-color: transparent;
-}
-
-
-.heatmap-bg-pane {
-    -fx-background-image: url('../images/ftc_bg.jpg');
-    -fx-background-size: cover;
-    -fx-background-position: center;
 }
 
 .cyber-badge-success {
@@ -414,7 +454,7 @@
     -fx-background-image: url('../images/hub_bg.png');
     -fx-background-position: center center;
     -fx-background-repeat: no-repeat;
-    -fx-background-size: 100% 100%;
+    -fx-background-size: cover;
     -fx-background-color: #000000;
 }
 
@@ -422,7 +462,7 @@
     -fx-background-image: url('../images/main_bg.png');
     -fx-background-position: center center;
     -fx-background-repeat: no-repeat;
-    -fx-background-size: 100% 100%;
+    -fx-background-size: cover;
     -fx-background-color: #000000;
 }
 
@@ -430,16 +470,8 @@
     -fx-background-image: url('../images/ftc_bg.jpg');
     -fx-background-position: center center;
     -fx-background-repeat: no-repeat;
-    -fx-background-size: 100% 100%;
+    -fx-background-size: cover;
     -fx-background-color: #000000;
-}
-.main-bg-pane .mac-card, .main-bg-pane .card {
-    -fx-background-color: linear-gradient(to bottom right, rgba(26, 26, 30, 0.35), rgba(10, 10, 12, 0.35));
-    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.9), 40, 0.15, 0, 20);
-}
-.hub-bg-pane .mac-card {
-    -fx-background-color: linear-gradient(to bottom right, rgba(26, 26, 30, 0.7), rgba(10, 10, 12, 0.7));
-    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.8), 40, 0.15, 0, 20);
 }
 
 .status-pill {
@@ -452,17 +484,13 @@
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 10, 0.2, 0, 4);
     -fx-font-size: 14px;
 }
-.main-bg-pane .mac-card, .main-bg-pane .card {
-    -fx-border-color: rgba(255, 255, 255, 0.08) rgba(255, 255, 255, 0.02) rgba(255, 255, 255, 0.01) rgba(255, 255, 255, 0.02);
-}
+
 /* ==============================================
-   8. WebView 黑暗模式适配 (修复白底问题)
+   8. WebView Fix
    ============================================== */
 .web-view {
     -fx-background-color: transparent;
 }
-
-/* 强制重写 WebView 内部网页的默认白色背景 */
 .web-view .page {
     -fx-background-color: transparent;
 }

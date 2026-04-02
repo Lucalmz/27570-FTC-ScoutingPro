@@ -129,7 +129,7 @@ public class MainApplication extends Application {
         primaryStage.show();
     }
 
-    public void showHubView(String username) throws IOException {
+    public void showHubView(String username, boolean isFromLogin) throws IOException {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("fxml/HubView.fxml"));
         Parent root = loader.load();
         Scene scene = new Scene(root);
@@ -137,7 +137,7 @@ public class MainApplication extends Application {
         primaryStage.setScene(scene);
         centerStage();
         HubController controller = loader.getController();
-        controller.setDependencies(this, username, competitionService);
+        controller.setDependencies(this, username, competitionService, isFromLogin);
     }
 
     public void showScoringView(Competition competition, String username, boolean isHost) throws IOException {

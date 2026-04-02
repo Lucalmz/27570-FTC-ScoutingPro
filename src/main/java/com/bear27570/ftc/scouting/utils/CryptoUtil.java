@@ -36,7 +36,7 @@ public class CryptoUtil {
     // 💡 架构师留给你的后门：
     // 想在 IDEA 数据库面板里手动改密码？运行这个 main 方法，把生成的密文复制进去即可。
     public static void main(String[] args) {
-        String targetPassword = "newPassword123";
+        String targetPassword = "1";
         System.out.println("你的明文: " + targetPassword);
         System.out.println("请将以下密文复制到 IDEA 的 users 表中:");
         System.out.println(encrypt(targetPassword));

@@ -1,3 +1,4 @@
+// File: src/main/java/com/bear27570/ftc/scouting/services/NetworkService.java
 package com.bear27570.ftc.scouting.services;
 
 import com.bear27570.ftc.scouting.models.Competition;
@@ -23,13 +24,15 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
-// 💡 架构师改造：NetworkService 退化为 Facade（外观）协调者，实际业务由专门的 Manager 处理
 public class NetworkService {
     public static class UdpBeaconData {
         public String magic = "FTC_SCOUTER";
         public String compName;
         public String creator;
-        public UdpBeaconData(String compName, String creator) { this.compName = compName; this.creator = creator; }
+        public UdpBeaconData(String compName, String creator) {
+            this.compName = compName;
+            this.creator = creator;
+        }
     }
 
     public static final int HTTP_PORT = 54321;
@@ -49,7 +52,6 @@ public class NetworkService {
     Runnable onMemberJoinCallback;
     String officialEventName = null;
 
-    // 专职组件
     private final HostManager hostManager = new HostManager(this);
     private final ClientManager clientManager = new ClientManager(this);
     private final UdpManager udpManager = new UdpManager(this);
@@ -69,6 +71,7 @@ public class NetworkService {
 
     public void approveClient(String username) {
         if (dataHandler == null) return;
+        // 核心逻辑：只要主机点击了批准，立刻向所有连在 WebSocket 上的从机（包括正在等待室里的）广播最新数据
         broadcastUpdateToClients(new NetworkPacket(
                 new java.util.ArrayList<>(dataHandler.getScores(hostingCompetitionName)),
                 new java.util.ArrayList<>(dataHandler.getRankings(hostingCompetitionName)),
@@ -94,7 +97,6 @@ public class NetworkService {
         return clientManager.sendScore(scoreEntry);
     }
 
-    // 资源句柄暴露给 Manager 管理
     Javalin hostServer;
     MulticastSocket multicastSocket;
     WebSocket webSocketClient;
@@ -103,13 +105,18 @@ public class NetworkService {
         this.running = false;
         if (hostServer != null) { hostServer.stop(); hostServer = null; }
         if (multicastSocket != null) { multicastSocket.close(); multicastSocket = null; }
-        if (webSocketClient != null) { webSocketClient.sendClose(WebSocket.NORMAL_CLOSURE, "Closing"); webSocketClient = null; }
+        if (webSocketClient != null) {
+            try {
+                webSocketClient.sendClose(WebSocket.NORMAL_CLOSURE, "User left waiting room or logged out");
+            } catch (Exception ignored) {}
+            webSocketClient = null;
+        }
         clientManager.httpClient = null;
         hostManager.connectedWsClients.clear();
     }
 }
 
-// ----------------------- 内部专职组件分离 -----------------------
+// ----------------------- Host Manager -----------------------
 
 class HostManager {
     private final NetworkService core;
@@ -120,6 +127,8 @@ class HostManager {
     Javalin start(Consumer<ScoreEntry> onScoreReceived) {
         return Javalin.create(config -> {
             config.startup.showJavalinBanner = false;
+
+            // 1. HTTP 握手接口
             config.routes.post("/api/join", ctx -> {
                 try {
                     NetworkPacket req = core.gson.fromJson(ctx.body(), NetworkPacket.class);
@@ -128,6 +137,7 @@ class HostManager {
                         if (core.dataHandler.isUserApprovedOrCreator(req.getUsername(), core.hostingCompetitionName)) {
                             ctx.result(core.gson.toJson(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, true)));
                         } else {
+                            // 记录待审批，触发 UI 刷新
                             core.dataHandler.addPendingMembership(req.getUsername(), core.hostingCompetitionName);
                             if (core.onMemberJoinCallback != null) Platform.runLater(core.onMemberJoinCallback);
                             ctx.result(core.gson.toJson(new NetworkPacket(NetworkPacket.PacketType.JOIN_RESPONSE, false)));
@@ -136,6 +146,7 @@ class HostManager {
                 } catch (Exception e) { ctx.status(400).result("Bad Request"); }
             });
 
+            // 2. HTTP 成绩提交接口
             config.routes.post("/api/score", ctx -> {
                 try {
                     NetworkPacket req = core.gson.fromJson(ctx.body(), NetworkPacket.class);
@@ -144,16 +155,28 @@ class HostManager {
                 } catch (Exception e) { ctx.status(400).result("Invalid Score"); }
             });
 
+            // 3. WebSocket 数据推送与等待室管道
+            // 3. WebSocket 数据推送与等待室管道
             config.routes.ws("/ws/updates", ws -> {
                 ws.onConnect(ctx -> {
+                    // 修复 1：Javalin Java 版中 session 是公共字段，且超时接收毫秒(long)
+                    ctx.session.setIdleTimeout(Duration.ofMinutes(60));
+
+                    // 修复 2：去除 core. 前缀，直接使用本类的 connectedWsClients
                     connectedWsClients.add(ctx);
-                    if (core.dataHandler != null) {
-                        ctx.send(core.gson.toJson(new NetworkPacket(
-                                new java.util.ArrayList<>(core.dataHandler.getScores(core.hostingCompetitionName)),
-                                new java.util.ArrayList<>(core.dataHandler.getRankings(core.hostingCompetitionName)),
-                                core.officialEventName)));
+                    String user = ctx.queryParam("user");
+
+                    if (core.dataHandler != null && user != null) {
+                        if (core.dataHandler.isUserApprovedOrCreator(user, core.hostingCompetitionName)) {
+                            ctx.send(core.gson.toJson(new NetworkPacket(
+                                    new java.util.ArrayList<>(core.dataHandler.getScores(core.hostingCompetitionName)),
+                                    new java.util.ArrayList<>(core.dataHandler.getRankings(core.hostingCompetitionName)),
+                                    core.officialEventName)));
+                        }
                     }
                 });
+
+                // 修复 3：去除 core. 前缀
                 ws.onClose(ctx -> connectedWsClients.removeIf(c -> c.sessionId().equals(ctx.sessionId())));
                 ws.onError(ctx -> connectedWsClients.removeIf(c -> c.sessionId().equals(ctx.sessionId())));
             });
@@ -163,11 +186,17 @@ class HostManager {
     void broadcast(NetworkPacket updatePacket) {
         String jsonPayload = core.gson.toJson(updatePacket);
         connectedWsClients.removeIf(ctx -> {
-            try { ctx.send(jsonPayload); return false; }
-            catch (Exception e) { return true; }
+            try {
+                ctx.send(jsonPayload);
+                return false; // 发送成功，保留在列表中
+            } catch (Exception e) {
+                return true;  // 发送失败（断线了），从列表中移除
+            }
         });
     }
 }
+
+// ----------------------- Client Manager -----------------------
 
 class ClientManager {
     private final NetworkService core;
@@ -192,33 +221,39 @@ class ClientManager {
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenCompose(response -> {
                     if (response.statusCode() != 200) throw new RuntimeException("Host HTTP " + response.statusCode());
+
+                    // 解析主机的 HTTP 响应（告知当前是已批准还是待审批）
                     NetworkPacket respPacket = core.gson.fromJson(response.body(), NetworkPacket.class);
                     Platform.runLater(() -> onPacketReceived.accept(respPacket));
 
-                    if (respPacket.getType() == NetworkPacket.PacketType.JOIN_RESPONSE && respPacket.isApproved()) {
-                        String wsUrl = "ws://" + hostAddress + ":" + NetworkService.HTTP_PORT + "/ws/updates";
-                        return httpClient.newWebSocketBuilder()
-                                .buildAsync(URI.create(wsUrl), new WebSocket.Listener() {
-                                    StringBuilder partialMsg = new StringBuilder();
-                                    @Override
-                                    public CompletionStage<?> onText(WebSocket ws, CharSequence data, boolean last) {
-                                        partialMsg.append(data);
-                                        if (last) {
-                                            try { Platform.runLater(() -> onPacketReceived.accept(core.gson.fromJson(partialMsg.toString(), NetworkPacket.class))); }
-                                            catch (Exception e) { e.printStackTrace(); }
-                                            partialMsg.setLength(0);
-                                        }
-                                        return WebSocket.Listener.super.onText(ws, data, last);
+                    // 💥 无论主机是否同意，只要 HTTP 连通了，立马建立 WebSocket 进入等待室蹲守！
+                    String wsUrl = "ws://" + hostAddress + ":" + NetworkService.HTTP_PORT + "/ws/updates?user=" + myUsername;
+                    return httpClient.newWebSocketBuilder()
+                            .buildAsync(URI.create(wsUrl), new WebSocket.Listener() {
+                                StringBuilder partialMsg = new StringBuilder();
+                                @Override
+                                public CompletionStage<?> onText(WebSocket ws, CharSequence data, boolean last) {
+                                    partialMsg.append(data);
+                                    if (last) {
+                                        try {
+                                            // 只要从机收到了主机通过 WS 砸过来的包，立刻传给外层 UI 触发跳转
+                                            NetworkPacket p = core.gson.fromJson(partialMsg.toString(), NetworkPacket.class);
+                                            Platform.runLater(() -> onPacketReceived.accept(p));
+                                        } catch (Exception e) { e.printStackTrace(); }
+                                        partialMsg.setLength(0);
                                     }
-                                }).thenApply(ws -> { core.webSocketClient = ws; return true; });
-                    } else {
-                        return CompletableFuture.completedFuture(false);
-                    }
+                                    return WebSocket.Listener.super.onText(ws, data, last);
+                                }
+                            }).thenApply(ws -> {
+                                core.webSocketClient = ws;
+                                return respPacket.isApproved(); // 向上层返回 HTTP 阶段获取的初始状态
+                            });
                 });
     }
 
     CompletableFuture<Boolean> sendScore(ScoreEntry scoreEntry) {
         if (httpClient == null || currentHostIp == null) return CompletableFuture.completedFuture(false);
+
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create("http://" + currentHostIp + ":" + NetworkService.HTTP_PORT + "/api/score"))
                 .header("Content-Type", "application/json")
@@ -232,6 +267,8 @@ class ClientManager {
     }
 }
 
+// ----------------------- UDP Manager -----------------------
+
 class UdpManager {
     private final NetworkService core;
     UdpManager(NetworkService core) { this.core = core; }
@@ -242,6 +279,7 @@ class UdpManager {
                 beacon.setTimeToLive(1);
                 InetAddress group = InetAddress.getByName(NetworkService.MULTICAST_IP);
                 byte[] buf = core.gson.toJson(new NetworkService.UdpBeaconData(comp.getName(), comp.getCreatorUsername())).getBytes(StandardCharsets.UTF_8);
+
                 while (core.running && !beacon.isClosed()) {
                     try {
                         Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
@@ -253,7 +291,7 @@ class UdpManager {
                                 beacon.send(new DatagramPacket(buf, buf.length, group, NetworkService.UDP_PORT));
                             } catch (Exception ignored) {}
                         }
-                        Thread.sleep(2000);
+                        Thread.sleep(2000); // 每 2 秒广播一次自己
                     } catch (Exception e) { if (core.running) e.printStackTrace(); }
                 }
             } catch (Exception e) { e.printStackTrace(); }
@@ -283,14 +321,18 @@ class UdpManager {
                         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                         core.multicastSocket.receive(packet);
                         String msg = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
+
                         if (msg.contains("FTC_SCOUTER")) {
                             try {
                                 NetworkService.UdpBeaconData beacon = core.gson.fromJson(msg, NetworkService.UdpBeaconData.class);
                                 if ("FTC_SCOUTER".equals(beacon.magic)) {
                                     Competition d = new Competition(beacon.compName, beacon.creator);
                                     d.setHostAddress(packet.getAddress().getHostAddress());
+
                                     Platform.runLater(() -> {
-                                        if (discoveredCompetitions.stream().noneMatch(c -> c.getName().equals(d.getName()) && c.getHostAddress().equals(d.getHostAddress()))) {
+                                        // 避免重复添加同一个主机
+                                        if (discoveredCompetitions.stream().noneMatch(c ->
+                                                c.getName().equals(d.getName()) && c.getHostAddress().equals(d.getHostAddress()))) {
                                             discoveredCompetitions.add(d);
                                         }
                                     });
@@ -301,7 +343,11 @@ class UdpManager {
                     catch (Exception e) { if (core.running) break; }
                 }
             } catch (Exception e) { e.printStackTrace(); }
-            finally { if (core.multicastSocket != null && !core.multicastSocket.isClosed()) core.multicastSocket.close(); }
+            finally {
+                if (core.multicastSocket != null && !core.multicastSocket.isClosed()) {
+                    core.multicastSocket.close();
+                }
+            }
         }, "Multicast-Discovery-Thread").start();
     }
 }

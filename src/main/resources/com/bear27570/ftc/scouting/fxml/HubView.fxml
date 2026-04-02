@@ -4,71 +4,87 @@
 <?import javafx.scene.layout.*?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane styleClass="hub-bg-pane" prefHeight="700.0" prefWidth="1000.0" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.HubController">
-    <top>
-        <HBox alignment="CENTER_LEFT" spacing="20" styleClass="top-bar">
-            <padding><Insets top="20" right="40" bottom="20" left="40" /></padding>
-            <Label fx:id="welcomeLabel" styleClass="title-3" text="Workspace Dashboard" />
-            <Region HBox.hgrow="ALWAYS" />
-            <Button onAction="#handleLogout" text="Sign Out" styleClass="button">
-                <graphic><FontIcon iconLiteral="fth-log-out" iconSize="14"/></graphic>
-            </Button>
-        </HBox>
-    </top>
-    <center>
-        <VBox spacing="40" alignment="TOP_CENTER">
-            <padding><Insets top="60" right="60" bottom="60" left="60" /></padding>
+<StackPane stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.HubController">
 
-            <HBox alignment="CENTER" spacing="30">
-                <Button fx:id="hostModeButton" onAction="#selectHostMode" text="Host Competition" prefWidth="220" prefHeight="55">
-                    <graphic><FontIcon iconLiteral="fth-server" iconSize="18"/></graphic>
-                </Button>
-                <Button fx:id="joinModeButton" onAction="#selectJoinMode" text="Join Competition" prefWidth="220" prefHeight="55">
-                    <graphic><FontIcon iconLiteral="fth-wifi" iconSize="18"/></graphic>
+    <BorderPane styleClass="hub-bg-pane" prefHeight="700.0" prefWidth="1000.0">
+        <top>
+            <HBox alignment="CENTER_LEFT" spacing="20" styleClass="top-bar">
+                <padding><Insets top="20" right="40" bottom="20" left="40" /></padding>
+                <Label fx:id="welcomeLabel" styleClass="title-3" text="Workspace Dashboard" />
+                <Region HBox.hgrow="ALWAYS" />
+                <Button onAction="#handleLogout" text="Sign Out" styleClass="button">
+                    <graphic><FontIcon iconLiteral="fth-log-out" iconSize="14"/></graphic>
                 </Button>
             </HBox>
+        </top>
+        <center>
+            <VBox spacing="40" alignment="TOP_CENTER">
+                <padding><Insets top="60" right="60" bottom="60" left="60" /></padding>
 
-            <Label fx:id="statusLabel" styleClass="text-muted, status-pill" text="Select a mode to begin." />
-
-            <VBox fx:id="hostPane" spacing="25" alignment="TOP_CENTER" managed="false" visible="false" styleClass="mac-card" maxWidth="800">
-                <padding><Insets top="40" right="40" bottom="40" left="40" /></padding>
-                <Label styleClass="title-3" text="Your Competitions"/>
-                <ListView fx:id="myCompetitionsListView" prefHeight="220"/>
-
-                <HBox spacing="20" alignment="CENTER">
-                    <Button onAction="#handleHostButton" text="Start Hosting" styleClass="success" prefWidth="180">
-                        <graphic><FontIcon iconLiteral="fth-play" iconSize="16" iconColor="#34D399"/></graphic>
+                <HBox alignment="CENTER" spacing="30">
+                    <Button fx:id="hostModeButton" onAction="#selectHostMode" text="Host Competition" prefWidth="220" prefHeight="55">
+                        <graphic><FontIcon iconLiteral="fth-server" iconSize="18"/></graphic>
                     </Button>
-                    <Button onAction="#handleManageMembers" text="Members" styleClass="accent" prefWidth="140">
-                        <graphic><FontIcon iconLiteral="fth-users" iconSize="16" iconColor="#18181B"/></graphic>
-                    </Button>
-                    <Button onAction="#handleAllianceAnalysis" text="Analysis" prefWidth="140">
-                        <graphic><FontIcon iconLiteral="fth-pie-chart" iconSize="16"/></graphic>
-                    </Button>
-
-                    <Button onAction="#handleDeleteCompetition" text="Delete" styleClass="danger" prefWidth="120">
-                        <graphic><FontIcon iconLiteral="fth-trash-2" iconSize="16" iconColor="#F87171"/></graphic>
+                    <Button fx:id="joinModeButton" onAction="#selectJoinMode" text="Join Competition" prefWidth="220" prefHeight="55">
+                        <graphic><FontIcon iconLiteral="fth-wifi" iconSize="18"/></graphic>
                     </Button>
                 </HBox>
 
-                <Region style="-fx-background-color: rgba(255,255,255,0.05); -fx-pref-height: 1px; -fx-margin: 10 0;"/>
+                <Label fx:id="statusLabel" styleClass="text-muted, status-pill" text="Select a mode to begin." />
 
-                <HBox spacing="15" alignment="CENTER">
-                    <TextField fx:id="newCompetitionField" promptText="New Competition Name" prefWidth="350"/>
-                    <Button onAction="#handleCreateButton" text="Create" styleClass="accent">
-                        <graphic><FontIcon iconLiteral="fth-plus" iconSize="16" iconColor="#18181B"/></graphic>
+                <VBox fx:id="hostPane" spacing="25" alignment="TOP_CENTER" managed="false" visible="false" styleClass="mac-card" maxWidth="800">
+                    <padding><Insets top="40" right="40" bottom="40" left="40" /></padding>
+                    <Label styleClass="title-3" text="Your Competitions"/>
+                    <ListView fx:id="myCompetitionsListView" prefHeight="220"/>
+                    <VBox spacing="15" alignment="CENTER">
+                        <HBox spacing="20" alignment="CENTER">
+                            <Button onAction="#handleHostButton" text="Start Hosting" styleClass="success" prefWidth="180">
+                                <graphic><FontIcon iconLiteral="fth-play" iconSize="16" iconColor="#34D399"/></graphic>
+                            </Button>
+                            <Button onAction="#handleManageMembers" text="Members" styleClass="accent" prefWidth="140">
+                                <graphic><FontIcon iconLiteral="fth-users" iconSize="16" iconColor="#18181B"/></graphic>
+                            </Button>
+                            <Button onAction="#handleAllianceAnalysis" text="Analysis" prefWidth="140">
+                                <graphic><FontIcon iconLiteral="fth-pie-chart" iconSize="16"/></graphic>
+                            </Button>
+                        </HBox>
+
+                        <HBox spacing="20" alignment="CENTER">
+                            <Button onAction="#handleExportCompetition" text="Export Setup" styleClass="warning" prefWidth="150">
+                                <graphic><FontIcon iconLiteral="fth-upload" iconSize="16" iconColor="#FBBF24"/></graphic>
+                            </Button>
+                            <Button onAction="#handleImportCompetition" text="Import Setup" styleClass="warning" prefWidth="150">
+                                <graphic><FontIcon iconLiteral="fth-download" iconSize="16" iconColor="#FBBF24"/></graphic>
+                            </Button>
+                            <Button onAction="#handleDeleteCompetition" text="Delete" styleClass="danger" prefWidth="120">
+                                <graphic><FontIcon iconLiteral="fth-trash-2" iconSize="16" iconColor="#F87171"/></graphic>
+                            </Button>
+                        </HBox>
+                    </VBox>
+                    <HBox spacing="15" alignment="CENTER">
+                        <TextField fx:id="newCompetitionField" promptText="New Competition Name" prefWidth="350"/>
+                        <Button onAction="#handleCreateButton" text="Create" styleClass="accent">
+                            <graphic><FontIcon iconLiteral="fth-plus" iconSize="16" iconColor="#18181B"/></graphic>
+                        </Button>
+                    </HBox>
+                </VBox>
+
+                <VBox fx:id="joinPane" spacing="25" alignment="TOP_CENTER" managed="false" visible="false" styleClass="mac-card" maxWidth="800">
+                    <padding><Insets top="40" right="40" bottom="40" left="40" /></padding>
+                    <Label styleClass="title-3" text="Discovered Competitions"/>
+                    <ListView fx:id="discoveredCompetitionsListView" prefHeight="260"/>
+                    <Button onAction="#handleJoinButton" text="Request to Join" styleClass="accent" prefWidth="260" prefHeight="55">
+                        <graphic><FontIcon iconLiteral="fth-send" iconSize="18" iconColor="#18181B"/></graphic>
                     </Button>
-                </HBox>
+                </VBox>
             </VBox>
+        </center>
+    </BorderPane>
 
-            <VBox fx:id="joinPane" spacing="25" alignment="TOP_CENTER" managed="false" visible="false" styleClass="mac-card" maxWidth="800">
-                <padding><Insets top="40" right="40" bottom="40" left="40" /></padding>
-                <Label styleClass="title-3" text="Discovered Competitions"/>
-                <ListView fx:id="discoveredCompetitionsListView" prefHeight="260"/>
-                <Button onAction="#handleJoinButton" text="Request to Join" styleClass="accent" prefWidth="260" prefHeight="55">
-                    <graphic><FontIcon iconLiteral="fth-send" iconSize="18" iconColor="#18181B"/></graphic>
-                </Button>
-            </VBox>
-        </VBox>
-    </center>
-</BorderPane>
+    <HBox fx:id="toastCapsule" alignment="CENTER" spacing="10" maxWidth="-Infinity" maxHeight="-Infinity" StackPane.alignment="TOP_CENTER" visible="false" styleClass="toast-capsule" translateY="-60">
+        <StackPane.margin><Insets top="20"/></StackPane.margin>
+        <FontIcon iconLiteral="fth-check-circle" iconSize="20" iconColor="#000000"/>
+        <Label fx:id="toastLabel" text="Welcome back!" styleClass="toast-text"/>
+    </HBox>
+
+</StackPane>

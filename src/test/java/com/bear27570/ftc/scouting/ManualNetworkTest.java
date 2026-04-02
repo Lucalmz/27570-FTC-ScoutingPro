@@ -1,9 +1,16 @@
+// File: src/test/java/com/bear27570/ftc/scouting/ManualNetworkTest.java
 package com.bear27570.ftc.scouting;
 
 import com.bear27570.ftc.scouting.models.Competition;
 import com.bear27570.ftc.scouting.models.NetworkPacket;
 import com.bear27570.ftc.scouting.models.ScoreEntry;
+import com.bear27570.ftc.scouting.repository.*;
+import com.bear27570.ftc.scouting.repository.impl.*;
 import com.bear27570.ftc.scouting.services.NetworkService;
+import com.bear27570.ftc.scouting.services.domain.MatchDataService;
+import com.bear27570.ftc.scouting.services.domain.RankingService;
+import com.bear27570.ftc.scouting.services.domain.impl.MatchDataServiceImpl;
+import com.bear27570.ftc.scouting.services.network.DefaultNetworkDataHandler;
 import com.bear27570.ftc.scouting.services.network.NetworkDataHandler;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -13,77 +20,86 @@ import javafx.collections.ObservableList;
 import javafx.stage.Stage;
 
 import java.net.InetAddress;
-import java.util.Collections;
+import java.util.List;
 import java.util.Scanner;
-
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import java.util.UUID;
 
 /**
- * 手动网络连接测试工具 (Java 21 兼容版)
+ * FTC Scouting Pro - 全真局域网集群测试沙盒
  *
- * 使用说明：
- * 1. 确保两台电脑在同一局域网。
- * 2. 电脑 A 运行此程序 -> 输入 'host'。
- * 3. 电脑 B 运行此程序 -> 输入 'client'。
- * 4. 如果防火墙未拦截，Client 应能自动发现 Host，或手动输入 Host IP。
+ * 使用方法 (在 IDEA 中允许运行多个实例)：
+ * 1. 运行实例 A -> 输入 'host' -> 记录显示的 IP。
+ * 2. 运行实例 B -> 输入 'client' -> 输入不同的用户名 -> 测试发送数据。
+ * 3. 运行实例 C -> 输入 'client' -> 模拟多并发。
  */
 public class ManualNetworkTest extends Application {
 
     private NetworkService networkService;
     private final Scanner scanner = new Scanner(System.in);
 
-    // =================================================================
-    //  【关键】Java 21 兼容启动器
-    //  请运行这个 Launcher.main()，而不是直接运行 ManualNetworkTest
-    // =================================================================
+    // 真实的底层服务引用，用于测试查库
+    private MatchDataService matchDataService;
+    private MembershipRepository membershipRepository;
+    private String competitionName = "Simulated_Championship_2026";
+    private String currentUsername;
+
     public static class Launcher {
         public static void main(String[] args) {
             Application.launch(ManualNetworkTest.class, args);
         }
     }
 
-    /**
-     * 兼容旧版 IDE 的入口，建议优先使用上面的 Launcher.main
-     */
     public static void main(String[] args) {
         Launcher.main(args);
     }
 
     @Override
     public void start(Stage primaryStage) {
-        System.out.println("=========================================");
-        System.out.println("   FTC Scouting Network Test Tool");
-        System.out.println("   (v2.1.5 Data Model Adapted)");
-        System.out.println("=========================================");
+        System.out.println("==================================================");
+        System.out.println(" 🚀 FTC Scouting Pro - True Isolated Cluster Test");
+        System.out.println("==================================================");
 
         networkService = NetworkService.getInstance();
-
-        // 保持 JavaFX 线程存活，即使没有打开任何窗口
         Platform.setImplicitExit(false);
 
-        // 在新线程运行控制台交互，避免阻塞 JavaFX UI 线程
         new Thread(this::consoleLoop).start();
     }
 
     private void consoleLoop() {
         try {
-            System.out.print("请选择模式 (输入 host 或 client): ");
-            // 简单的输入循环
-            while (scanner.hasNextLine()) {
-                String mode = scanner.nextLine().trim().toLowerCase();
-                if ("host".equals(mode)) {
-                    runAsHost();
-                    break;
-                } else if ("client".equals(mode)) {
-                    runAsClient();
-                    break;
-                } else {
-                    if (!mode.isEmpty()) {
-                        System.out.print("输入无效，请输入 'host' 或 'client': ");
-                    }
-                }
+            System.out.print("👉 请选择启动模式 (host / client): ");
+            String mode = scanner.nextLine().trim().toLowerCase();
+
+            System.out.print("👉 请输入当前测试节点的用户名 (如 LeadScout, Scouter_A): ");
+            currentUsername = scanner.nextLine().trim();
+
+            // ★ 核心隔离：为每个进程分配完全独立的内存数据库
+            String dbUrl = "jdbc:h2:mem:test_db_" + UUID.randomUUID().toString().substring(0,8) + ";DB_CLOSE_DELAY=-1";
+            System.out.println("💽 初始化独立内存数据库: " + dbUrl);
+            DatabaseManager.initialize(dbUrl);
+
+            // 初始化真实的 Repository 和 Service
+            UserRepository userRepo = new UserRepositoryJdbiImpl();
+            membershipRepository = new MembershipRepositoryJdbiImpl();
+            CompetitionRepository compRepo = new CompetitionRepositoryJdbiImpl();
+            ScoreRepository scoreRepo = new ScoreRepositoryJdbiImpl();
+            PenaltyRepository penaltyRepo = new PenaltyRepositoryJdbiImpl();
+
+            matchDataService = new MatchDataServiceImpl(scoreRepo, penaltyRepo);
+            RankingService rankingService = new RankingService(scoreRepo, penaltyRepo, compRepo);
+
+            // 组装真实的 NetworkDataHandler
+            NetworkDataHandler realHandler = new DefaultNetworkDataHandler(membershipRepository, userRepo, matchDataService, rankingService);
+            networkService.setDataHandler(realHandler);
+            networkService.setOfficialEventName("FTC Asia Pacific 2026");
+
+            if ("host".equals(mode)) {
+                // 主机需要先在本地数据库创建比赛
+                compRepo.create(competitionName, currentUsername, "total");
+                membershipRepository.addMembership(currentUsername, competitionName, com.bear27570.ftc.scouting.models.Membership.Status.CREATOR);
+                runAsHost();
+            } else {
+                runAsClient();
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -91,170 +107,139 @@ public class ManualNetworkTest extends Application {
     }
 
     // ==========================================
-    //                 主机逻辑
+    //                  主机逻辑
     // ==========================================
     private void runAsHost() {
         try {
-            System.out.println("\n[主机模式] 初始化中...");
+            System.out.println("\n👑 [主机模式] 初始化中...");
 
-            // 1. 模拟数据处理器 (Mock)
-            // 如果报错 ClassNotFoundException: org.mockito...
-            // 请确保 pom.xml 中 mockito 依赖没有 <scope>test</scope> 限制，或者将此文件移入 src/test/java
-            NetworkDataHandler mockHandler = mock(NetworkDataHandler.class);
-
-            // 模拟行为：允许任何人加入，返回空数据
-            when(mockHandler.isUserApprovedOrCreator(anyString(), anyString())).thenReturn(true);
-            when(mockHandler.getScores(anyString())).thenReturn(Collections.emptyList());
-            when(mockHandler.getRankings(anyString())).thenReturn(Collections.emptyList());
-
-            networkService.setDataHandler(mockHandler);
-            networkService.setOfficialEventName("FTC Test Event 2026");
-
-            // 2. 启动主机
-            Competition comp = new Competition("TestComp", "HostUser");
+            Competition comp = new Competition(competitionName, currentUsername);
             networkService.startHost(comp, (score) -> {
-                System.out.println(">>> [主机] 收到成绩提交! ");
-                System.out.println("    Match: " + score.getMatchNumber());
-                System.out.println("    Alliance: " + score.getAlliance());
-                System.out.println("    Auto Score: " + score.getAutoArtifacts());
-                System.out.println("    TeleOp Score: " + score.getTeleopArtifacts());
-                System.out.println("    Total Score: " + score.getTotalScore());
+                System.out.println("\n📥 [主机] 收到来自 " + score.getSubmitter() + " 的成绩提交 (Match " + score.getMatchNumber() + ")!");
+                // 模拟业务层的落库操作
+                score.setSyncStatus(ScoreEntry.SyncStatus.SYNCED);
+                matchDataService.submitScore(competitionName, score);
+                System.out.println("   ✅ 数据已落入主机本地内存数据库。");
+
+                // 触发全局广播
+                networkService.broadcastUpdateToClients(new NetworkPacket(
+                        matchDataService.getHistory(competitionName),
+                        null, "FTC Asia Pacific 2026"
+                ));
+            });
+
+            // 监听加入请求
+            networkService.setOnMemberJoinCallback(() -> {
+                System.out.println("\n🔔 [主机通知] 有新的侦查员申请加入！请使用 'approve <用户名>' 命令批准。");
             });
 
             String localIp = InetAddress.getLocalHost().getHostAddress();
             System.out.println("-----------------------------------------");
-            System.out.println("[成功] 主机已启动！");
-            System.out.println("本机 IP 地址: " + localIp);
-            System.out.println("HTTP 端口: " + NetworkService.HTTP_PORT);
-            System.out.println("UDP  端口: " + NetworkService.UDP_PORT);
-            System.out.println("正在等待从机连接...");
+            System.out.println("✅ 主机已启动！(IP: " + localIp + ")");
+            System.out.println("可用命令: 'status' (查看库中数据), 'approve <user>' (批准加入), 'exit'");
             System.out.println("-----------------------------------------");
 
+            while (scanner.hasNextLine()) {
+                String cmd = scanner.nextLine().trim();
+                if (cmd.equals("exit")) break;
+                if (cmd.equals("status")) {
+                    List<ScoreEntry> scores = matchDataService.getHistory(competitionName);
+                    System.out.println("📊 主机当前数据库记录数: " + scores.size());
+                } else if (cmd.startsWith("approve ")) {
+                    String targetUser = cmd.substring(8).trim();
+                    membershipRepository.updateMembershipStatus(targetUser, competitionName, com.bear27570.ftc.scouting.models.Membership.Status.APPROVED);
+                    networkService.approveClient(targetUser);
+                    System.out.println("✅ 已批准 " + targetUser + " 加入赛事！并已广播全量数据。");
+                }
+            }
         } catch (Exception e) {
-            System.err.println("[错误] 主机启动失败: ");
             e.printStackTrace();
+        } finally {
             Platform.exit();
         }
     }
 
     // ==========================================
-    //                 从机逻辑
+    //                  从机逻辑
     // ==========================================
     private void runAsClient() {
         try {
-            System.out.println("\n[从机模式] 准备连接...");
+            System.out.println("\n💻 [从机模式] 准备连接...");
+            System.out.println("📡 正在监听 UDP 广播自动发现主机 (等待 3 秒)...");
 
-            // 1. 启动 UDP 自动发现
-            System.out.println("正在监听 UDP 广播 (等待 3 秒)...");
             ObservableList<Competition> discovered = FXCollections.observableArrayList();
-
-            // 当发现新主机时打印出来
             discovered.addListener((ListChangeListener<Competition>) c -> {
                 while (c.next()) {
                     if (c.wasAdded()) {
                         for (Competition comp : c.getAddedSubList()) {
-                            System.out.println(">>> [UDP 发现] 主机: " + comp.getHostAddress() + " | 比赛: " + comp.getName());
+                            System.out.println(">>> 🎯 [UDP 发现] 找到主机: " + comp.getHostAddress() + " | 比赛: " + comp.getName());
                         }
                     }
                 }
             });
 
             networkService.startDiscovery(discovered);
-
-            // 简单的倒计时，让用户有机会看到 UDP 结果
             Thread.sleep(3000);
 
-            // 2. 获取 IP 输入
-            System.out.print("\n请输入主机 IP 地址 (如果上方已发现，请直接输入 IP): ");
+            System.out.print("\n👉 请输入要连接的主机 IP 地址: ");
             String hostIp = scanner.nextLine().trim();
+            if (hostIp.isEmpty()) return;
 
-            if (hostIp.isEmpty()) {
-                System.out.println("IP 不能为空！程序退出。");
-                Platform.exit();
-                return;
-            }
+            System.out.println("🔗 正在连接到 " + hostIp + " ...");
 
-            System.out.println("正在连接到 " + hostIp + " ...");
-
-            // 3. 连接主机
-            String myUsername = "ClientUser_01";
-            networkService.connectToHost(hostIp, myUsername, (packet) -> {
-                // 处理收到的包
+            networkService.connectToHost(hostIp, currentUsername, (packet) -> {
                 if (packet.getType() == NetworkPacket.PacketType.JOIN_RESPONSE) {
                     if (packet.isApproved()) {
-                        System.out.println(">>> [连接成功] 已加入主机房间！");
-                        // 连接成功 1 秒后，自动发送一条测试成绩
-                        testSendScore(myUsername);
+                        System.out.println("✅ [连接成功] 已加入主机房间！");
                     } else {
-                        System.out.println(">>> [连接失败] 主机拒绝了加入请求 (或待审批)。");
+                        System.out.println("⏳ [待审批] 主机已收到请求，请等待 Host 审批...");
                     }
                 } else if (packet.getType() == NetworkPacket.PacketType.UPDATE_DATA) {
-                    System.out.println(">>> [数据同步] 收到全量数据更新。");
-                    if (packet.getOfficialEventName() != null) {
-                        System.out.println("    当前赛事: " + packet.getOfficialEventName());
-                    }
+                    System.out.println("\n🔄 [数据同步] 收到主机广播的全量数据更新！(包含 " + packet.getScoreHistory().size() + " 条记录)");
+                    // 模拟从机同步本地库
+                    matchDataService.syncWithHostData(competitionName, packet.getScoreHistory());
                 }
             });
 
+            System.out.println("可用命令: 'send' (发送一条测试数据), 'status' (查看本地同步的数据), 'exit'");
+
+            int matchCounter = 1;
+            while (scanner.hasNextLine()) {
+                String cmd = scanner.nextLine().trim();
+                if (cmd.equals("exit")) break;
+                if (cmd.equals("status")) {
+                    List<ScoreEntry> scores = matchDataService.getHistory(competitionName);
+                    System.out.println("📊 从机本地数据库记录数: " + scores.size());
+                } else if (cmd.equals("send")) {
+                    ScoreEntry dummyScore = new ScoreEntry(
+                            ScoreEntry.Type.ALLIANCE, matchCounter++, "Red", 1234, 5678,
+                            15, 10, "NEAR", "FAR", "R1 R2", "NONE",
+                            25, true, false, true, false, false, false, false, false,
+                            "1:300.0,250.0,0,0;", currentUsername
+                    );
+
+                    networkService.sendScoreToServer(dummyScore).thenAccept(success -> {
+                        if (success) {
+                            System.out.println("🚀 成绩已成功推送到主机！");
+                        } else {
+                            System.out.println("❌ 成绩推送失败，主机可能掉线。");
+                        }
+                    });
+                }
+            }
         } catch (Exception e) {
-            System.err.println("[错误] 连接失败: " + e.getMessage());
             e.printStackTrace();
+        } finally {
             Platform.exit();
         }
-    }
-
-    // 构造并发送测试成绩
-    private void testSendScore(String username) {
-        new Thread(() -> {
-            try {
-                System.out.println("\n[测试] 准备发送模拟成绩...");
-                Thread.sleep(1500); // 稍等一下再发
-
-                // 使用适应您 ScoreEntry 定义的构造函数
-                ScoreEntry dummyScore = new ScoreEntry(
-                        ScoreEntry.Type.ALLIANCE, // Type
-                        1,                        // Match Number
-                        "Red",                    // Alliance
-                        12345,                    // Team 1
-                        67890,                    // Team 2
-                        5,                        // Auto Artifacts
-                        10,                       // TeleOp Artifacts
-                        true,                     // Team 1 Sequence
-                        false,                    // Team 2 Sequence
-                        true,                     // Team 1 L2 Climb
-                        false,                    // Team 2 L2 Climb
-                        false,                    // T1 Ignored
-                        false,                    // T2 Ignored
-                        false,                    // T1 Broken
-                        false,                    // T2 Broken
-                        "[]",                     // Click Locations (JSON)
-                        username                  // Submitter
-                );
-
-                // 显式设置为未同步 (虽然构造函数已默认设置)
-                dummyScore.setSyncStatus(ScoreEntry.SyncStatus.UNSYNCED);
-
-                boolean success = networkService.sendScoreToServer(dummyScore);
-
-                if (success) {
-                    System.out.println("[测试] 成绩已通过 HTTP 发送成功！");
-                } else {
-                    System.err.println("[测试] 成绩发送失败！");
-                }
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
     }
 
     @Override
     public void stop() throws Exception {
         super.stop();
-        if (networkService != null) {
-            networkService.stop();
-        }
-        System.out.println("NetworkService 已停止，程序退出。");
+        if (networkService != null) networkService.stop();
+        DatabaseManager.close(); // 清理连接池
+        System.out.println("🛑 测试结束，资源已安全释放。");
         System.exit(0);
     }
 }
