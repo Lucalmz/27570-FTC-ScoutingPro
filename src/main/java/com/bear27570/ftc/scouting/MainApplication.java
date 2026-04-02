@@ -112,6 +112,14 @@ public class MainApplication extends Application {
         Font.loadFont(getClass().getResourceAsStream("/com/bear27570/ftc/scouting/fonts/Teko-Bold.ttf"), 14);
         this.primaryStage = primaryStage;
         primaryStage.setTitle("FTC Scouting Pro");
+        primaryStage.setOnCloseRequest(event -> {
+            // 彻底关闭网络服务释放端口
+            if (NetworkService.getInstance() != null) {
+                NetworkService.getInstance().stop();
+            }
+            // 强制退出所有 Java 线程，防止有残留的守护线程导致进程假死
+            System.exit(0);
+        });
         setStageIcon(primaryStage);
         showLoginView();
     }

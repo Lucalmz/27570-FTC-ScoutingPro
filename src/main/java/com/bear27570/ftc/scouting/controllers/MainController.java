@@ -16,7 +16,9 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
@@ -40,6 +42,9 @@ public class MainController {
     @FXML private Tab ftcScoutTab;
     @FXML private Label competitionNameLabel;
     @FXML private Button manageMembersBtn, offlineSyncBtn;
+    @FXML private HBox toastCapsule;
+    @FXML private Label toastLabel;
+    @FXML private org.kordamp.ikonli.javafx.FontIcon toastIcon;
 
     @FXML private TabScoringController tabScoringController;
     @FXML private TabFtcScoutController tabFtcScoutController;
@@ -260,55 +265,99 @@ public class MainController {
         }
     }
 
-    @FXML private void handleOfflineSync() {
-        FileChooser fileChooser = new FileChooser();
+    @FXML
+    private void handleOfflineSync() {
         Gson gson = new Gson();
         Preferences prefs = Preferences.userNodeForPackage(MainController.class);
 
         if (isHost) {
-            fileChooser.setTitle("Import Scouter Data (.ftcsync)");
-            fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Scouter Sync Data (*.ftcsync)", "*.ftcsync"));
-            File file = fileChooser.showOpenDialog(competitionNameLabel.getScene().getWindow());
+            // 主机模式：选择目录，批量扫描导入
+            DirectoryChooser dirChooser = new DirectoryChooser();
+            dirChooser.setTitle("Select Directory to Auto-Import Scouter Data");
+            File dir = dirChooser.showDialog(competitionNameLabel.getScene().getWindow());
 
-            if (file != null) {
-                try (FileInputStream fis = new FileInputStream(file);
-                     GZIPInputStream gis = new GZIPInputStream(fis);
-                     InputStreamReader reader = new InputStreamReader(gis, StandardCharsets.UTF_8)) {
+            if (dir != null) {
+                // 自动搜索目录下所有 .ftcsync 结尾的文件
+                File[] syncFiles = dir.listFiles((d, name) -> name.toLowerCase().endsWith(".ftcsync"));
 
-                    SyncPayload payload = gson.fromJson(reader, SyncPayload.class);
+                if (syncFiles == null || syncFiles.length == 0) {
+                    showToast("No .ftcsync files found.", false);
+                    tabScoringController.getViewModel().setStatus("No .ftcsync files found in directory.", "#FF9F0A");
+                    return;
+                }
 
-                    if (payload == null || payload.data == null || payload.data.isEmpty()) {
-                        tabScoringController.getViewModel().setStatus("No data found in file.", "#FF9F0A");
-                        return;
+                String importedPrefsKey = "imported_sync_ids_" + currentCompetition.getName();
+                String importedIds = prefs.get(importedPrefsKey, "");
+
+                int totalImportedRecords = 0;
+                int filesProcessed = 0;
+                int duplicatesSkipped = 0;
+
+                // 遍历解析所有数据包
+                for (File file : syncFiles) {
+                    try (FileInputStream fis = new FileInputStream(file);
+                         GZIPInputStream gis = new GZIPInputStream(fis);
+                         InputStreamReader reader = new InputStreamReader(gis, StandardCharsets.UTF_8)) {
+
+                        SyncPayload payload = gson.fromJson(reader, SyncPayload.class);
+
+                        if (payload == null || payload.data == null || payload.data.isEmpty()) {
+                            log.warn("Skipping empty or invalid file: {}", file.getName());
+                            continue;
+                        }
+
+                        // 防呆拦截：利用 exportId 识别已经导入过的数据包
+                        if (importedIds.contains(payload.exportId)) {
+                            duplicatesSkipped++;
+                            continue;
+                        }
+
+                        // 执行数据合并
+                        matchDataService.syncWithHostData(currentCompetition.getName(), payload.data);
+                        importedIds += payload.exportId + ";";
+
+                        totalImportedRecords += payload.data.size();
+                        filesProcessed++;
+
+                    } catch (Exception e) {
+                        log.error("Failed to import file: " + file.getName(), e);
                     }
+                }
 
-                    String importedPrefsKey = "imported_sync_ids_" + currentCompetition.getName();
-                    String importedIds = prefs.get(importedPrefsKey, "");
+                // 统一保存已导入的记录标记
+                prefs.put(importedPrefsKey, importedIds);
 
-                    if (importedIds.contains(payload.exportId)) {
-                        FxThread.run(() -> {
-                            Alert alert = new Alert(Alert.AlertType.WARNING, "防呆拦截：这个文件你之前已经成功导入过了，无需重复操作！", ButtonType.OK);
-                            alert.setHeaderText("重复导入警告");
-                            try { alert.getDialogPane().getStylesheets().add(getClass().getResource("/com/bear27570/ftc/scouting/styles/style.css").toExternalForm()); alert.getDialogPane().getStyleClass().add("mac-card"); } catch (Exception ignored) {}
-                            alert.showAndWait();
-                        });
-                        return;
-                    }
-
-                    matchDataService.syncWithHostData(currentCompetition.getName(), payload.data);
-                    prefs.put(importedPrefsKey, importedIds + payload.exportId + ";");
-
+                // 根据处理结果更新 UI 与 Toast
+                if (filesProcessed > 0) {
                     triggerDataRefreshAndBroadcast();
-                    tabScoringController.getViewModel().setStatus("Imported " + payload.data.size() + " records from " + payload.submitter + "!", "#32D74B");
-
-                } catch (Exception e) {
-                    log.error("Import Failed", e);
-                    tabScoringController.getViewModel().setError("Import Failed. File might be corrupted or outdated.");
+                    String successMsg = String.format("Imported %d records from %d files!", totalImportedRecords, filesProcessed);
+                    showToast(successMsg, true);
+                    tabScoringController.getViewModel().setStatus(successMsg + " (" + duplicatesSkipped + " duplicates skipped)", "#32D74B");
+                } else if (duplicatesSkipped > 0) {
+                    showToast("Skipped " + duplicatesSkipped + " duplicate files.", false);
+                    int finalDuplicatesSkipped = duplicatesSkipped;
+                    FxThread.run(() -> {
+                        Alert alert = new Alert(Alert.AlertType.INFORMATION, "扫描完成：目录下的 " + finalDuplicatesSkipped + " 个文件之前已成功导入，系统已自动跳过。", ButtonType.OK);
+                        alert.setHeaderText("无需重复导入");
+                        try {
+                            alert.getDialogPane().getStylesheets().add(getClass().getResource("/com/bear27570/ftc/scouting/styles/style.css").toExternalForm());
+                            alert.getDialogPane().getStyleClass().add("mac-card");
+                        } catch (Exception ignored) {}
+                        alert.showAndWait();
+                    });
+                    tabScoringController.getViewModel().setStatus("All found files were already imported.", "#FF9F0A");
+                } else {
+                    showToast("Import Failed: No valid data.", false);
+                    tabScoringController.getViewModel().setError("Import Failed: No valid data could be read.");
                 }
             }
         } else {
+            // 从机模式：收集本地未同步数据，打包导出为单个文件
+            FileChooser fileChooser = new FileChooser();
             List<ScoreEntry> pending = matchDataService.getPendingExports(currentCompetition.getName());
+
             if (pending.isEmpty()) {
+                showToast("No pending data to export.", false);
                 tabScoringController.getViewModel().setStatus("No pending offline data to export.", "#FF9F0A");
                 return;
             }
@@ -344,13 +393,29 @@ public class MainController {
                     matchDataService.markAsExported(pending.stream().map(ScoreEntry::getId).collect(Collectors.toList()));
                     refreshAllDataFromDatabase();
 
+                    showToast("Exported successfully!", true);
                     tabScoringController.getViewModel().setStatus("Exported successfully! Send this to Host.", "#32D74B");
                 } catch (Exception e) {
                     log.error("Export Failed", e);
+                    showToast("Export Failed", false);
                     tabScoringController.getViewModel().setError("Export Failed: " + e.getMessage());
                 }
             }
         }
+    }
+    private void showToast(String message, boolean isSuccess) {
+        FxThread.run(() -> {
+            toastLabel.setText(message);
+            if (isSuccess) {
+                toastCapsule.setStyle("-fx-background-color: #32D74B;"); // 成功绿
+                if (toastIcon != null) toastIcon.setIconLiteral("fth-check-circle");
+            } else {
+                toastCapsule.setStyle("-fx-background-color: #F87171;"); // 错误红
+                if (toastIcon != null) toastIcon.setIconLiteral("fth-alert-triangle");
+            }
+            // 复用 AnimationUtils 里的进退场动画
+            AnimationUtils.playWelcomeToast(toastCapsule);
+        });
     }
 
     @FXML private void handleExport() {

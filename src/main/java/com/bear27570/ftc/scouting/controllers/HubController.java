@@ -72,6 +72,7 @@ public class HubController {
             Platform.runLater(() -> AnimationUtils.playWelcomeToast(toastCapsule));
         }
     }
+// 在 HubController.java 中修改：
 
     @FXML
     private void selectHostMode() {
@@ -81,10 +82,12 @@ public class HubController {
             hostPane.setVisible(true); hostPane.setManaged(true);
             joinPane.setVisible(false); joinPane.setManaged(false);
 
-            statusLabel.setStyle("-fx-text-fill: #a6adc8;");
+            statusLabel.setStyle("-fx-text-fill: #A1A1AA;"); // 改用新的暗色
             statusLabel.setText("Host Mode: Select a competition to start.");
-            hostModeButton.setStyle("-fx-background-color: rgba(212, 175, 55, 0.25) !important; -fx-border-color: #FFDF73 !important; -fx-text-fill: #FFDF73 !important; -fx-effect: dropshadow(gaussian, rgba(212, 175, 55, 0.65), 15, 0.5, 0, 0) !important;");
-            joinModeButton.setStyle("");
+
+            // 【关键修复】不要写死 style，改用移除和添加 class
+            hostModeButton.getStyleClass().add("mode-button-active");
+            joinModeButton.getStyleClass().remove("mode-button-active");
 
             AnimationUtils.playSmoothEntrance(hostPane);
         }
@@ -100,10 +103,13 @@ public class HubController {
             hostPane.setVisible(false); hostPane.setManaged(false);
             joinPane.setVisible(true); joinPane.setManaged(true);
 
-            statusLabel.setStyle("-fx-text-fill: #f9e2af;");
+            statusLabel.setStyle("-fx-text-fill: #A1A1AA;"); // 改用新的暗色
             statusLabel.setText("Searching for local competitions via UDP...");
-            joinModeButton.setStyle("-fx-background-color: rgba(212, 175, 55, 0.25) !important; -fx-border-color: #FFDF73 !important; -fx-text-fill: #FFDF73 !important; -fx-effect: dropshadow(gaussian, rgba(212, 175, 55, 0.65), 15, 0.5, 0, 0) !important;");
-            hostModeButton.setStyle("");
+
+            // 【关键修复】
+            joinModeButton.getStyleClass().add("mode-button-active");
+            hostModeButton.getStyleClass().remove("mode-button-active");
+
             discoveredCompetitions.clear();
             NetworkService.getInstance().startDiscovery(discoveredCompetitions);
 

@@ -3,62 +3,35 @@
 /* ==============================================
    Font Face Definitions
    ============================================== */
-@font-face {
-    font-family: 'Audiowide';
-    src: url('../fonts/Audiowide-Regular.ttf');
-}
-
-@font-face {
-    font-family: 'Oxanium';
-    src: url('../fonts/Oxanium-Regular.ttf');
-}
-@font-face {
-    font-family: 'Oxanium';
-    src: url('../fonts/Oxanium-Bold.ttf');
-}
-
-@font-face {
-    font-family: 'Teko';
-    src: url('../fonts/Teko-Regular.ttf');
-}
-@font-face {
-    font-family: 'Teko';
-    src: url('../fonts/Teko-Bold.ttf');
-}
+@font-face { font-family: 'Audiowide'; src: url('../fonts/Audiowide-Regular.ttf'); }
+@font-face { font-family: 'Oxanium'; src: url('../fonts/Oxanium-Regular.ttf'); }
+@font-face { font-family: 'Oxanium'; src: url('../fonts/Oxanium-Bold.ttf'); }
+@font-face { font-family: 'Teko'; src: url('../fonts/Teko-Regular.ttf'); }
+@font-face { font-family: 'Teko'; src: url('../fonts/Teko-Bold.ttf'); }
 
 /* ==============================================
    Core Variables
    ============================================== */
 * {
     -color-bg-root: #000000;
-    -color-bg-card: rgba(20, 20, 24, 0.65);
-    -color-bg-panel: rgba(10, 10, 12, 0.5);
+    -color-bg-card: #09090B;
+    -color-bg-panel: #18181B;
 
-    -color-gold-base: #D4AF37;
-    -color-gold-light: #FDE047;
-    -color-gold-dark: #8B7322;
-    -color-gold-glow: rgba(253, 224, 71, 0.4);
+    -color-border-hairline: #27272A;
+    -color-border-focus: #FAFAFA;
 
-    /* 修复了此处缺失的 accent 变量，消除控制台警告 */
-    -color-accent: #FDE047;
+    -color-accent: #FAFAFA;
+    -color-accent-hover: #D4D4D8;
 
     -color-text-main: #FFFFFF;
     -color-text-normal: #E4E4E7;
     -color-text-muted: #A1A1AA;
-
-    -color-glass-edge-top: rgba(255, 255, 255, 0.15);
-    -color-glass-edge-bottom: rgba(255, 255, 255, 0.02);
-    -color-glass-edge-side: rgba(255, 255, 255, 0.05);
 }
 
 .root {
     -fx-background-color: -color-bg-root;
     -fx-font-family: "Oxanium", sans-serif;
     -fx-font-smoothing-type: lcd;
-}
-
-.bg-gradient {
-    -fx-background-color: radial-gradient(focus-angle 45deg, focus-distance 20%, center 50% 50%, radius 100%, #17140B 0%, #000000 100%);
 }
 
 .mono-text {
@@ -74,103 +47,52 @@
 .title-2, .title-3, .header-label {
     -fx-font-family: "Audiowide", sans-serif;
     -fx-text-fill: -color-text-main;
-    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.1), 5, 0.1, 0, 0);
+    -fx-effect: null;
 }
 .title-2 { -fx-font-size: 26px; }
 .title-3 { -fx-font-size: 20px; }
-.header-label { -fx-font-size: 24px; -fx-text-fill: -color-gold-light; }
 
 .title-4, .sub-header-label {
     -fx-font-family: "Oxanium", sans-serif;
     -fx-text-fill: -color-text-main;
     -fx-font-weight: 800;
     -fx-font-size: 16px;
-    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.1), 5, 0.1, 0, 0);
+    -fx-effect: null;
 }
-.sub-header-label { -fx-font-size: 18px; -fx-text-fill: -color-gold-base; }
 
 .text-bold { -fx-font-weight: bold; }
 .text-muted { -fx-text-fill: -color-text-muted; }
-.text-warning { -fx-text-fill: #FBBF24; -fx-effect: dropshadow(gaussian, rgba(251,191,36,0.3), 8, 0.3, 0, 0); }
-.text-success { -fx-text-fill: #34D399; -fx-effect: dropshadow(gaussian, rgba(52,211,153,0.3), 8, 0.3, 0, 0); }
-.text-danger  { -fx-text-fill: #F87171; -fx-effect: dropshadow(gaussian, rgba(248,113,113,0.3), 8, 0.3, 0, 0); }
-.text-accent  { -fx-text-fill: -color-gold-light; -fx-effect: dropshadow(gaussian, -color-gold-glow, 10, 0.4, 0, 0); }
+
+.text-warning { -fx-text-fill: #F59E0B; }
+.text-success { -fx-text-fill: #34D399; }
+.text-danger  { -fx-text-fill: #EF4444; }
+.text-accent  { -fx-text-fill: -color-accent; }
 
 /* ==============================================
-   2. Spatial Cards & Panels (高级玻璃态)
+   2. Spatial Cards & Panels
    ============================================== */
-/* 修改原有的 mac-card 样式，变为淡黄色半透明玻璃材质 */
 .mac-card, .card {
-    -fx-background-color: linear-gradient(from 0% 0% to 100% 100%,
-    rgb(30, 31, 34, 0.7) 0%,
-    rgba(80, 68, 10, 0.8) 40%,
-    rgba(0, 0, 0, 0.26) 100%
-    );
-    -fx-background-radius: 16px;
-    -fx-border-radius: 16px;
-    -fx-border-width: 1.2;
-    -fx-border-color: linear-gradient(from 0% 0% to 100% 100%,
-    rgba(80, 71, 27, 0.7) 0%,
-    rgba(80, 60, 10, 0.7) 30%,
-    rgba(255, 255, 255, 0.05) 100%
-    );
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 35, 0.1, 0, 10);
-}
-
-/* ==============================================
-   新增：绿色胶囊动画样式
-   ============================================== */
-.toast-capsule {
-    -fx-background-color: #32D74B;
-    -fx-background-radius: 30px;
-    -fx-border-radius: 30px;
-    -fx-padding: 12px 25px;
-    -fx-effect: dropshadow(gaussian, rgba(50, 215, 75, 0.5), 15, 0.3, 0, 5);
-}
-
-.toast-text {
-    -fx-text-fill: #000000;
-    -fx-font-family: "Oxanium", sans-serif;
-    -fx-font-weight: 800;
-    -fx-font-size: 16px;
-}
-
-/* 核心：为动态流光边框准备的底层材质 */
-.cyber-glass-card {
-    -fx-background-color: linear-gradient(
-            to bottom right,
-            rgba(255, 255, 255, 0.08) 0%,
-            rgba(255, 255, 255, 0.02) 30%,
-            rgba(10, 10, 15, 0.6) 80%,
-            rgba(255, 255, 255, 0.05) 100%
-    );
-    -fx-background-radius: 16px;
-    -fx-border-radius: 16px;
-
+    -fx-background-color: -color-bg-card;
+    -fx-border-color: -color-border-hairline;
     -fx-border-width: 1px;
-    -fx-border-color: linear-gradient(
-            to bottom right,
-            rgba(255, 255, 255, 0.3) 0%,
-            rgba(255, 255, 255, 0.05) 40%,
-            rgba(0, 0, 0, 0.5) 80%,
-            rgba(255, 255, 255, 0.1) 100%
-    );
-    -fx-effect: dropshadow(two-pass-box, rgba(0, 0, 0, 0.6), 25, 0.1, 0, 10);
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-effect: null;
 }
 
 .panel-inner {
-    -fx-background-color: rgba(0, 0, 0, 0.4);
-    -fx-background-radius: 12px;
-    -fx-border-color: rgba(255, 255, 255, 0.04);
+    -fx-background-color: -color-bg-panel;
+    -fx-border-color: -color-border-hairline;
     -fx-border-width: 1px;
-    -fx-border-radius: 12px;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
     -fx-padding: 18px;
-    -fx-effect: innershadow(gaussian, rgba(0,0,0,0.8), 10, 0.2, 0, 4);
+    -fx-effect: null;
 }
 
 .top-bar {
-    -fx-background-color: rgba(5, 5, 5, 0.85);
-    -fx-border-color: transparent transparent rgba(255, 255, 255, 0.08) transparent;
+    -fx-background-color: #000000;
+    -fx-border-color: transparent transparent -color-border-hairline transparent;
     -fx-border-width: 0 0 1px 0;
 }
 
@@ -178,319 +100,311 @@
    3. Inputs & Forms
    ============================================== */
 .text-field, .password-field, .text-area {
-    -fx-background-color: linear-gradient(to bottom right, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
-    -fx-border-color: linear-gradient(to bottom right, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 100%);
-    -fx-border-width: 1.2px;
-    -fx-border-radius: 8px;
-    -fx-background-radius: 8px;
-    -fx-padding: 8px 12px;
+    -fx-background-color: #000000;
+    -fx-border-color: -color-border-hairline;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-padding: 10px 14px;
     -fx-text-fill: -color-text-main;
-    -fx-prompt-text-fill: rgba(255,255,255,0.4);
-    -fx-highlight-fill: -color-accent;
-    -fx-highlight-text-fill: #18181B;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 8, 0.2, 0, 4);
+    -fx-prompt-text-fill: #52525B;
+    -fx-highlight-fill: #3F3F46;
+    -fx-highlight-text-fill: #FFFFFF;
+    -fx-effect: null;
 }
 
-.text-field:focused, .password-field:focused , .text-area:focused {
-    -fx-border-color: #FDE047;
-    -fx-background-color: rgba(0, 0, 0, 0.8);
-    -fx-effect: dropshadow(gaussian, rgba(253, 224, 71, 0.4), 10, 0.5, 0, 0);
+.text-field:focused, .password-field:focused, .text-area:focused {
+    -fx-border-color: -color-border-focus;
+    -fx-background-color: #09090B;
 }
 
 /* ==============================================
-   4. Buttons (Refined Glass & Precise Light Spot)
+   4. Buttons & Dynamic Icon Colors
    ============================================== */
 .button {
-    -fx-background-color: linear-gradient(to bottom right, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01));
-    -fx-border-color: linear-gradient(to bottom right, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 50%, transparent 100%);
+    -fx-background-color: -color-bg-panel;
+    -fx-border-color: #3F3F46;
     -fx-border-width: 1px !important;
-    -fx-border-radius: 8px !important;
-    -fx-background-radius: 8px !important;
+    -fx-background-radius: 100px !important;
+    -fx-border-radius: 100px !important;
     -fx-text-fill: -color-text-main !important;
-    -fx-padding: 8px 18px !important;
+    -fx-padding: 8px 24px !important;
     -fx-cursor: hand !important;
     -fx-font-weight: 700 !important;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.3), 8, 0.2, 0, 4);
+    -fx-effect: null !important;
+}
+.button .ikonli-font-icon {
+    -fx-icon-color: -color-text-main !important;
 }
 
 .button:hover {
-    -fx-background-color:
-            radial-gradient(center 15% 15%, radius 30%, rgba(255, 255, 255, 0.25), transparent),
-            linear-gradient(to bottom right, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
-    -fx-border-color: linear-gradient(to bottom right, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%);
-    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.15), 10, 0.3, 0, 0);
+    -fx-background-color: #27272A;
+    -fx-border-color: #52525B;
 }
 
-.button:pressed {
-    -fx-background-color: rgba(255, 255, 255, 0.02);
-    -fx-border-color: rgba(255, 255, 255, 0.1) transparent transparent rgba(255, 255, 255, 0.05);
-    -fx-translate-y: 2px;
-    -fx-effect: none;
+/* --- 核心模式切换选中状态 (替代原来的 Java 硬编码发光) --- */
+.mode-button-active {
+    -fx-background-color: -color-accent !important;
+    -fx-border-color: transparent !important;
+    -fx-text-fill: #000000 !important;
+}
+.mode-button-active .ikonli-font-icon {
+    -fx-icon-color: #000000 !important;
+}
+.mode-button-active:hover {
+    -fx-background-color: -color-accent-hover !important;
 }
 
+/* --- Accent 按钮 --- */
 .button.accent {
-    -fx-background-color: linear-gradient(to bottom right, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.05));
-    -fx-border-color: linear-gradient(to bottom right, rgba(253, 224, 71, 0.5) 0%, rgba(212, 175, 55, 0.1) 50%, transparent 100%) !important;
-    -fx-text-fill: #FDE047 !important;
-    -fx-effect: dropshadow(gaussian, rgba(212, 175, 55, 0.2), 8, 0.2, 0, 3) !important;
+    -fx-background-color: -color-accent;
+    -fx-border-color: transparent !important;
+    -fx-text-fill: #000000 !important;
+}
+.button.accent .ikonli-font-icon {
+    -fx-icon-color: #000000 !important;
 }
 .button.accent:hover {
-    -fx-background-color:
-            radial-gradient(center 15% 15%, radius 35%, rgba(255, 255, 255, 0.35), transparent),
-            linear-gradient(to bottom right, rgba(212, 175, 55, 0.35), rgba(212, 175, 55, 0.1));
-    -fx-effect: dropshadow(gaussian, rgba(253, 224, 71, 0.3), 15, 0.3, 0, 0) !important;
+    -fx-background-color: -color-accent-hover;
 }
 
-.button.success {
-    -fx-background-color: linear-gradient(to bottom right, rgba(52, 211, 153, 0.18), rgba(4, 120, 87, 0.05));
-    -fx-border-color: linear-gradient(to bottom right, rgba(167, 243, 208, 0.5) 0%, rgba(52, 211, 153, 0.15) 50%, transparent 100%) !important;
-    -fx-text-fill: #A7F3D0 !important;
-}
-.button.success:hover {
-    -fx-background-color:
-            radial-gradient(center 15% 15%, radius 35%, rgba(255, 255, 255, 0.3), transparent),
-            linear-gradient(to bottom right, rgba(52, 211, 153, 0.3), rgba(4, 120, 87, 0.1));
-    -fx-effect: dropshadow(gaussian, rgba(52, 211, 153, 0.3), 15, 0.3, 0, 0) !important;
-}
-
+/* --- Danger 按钮 --- */
 .button.danger {
-    -fx-background-color: linear-gradient(to bottom right, rgba(248, 113, 113, 0.18), rgba(185, 28, 28, 0.05));
-    -fx-border-color: linear-gradient(to bottom right, rgba(254, 202, 202, 0.5) 0%, rgba(248, 113, 113, 0.15) 50%, transparent 100%) !important;
-    -fx-text-fill: #FECACA !important;
+    -fx-background-color: rgba(239, 68, 68, 0.1);
+    -fx-border-color: #EF4444 !important;
+    -fx-text-fill: #EF4444 !important;
+}
+.button.danger .ikonli-font-icon {
+    -fx-icon-color: #EF4444 !important;
 }
 .button.danger:hover {
-    -fx-background-color:
-            radial-gradient(center 15% 15%, radius 35%, rgba(255, 255, 255, 0.3), transparent),
-            linear-gradient(to bottom right, rgba(248, 113, 113, 0.3), rgba(185, 28, 28, 0.1));
-    -fx-effect: dropshadow(gaussian, rgba(248, 113, 113, 0.3), 15, 0.3, 0, 0) !important;
+    -fx-background-color: #EF4444;
+    -fx-text-fill: #FFFFFF !important;
+}
+.button.danger:hover .ikonli-font-icon {
+    -fx-icon-color: #FFFFFF !important;
 }
 
+/* --- Warning 按钮 --- */
 .button.warning {
-    -fx-background-color: linear-gradient(to bottom right, rgba(251, 191, 36, 0.18), rgba(180, 83, 9, 0.05));
-    -fx-border-color: linear-gradient(to bottom right, rgba(253, 230, 138, 0.5) 0%, rgba(251, 191, 36, 0.15) 50%, transparent 100%) !important;
-    -fx-text-fill: #FDE68A !important;
+    -fx-background-color: rgba(245, 158, 11, 0.1);
+    -fx-border-color: #F59E0B !important;
+    -fx-text-fill: #F59E0B !important;
+}
+.button.warning .ikonli-font-icon {
+    -fx-icon-color: #F59E0B !important;
 }
 .button.warning:hover {
-    -fx-background-color:
-            radial-gradient(center 15% 15%, radius 35%, rgba(255, 255, 255, 0.3), transparent),
-            linear-gradient(to bottom right, rgba(251, 191, 36, 0.3), rgba(180, 83, 9, 0.1));
-    -fx-effect: dropshadow(gaussian, rgba(251, 191, 36, 0.3), 15, 0.3, 0, 0) !important;
+    -fx-background-color: #F59E0B;
+    -fx-text-fill: #000000 !important;
+}
+.button.warning:hover .ikonli-font-icon {
+    -fx-icon-color: #000000 !important;
+}
+
+/* --- Success 按钮 --- */
+.button.success {
+    -fx-background-color: rgba(52, 211, 153, 0.1);
+    -fx-border-color: #34D399 !important;
+    -fx-text-fill: #34D399 !important;
+}
+.button.success .ikonli-font-icon {
+    -fx-icon-color: #34D399 !important;
+}
+.button.success:hover {
+    -fx-background-color: #34D399;
+    -fx-text-fill: #000000 !important;
+}
+.button.success:hover .ikonli-font-icon {
+    -fx-icon-color: #000000 !important;
 }
 
 .table-view .button {
-    -fx-padding: 4px 10px !important;
-    -fx-font-size: 11px !important;
-    -fx-effect: none !important;
+    -fx-padding: 4px 12px !important;
+    -fx-font-size: 12px !important;
 }
 
 /* ==============================================
-   5. Data Views
+   5. Capsules & Badges
    ============================================== */
-.table-view, .list-view {
-    -fx-background-color: transparent;
-    -fx-border-color: rgba(255, 255, 255, 0.08);
-    -fx-border-radius: 12px;
-    -fx-background-radius: 12px;
-}
-.scroll-pane,
-.scroll-pane .viewport {
-    -fx-background-color: transparent !important;
-    -fx-border-color: transparent !important;
-    -fx-border-width: 0 !important;
-    -fx-background-insets: 0 !important;
-    -fx-padding: 0 !important;
-}
-.edge-to-edge { -fx-border-width: 0 !important; }
-
-.table-view .column-header-background {
-    -fx-background-color: rgba(0, 0, 0, 0.8);
-    -fx-background-radius: 12px 12px 0 0;
-    -fx-border-color: transparent transparent rgba(255, 255, 255, 0.1) transparent;
-    -fx-border-width: 1px;
-}
-.table-view .column-header { -fx-background-color: transparent; -fx-border-width: 0; }
-.table-view .column-header .label { -fx-text-fill: -color-gold-base; -fx-font-weight: 800; }
-
-.table-row-cell, .list-cell {
-    -fx-background-color: transparent;
-    -fx-table-cell-border-color: transparent;
-    -fx-border-color: transparent transparent rgba(255,255,255,0.03) transparent;
-    -fx-border-width: 1px;
-    -fx-padding: 10px 8px;
-    -fx-text-fill: -color-text-main !important;
-}
-.striped .table-row-cell:odd, .list-cell:odd { -fx-background-color: rgba(255, 255, 255, 0.02); }
-
-.table-row-cell:hover, .list-cell:hover {
-    -fx-background-color: rgba(255, 255, 255, 0.08) !important;
-    -fx-cursor: hand;
-}
-.table-row-cell:selected, .list-cell:selected {
-    -fx-background-color: linear-gradient(to right, rgba(212, 175, 55, 0.25) 0%, rgba(0,0,0,0) 100%) !important;
-    -fx-border-color: transparent transparent transparent -color-gold-light;
-    -fx-border-width: 0 0 0 4px;
-}
-.table-view .table-cell {
-    -fx-text-fill: #E4E4E7 !important;
-    -fx-font-family: "Teko", sans-serif;
-    -fx-font-size: 16px;
-}
-.table-row-cell:selected .table-cell, .list-cell:selected {
-    -fx-text-fill: -color-gold-light !important;
-    -fx-font-weight: bold;
+.toast-capsule {
+    -fx-background-color: #32D74B; /* 改为航天绿 */
+    -fx-background-radius: 100px;
+    -fx-border-radius: 100px;
+    -fx-padding: 12px 28px;
+    -fx-effect: dropshadow(gaussian, rgba(50, 215, 75, 0.25), 20, 0, 0, 8);
 }
 
-/* ==============================================
-   6. Toggles, Checkboxes & Tabs
-   ============================================== */
-.toggle-button {
-    -fx-background-color: rgba(20, 20, 25, 0.8);
-    -fx-text-fill: -color-text-muted;
-    -fx-border-color: rgba(255,255,255,0.1);
-    -fx-border-radius: 6px;
-    -fx-background-radius: 6px;
-    -fx-cursor: hand;
-    -fx-font-weight: 600;
-}
-.toggle-button:hover { -fx-background-color: rgba(40, 40, 45, 0.8); }
-.toggle-button:selected {
-    -fx-background-color: rgba(212, 175, 55, 0.2);
-    -fx-border-color: -color-gold-base;
-    -fx-text-fill: -color-gold-light;
-    -fx-effect: dropshadow(gaussian, rgba(212,175,55,0.4), 10, 0.2, 0, 0);
-}
-
-.box-toggle {
-    -fx-background-color: rgba(10, 10, 15, 0.6);
-    -fx-border-color: rgba(255,255,255,0.08);
-    -fx-text-fill: -color-text-muted;
-    -fx-border-radius: 6px;
-    -fx-background-radius: 6px;
-    -fx-padding: 6px 12px;
-    -fx-cursor: hand;
-    -fx-font-weight: 700;
-    -fx-font-size: 11px;
-    -fx-alignment: center;
-    -fx-min-width: 55px;
-    -fx-max-width: 55px;
-}
-.box-toggle:selected {
-    -fx-background-color: rgba(253, 224, 71, 0.15);
-    -fx-border-color: -color-gold-light;
-    -fx-text-fill: -color-gold-light;
-    -fx-effect: dropshadow(gaussian, -color-gold-glow, 12, 0.4, 0, 0);
-}
-.radio-button, .check-box {
-    -fx-background-color: transparent !important;
-    -fx-text-fill: -color-text-normal;
-}
-.check-box .box, .radio-button .radio {
-    -fx-background-color: rgba(0, 0, 0, 0.5);
-    -fx-border-color: rgba(255,255,255,0.2);
-    -fx-border-radius: 4px;
-    -fx-background-radius: 4px;
-}
-.radio-button .radio { -fx-border-radius: 100px; -fx-background-radius: 100px; }
-.check-box:selected .mark, .radio-button:selected .dot {
-    -fx-background-color: -color-gold-light;
-}
-.check-box:selected .box, .radio-button:selected .radio {
-    -fx-border-color: -color-gold-light;
-    -fx-effect: dropshadow(gaussian, -color-gold-glow, 6, 0.5, 0, 0);
-}
-
-.tab-pane,
-.tab-pane .tab-header-area,
-.tab-pane .tab-header-area .tab-header-background,
-.tab-pane .tab-header-area .headers-region {
-    -fx-background-color: transparent !important;
-    -fx-border-color: transparent !important;
-    -fx-border-width: 0 !important;
-}
-
-.tab-pane .tab {
-    -fx-background-color: transparent !important;
-    -fx-border-width: 0 !important;
-    -fx-padding: 10px 25px;
-    -fx-cursor: hand;
-}
-
-.tab-pane .tab .tab-label {
-    -fx-text-fill: -color-text-muted;
-    -fx-font-weight: 600;
-    -fx-transition: -fx-text-fill 0.3s ease;
-}
-
-.tab-pane .tab:selected .tab-label {
-    -fx-text-fill: -color-gold-light;
+.toast-capsule .toast-text {
+    -fx-text-fill: #000000 !important; /* 强制黑字 */
+    -fx-font-family: "Oxanium", sans-serif;
     -fx-font-weight: 800;
-    -fx-effect: dropshadow(gaussian, -color-gold-glow, 8, 0.4, 0, 0);
+    -fx-font-size: 15px;
 }
 
-.tab-pane .tab:selected:focused {
-    -fx-focus-color: transparent;
-    -fx-faint-focus-color: transparent;
+/* 【关键修复】强制翻转胶囊内图标的颜色，无视 FXML 里的硬编码！ */
+.toast-capsule .ikonli-font-icon {
+    -fx-icon-color: #000000 !important;
+}
+
+.status-pill {
+    -fx-background-color: #18181B;
+    -fx-border-color: #3F3F46;
+    -fx-border-width: 1px;
+    -fx-background-radius: 100px;
+    -fx-border-radius: 100px;
+    -fx-padding: 6px 18px;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
 }
 
 .cyber-badge-success {
     -fx-background-color: rgba(52, 211, 153, 0.15);
-    -fx-border-color: #34D399;
-    -fx-border-radius: 4px; -fx-background-radius: 4px;
-    -fx-padding: 2px 6px; -fx-font-size: 10px; -fx-font-weight: 800;
-    -fx-text-fill: #34D399; -fx-effect: dropshadow(gaussian, rgba(52,211,153,0.5), 5, 0.5, 0, 0);
+    -fx-border-color: rgba(52, 211, 153, 0.4);
+    -fx-border-radius: 100px; -fx-background-radius: 100px;
+    -fx-padding: 3px 10px; -fx-font-size: 11px; -fx-font-weight: 800;
+    -fx-text-fill: #34D399;
 }
 .cyber-badge-danger {
-    -fx-background-color: rgba(248, 113, 113, 0.15);
-    -fx-border-color: #F87171;
-    -fx-border-radius: 4px; -fx-background-radius: 4px;
-    -fx-padding: 2px 6px; -fx-font-size: 10px; -fx-font-weight: 800;
-    -fx-text-fill: #F87171; -fx-effect: dropshadow(gaussian, rgba(248,113,113,0.5), 5, 0.5, 0, 0);
+    -fx-background-color: rgba(239, 68, 68, 0.15);
+    -fx-border-color: rgba(239, 68, 68, 0.4);
+    -fx-border-radius: 100px; -fx-background-radius: 100px;
+    -fx-padding: 3px 10px; -fx-font-size: 11px; -fx-font-weight: 800;
+    -fx-text-fill: #EF4444;
 }
-
+/* 中性/稳定 状态胶囊 */
+.cyber-badge-neutral {
+    -fx-background-color: rgba(161, 161, 170, 0.15); /* 哑光灰底 */
+    -fx-border-color: rgba(161, 161, 170, 0.4);
+    -fx-border-radius: 100px; -fx-background-radius: 100px;
+    -fx-padding: 3px 10px; -fx-font-size: 11px; -fx-font-weight: 800;
+    -fx-text-fill: #A1A1AA;
+}
 /* ==============================================
-   7. Custom View Backgrounds
+   6. Data Views
    ============================================== */
-.hub-bg-pane {
-    -fx-background-image: url('../images/hub_bg.png');
-    -fx-background-position: center center;
-    -fx-background-repeat: no-repeat;
-    -fx-background-size: cover;
-    -fx-background-color: #000000;
+.table-view, .list-view {
+    -fx-background-color: transparent;
+    -fx-border-color: -color-border-hairline;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+}
+.scroll-pane, .scroll-pane .viewport {
+    -fx-background-color: transparent !important;
+    -fx-border-width: 0 !important;
 }
 
-.main-bg-pane {
-    -fx-background-image: url('../images/main_bg.png');
-    -fx-background-position: center center;
-    -fx-background-repeat: no-repeat;
-    -fx-background-size: cover;
-    -fx-background-color: #000000;
-}
-
-.heatmap-bg-pane {
-    -fx-background-image: url('../images/ftc_bg.jpg');
-    -fx-background-position: center center;
-    -fx-background-repeat: no-repeat;
-    -fx-background-size: cover;
-    -fx-background-color: #000000;
-}
-
-.status-pill {
-    -fx-background-color: rgba(10, 10, 12, 0.65);
-    -fx-padding: 8px 24px;
-    -fx-background-radius: 20px;
-    -fx-border-color: rgba(255, 255, 255, 0.15);
-    -fx-border-radius: 20px;
+.table-view .column-header-background {
+    -fx-background-color: #09090B;
+    -fx-background-radius: 8px 8px 0 0;
+    -fx-border-color: transparent transparent -color-border-hairline transparent;
     -fx-border-width: 1px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 10, 0.2, 0, 4);
-    -fx-font-size: 14px;
+}
+.table-view .column-header { -fx-background-color: transparent; }
+.table-view .column-header .label { -fx-text-fill: #A1A1AA; -fx-font-weight: bold; }
+
+.table-row-cell, .list-cell {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent rgba(255,255,255,0.05) transparent;
+    -fx-border-width: 1px;
+    -fx-padding: 8px;
+}
+.table-row-cell:hover, .list-cell:hover {
+    -fx-background-color: #18181B !important;
+}
+.table-row-cell:selected, .list-cell:selected {
+    -fx-background-color: #27272A !important;
+}
+.table-view .table-cell {
+    -fx-text-fill: #E4E4E7 !important;
+    -fx-font-family: "Teko", sans-serif;
+    -fx-font-size: 17px;
 }
 
 /* ==============================================
-   8. WebView Fix
+   7. Toggles & Tabs (替换单选框/复选框部分)
    ============================================== */
-.web-view {
-    -fx-background-color: transparent;
+
+/* 【关键修复】镇压 AtlantaFX，强制整个控件的背景必须透明 */
+.radio-button, .radio-button:selected, .radio-button:hover,
+.check-box, .check-box:selected, .check-box:hover {
+    -fx-background-color: transparent !important;
+    -fx-text-fill: #E4E4E7 !important; /* 确保文字依然是亮灰色 */
 }
-.web-view .page {
-    -fx-background-color: transparent;
+
+/* 我们只给真正的“勾选方块”和“单选圆圈”上色 */
+.check-box .box, .radio-button .radio {
+    -fx-background-color: #000000 !important;
+    -fx-border-color: #52525B !important;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
 }
+
+.radio-button .radio {
+    -fx-border-radius: 100px;
+    -fx-background-radius: 100px;
+}
+
+/* 选中时的圆心/勾 */
+.check-box:selected .mark, .radio-button:selected .dot {
+    -fx-background-color: #000000 !important;
+}
+
+/* 选中时的外框变成高亮白 */
+.check-box:selected .box, .radio-button:selected .radio {
+    -fx-background-color: #FAFAFA !important;
+    -fx-border-color: transparent !important;
+}
+
+/* --- Tabs --- */
+.tab-pane .tab-header-area { -fx-border-width: 0 !important; }
+.tab-pane .tab {
+    -fx-background-color: transparent !important;
+    -fx-padding: 10px 25px;
+}
+.tab-pane .tab .tab-label {
+    -fx-text-fill: #71717A;
+    -fx-font-weight: 600;
+}
+.tab-pane .tab:selected .tab-label {
+    -fx-text-fill: #FAFAFA;
+    -fx-font-weight: 800;
+}
+
+.toggle-red, .toggle-blue {
+    -fx-background-color: #000000;
+    -fx-text-fill: #A1A1AA;
+    -fx-border-color: #3F3F46;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+}
+
+/* 红方悬浮和选中状态 */
+.toggle-red:hover {
+    -fx-border-color: #EF4444 !important;
+    -fx-text-fill: #EF4444 !important;
+}
+.toggle-red:selected {
+    -fx-background-color: #EF4444 !important;
+    -fx-border-color: transparent !important;
+    -fx-text-fill: #FFFFFF !important;
+}
+
+/* 蓝方悬浮和选中状态 */
+.toggle-blue:hover {
+    -fx-border-color: #0A84FF !important;
+    -fx-text-fill: #0A84FF !important;
+}
+.toggle-blue:selected {
+    -fx-background-color: #0A84FF !important;
+    -fx-border-color: transparent !important;
+    -fx-text-fill: #FFFFFF !important;
+}
+/* ==============================================
+   8. Backgrounds
+   ============================================== */
+.hub-bg-pane { -fx-background-image: url('../images/hub_bg.png'); -fx-background-size: cover; -fx-background-color: #000000; }
+.main-bg-pane { -fx-background-image: url('../images/main_bg.png'); -fx-background-size: cover; -fx-background-color: #000000; }
+.heatmap-bg-pane { -fx-background-image: url('../images/ftc_bg.jpg'); -fx-background-size: cover; -fx-background-color: #000000; }

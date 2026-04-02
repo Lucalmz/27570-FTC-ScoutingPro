@@ -15,6 +15,7 @@ import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.HBox;
 import javafx.util.Callback;
 import org.kordamp.ikonli.javafx.FontIcon;
 import org.slf4j.Logger;
@@ -127,54 +128,76 @@ public class TabRankingsController {
                 }
             }
         });
-
+// 重新定义 Trend 列：动能徽章 (Momentum Badge)
         rankTrendCol.setCellValueFactory(new PropertyValueFactory<>("recentRatings"));
         rankTrendCol.setCellFactory(tc -> new TableCell<>() {
-            private final javafx.scene.canvas.Canvas canvas = new javafx.scene.canvas.Canvas(70, 30);
+
+            // 声明 UI 组件
+            private final Label textLabel = new Label();
+            private final FontIcon icon = new FontIcon();
+            private final HBox badge = new HBox(6, icon, textLabel);
+
             {
-                canvas.setEffect(new javafx.scene.effect.DropShadow(4, javafx.scene.paint.Color.web("#D4AF37")));
+                badge.setAlignment(javafx.geometry.Pos.CENTER);
+                textLabel.setStyle("-fx-font-family: 'Oxanium'; -fx-font-weight: 800;");
             }
+
             @Override
             protected void updateItem(List<Double> ratings, boolean empty) {
                 super.updateItem(ratings, empty);
 
+                // 如果没有数据或比赛场次不足2场，不显示趋势
                 if (empty || ratings == null || ratings.size() < 2) {
                     setGraphic(null);
-                } else {
-                    javafx.scene.canvas.GraphicsContext gc = canvas.getGraphicsContext2D();
-                    gc.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
-
-                    double max = ratings.stream().max(Double::compareTo).orElse(1.0);
-                    double min = ratings.stream().min(Double::compareTo).orElse(0.0);
-                    double range = max - min == 0 ? 1 : max - min;
-
-                    gc.setStroke(javafx.scene.paint.Color.web("#FDE047"));
-                    gc.setLineWidth(1.5);
-
-                    double drawWidth = 60.0;
-                    double drawHeight = 20.0;
-                    double paddingX = 5.0;
-                    double paddingY = 5.0;
-                    double xStep = drawWidth / (ratings.size() - 1);
-
-                    gc.beginPath();
-                    for (int i = 0; i < ratings.size(); i++) {
-                        double x = paddingX + (i * xStep);
-                        double y = paddingY + ((max == min) ? (drawHeight / 2) : (drawHeight - ((ratings.get(i) - min) / range) * drawHeight));
-
-                        if (i == 0) gc.moveTo(x, y);
-                        else gc.lineTo(x, y);
-                    }
-                    gc.stroke();
-
-                    double lastX = paddingX + drawWidth;
-                    double lastY = paddingY + ((max == min) ? (drawHeight / 2) : (drawHeight - ((ratings.get(ratings.size()-1) - min) / range) * drawHeight));
-                    gc.setFill(javafx.scene.paint.Color.WHITE);
-                    gc.fillOval(lastX - 2.5, lastY - 2.5, 5, 5);
-
-                    setGraphic(canvas);
-                    setAlignment(javafx.geometry.Pos.CENTER);
+                    return;
                 }
+
+                // 🧠 核心逻辑：动量计算 (Momentum Calculation)
+                // 总体平均分
+                double overallAvg = ratings.stream().mapToDouble(d -> d).average().orElse(0.0);
+
+                // 近期平均分（取最近2场的平均值，消除单场意外断线的干扰）
+                double recentAvg;
+                if (ratings.size() >= 3) {
+                    recentAvg = (ratings.get(ratings.size() - 1) + ratings.get(ratings.size() - 2)) / 2.0;
+                } else {
+                    recentAvg = ratings.get(ratings.size() - 1);
+                }
+
+                // 计算差值
+                double delta = recentAvg - overallAvg;
+
+                // 🧹 清理之前的样式残留
+                badge.getStyleClass().removeAll("cyber-badge-success", "cyber-badge-danger", "cyber-badge-neutral");
+
+                // 🎨 判定并渲染 UI
+                if (delta > 10) {
+                    // 状态火热 (Improving)
+                    icon.setIconLiteral("fth-trending-up");
+                    icon.setIconColor(javafx.scene.paint.Color.web("#34D399"));
+                    textLabel.setText(String.format("+%.1f", delta));
+                    textLabel.setStyle("-fx-text-fill: #34D399;");
+                    badge.getStyleClass().add("cyber-badge-success");
+
+                } else if (delta < -10) {
+                    // 状态下滑 (Declining)
+                    icon.setIconLiteral("fth-trending-down");
+                    icon.setIconColor(javafx.scene.paint.Color.web("#EF4444"));
+                    textLabel.setText(String.format("%.1f", delta)); // 负数自带负号
+                    textLabel.setStyle("-fx-text-fill: #EF4444;");
+                    badge.getStyleClass().add("cyber-badge-danger");
+
+                } else {
+                    // 状态稳定 (Stable)
+                    icon.setIconLiteral("fth-minus");
+                    icon.setIconColor(javafx.scene.paint.Color.web("#A1A1AA"));
+                    textLabel.setText("STABLE");
+                    textLabel.setStyle("-fx-text-fill: #A1A1AA; -fx-font-size: 10px;"); // Stable字多，稍微缩细一点
+                    badge.getStyleClass().add("cyber-badge-neutral");
+                }
+
+                setGraphic(badge);
+                setAlignment(javafx.geometry.Pos.CENTER);
             }
         });
         rankingLegendLabel.setText("Penalty: Major=15, Minor=5. Auto Score now correctly skips matches with 0 points from average calculation.");

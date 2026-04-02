@@ -28,8 +28,8 @@
                 <VBox spacing="10">
                     <Label text="Alliance Color" styleClass="text-muted"/>
                     <HBox spacing="15">
-                        <ToggleButton fx:id="redAllianceToggle" text="Red" prefWidth="100" styleClass="danger"/>
-                        <ToggleButton fx:id="blueAllianceToggle" text="Blue" prefWidth="100" styleClass="accent"/>
+                        <ToggleButton fx:id="redAllianceToggle" text="Red" prefWidth="100" styleClass="toggle-red"/>
+                        <ToggleButton fx:id="blueAllianceToggle" text="Blue" prefWidth="100" styleClass="toggle-blue"/>
                     </HBox>
                 </VBox>
             </HBox>

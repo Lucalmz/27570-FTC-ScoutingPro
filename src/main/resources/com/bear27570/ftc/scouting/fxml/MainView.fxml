@@ -4,54 +4,64 @@
 <?import javafx.scene.layout.*?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane styleClass="main-bg-pane" prefHeight="900.0" prefWidth="1440.0" stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.MainController">
-    <top>
-        <HBox alignment="CENTER_LEFT" spacing="20" styleClass="top-bar">
-            <padding><Insets bottom="20" left="40" right="40" top="20" /></padding>
-            <Label fx:id="competitionNameLabel" styleClass="title-3" text="Competition Name" />
-            <Region HBox.hgrow="ALWAYS" />
-            <Button fx:id="offlineSyncBtn" onAction="#handleOfflineSync" styleClass="warning" text="Offline Sync">
-                <graphic><FontIcon iconLiteral="fth-refresh-cw" iconSize="14" iconColor="#FBBF24"/></graphic>
-            </Button>
-            <Button onAction="#handleExport" styleClass="button" text="Export CSV">
-                <graphic><FontIcon iconLiteral="fth-download" iconSize="14"/></graphic>
-            </Button>
-            <Button fx:id="manageMembersBtn" onAction="#handleManageMembers" styleClass="accent" text="Members" visible="false" managed="false">
-                <graphic><FontIcon iconLiteral="fth-users" iconSize="14" iconColor="#18181B"/></graphic>
-            </Button>
-            <Button onAction="#handleAllianceAnalysis" text="Analysis">
-                <graphic><FontIcon iconLiteral="fth-pie-chart" iconSize="14"/></graphic>
-            </Button>
-            <Button onAction="#handleBackButton" text="Hub">
-                <graphic><FontIcon iconLiteral="fth-arrow-left" iconSize="14"/></graphic>
-            </Button>
-        </HBox>
-    </top>
+<StackPane stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.MainController">
 
-    <center>
-        <TabPane fx:id="mainTabPane" tabClosingPolicy="UNAVAILABLE">
-            <tabs>
-                <Tab text="Scoring">
-                    <content>
-                        <fx:include fx:id="tabScoring" source="TabScoring.fxml"/>
-                    </content>
-                </Tab>
-                <Tab fx:id="ftcScoutTab" text="FTCScout Integrations">
-                    <content>
-                        <fx:include fx:id="tabFtcScout" source="TabFtcScout.fxml"/>
-                    </content>
-                </Tab>
-                <Tab text="Team Rankings">
-                    <content>
-                        <fx:include fx:id="tabRankings" source="TabRankings.fxml"/>
-                    </content>
-                </Tab>
-                <Tab text="Match History">
-                    <content>
-                        <fx:include fx:id="tabHistory" source="TabHistory.fxml"/>
-                    </content>
-                </Tab>
-            </tabs>
-        </TabPane>
-    </center>
-</BorderPane>
+    <BorderPane styleClass="main-bg-pane" prefHeight="900.0" prefWidth="1440.0">
+        <top>
+            <HBox alignment="CENTER_LEFT" spacing="20" styleClass="top-bar">
+                <padding><Insets bottom="20" left="40" right="40" top="20" /></padding>
+                <Label fx:id="competitionNameLabel" styleClass="title-3" text="Competition Name" />
+                <Region HBox.hgrow="ALWAYS" />
+                <Button fx:id="offlineSyncBtn" onAction="#handleOfflineSync" styleClass="warning" text="Offline Sync">
+                    <graphic><FontIcon iconLiteral="fth-refresh-cw" iconSize="14" iconColor="#FBBF24"/></graphic>
+                </Button>
+                <Button onAction="#handleExport" styleClass="button" text="Export CSV">
+                    <graphic><FontIcon iconLiteral="fth-download" iconSize="14"/></graphic>
+                </Button>
+                <Button fx:id="manageMembersBtn" onAction="#handleManageMembers" styleClass="accent" text="Members" visible="false" managed="false">
+                    <graphic><FontIcon iconLiteral="fth-users" iconSize="14" iconColor="#18181B"/></graphic>
+                </Button>
+                <Button onAction="#handleAllianceAnalysis" text="Analysis">
+                    <graphic><FontIcon iconLiteral="fth-pie-chart" iconSize="14"/></graphic>
+                </Button>
+                <Button onAction="#handleBackButton" text="Hub">
+                    <graphic><FontIcon iconLiteral="fth-arrow-left" iconSize="14"/></graphic>
+                </Button>
+            </HBox>
+        </top>
+
+        <center>
+            <TabPane fx:id="mainTabPane" tabClosingPolicy="UNAVAILABLE">
+                <tabs>
+                    <Tab text="Scoring">
+                        <content>
+                            <fx:include fx:id="tabScoring" source="TabScoring.fxml"/>
+                        </content>
+                    </Tab>
+                    <Tab fx:id="ftcScoutTab" text="FTCScout Integrations">
+                        <content>
+                            <fx:include fx:id="tabFtcScout" source="TabFtcScout.fxml"/>
+                        </content>
+                    </Tab>
+                    <Tab text="Team Rankings">
+                        <content>
+                            <fx:include fx:id="tabRankings" source="TabRankings.fxml"/>
+                        </content>
+                    </Tab>
+                    <Tab text="Match History">
+                        <content>
+                            <fx:include fx:id="tabHistory" source="TabHistory.fxml"/>
+                        </content>
+                    </Tab>
+                </tabs>
+            </TabPane>
+        </center>
+    </BorderPane>
+
+    <HBox fx:id="toastCapsule" alignment="CENTER" spacing="10" maxWidth="-Infinity" maxHeight="-Infinity" StackPane.alignment="TOP_CENTER" visible="false" styleClass="toast-capsule" translateY="-60">
+        <StackPane.margin><Insets top="20"/></StackPane.margin>
+        <FontIcon fx:id="toastIcon" iconLiteral="fth-check-circle" iconSize="20" iconColor="#000000"/>
+        <Label fx:id="toastLabel" text="Notification" styleClass="toast-text"/>
+    </HBox>
+
+</StackPane>

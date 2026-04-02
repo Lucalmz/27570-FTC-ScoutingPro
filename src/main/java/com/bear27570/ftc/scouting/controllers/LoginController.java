@@ -44,31 +44,12 @@ public class LoginController {
             if (event.getCode() == KeyCode.ENTER) passwordField.requestFocus();
         });
 
-        // ==========================================
-        // 应用重构后的玻璃拟物化流光边框
-        // ==========================================
-        if (loginCard != null && loginCard.getParent() instanceof StackPane) {
-            StackPane rootPane = (StackPane) loginCard.getParent();
-            int index = rootPane.getChildren().indexOf(loginCard);
-
-            // 包装卡片，参数：圆角 16px，边框粗细 2.5px，发金色光
-            StackPane glowingWrapper = AnimationUtils.wrapWithGlowingBorder(
-                    loginCard,
-                    Color.web("#FDE047"),
-                    16.0,
-                    2.5
-            );
-
-            // 将原有的卡片替换为拥有流光效果的 Wrapper
-            rootPane.getChildren().set(index, glowingWrapper);
-        }
-
         // 挂载高级空间计算按钮光效
         if (loginButton != null) {
-            AnimationUtils.attachSpatialButtonAnimation(loginButton, Color.web("#FDE047", 0.5));
+            AnimationUtils.attachSolidPressAnimation(loginButton);
         }
         if (createUserButton != null) {
-            AnimationUtils.attachSpatialButtonAnimation(createUserButton, Color.color(1, 1, 1, 0.2));
+            AnimationUtils.attachSolidPressAnimation(createUserButton);
         }
     }
 
