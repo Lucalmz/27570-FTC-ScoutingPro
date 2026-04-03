@@ -310,17 +310,43 @@
     -fx-padding: 8px;
 }
 .table-row-cell:hover, .list-cell:hover {
-    -fx-background-color: #18181B !important;
-}
-.table-row-cell:selected, .list-cell:selected {
-    -fx-background-color: #27272A !important;
-}
-.table-view .table-cell {
-    -fx-text-fill: #E4E4E7 !important;
-    -fx-font-family: "Teko", sans-serif;
-    -fx-font-size: 17px;
+    -fx-background-color: transparent !important;
 }
 
+/* 选中时保留一点微弱的底色标记 */
+.table-row-cell:selected, .list-cell:selected {
+    -fx-background-color: rgba(255,255,255,0.08) !important;
+}
+
+.gliding-highlight {
+    -fx-background-color: #18181B;
+    -fx-border-color: rgba(255,255,255,0.08);
+    -fx-border-width: 1px;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 10, 0, 0, 4);
+}
+/* ==============================================
+   强制打穿 TableView 的内部不透明壁垒
+   ============================================== */
+/* 1. 让滚动流和视口彻底透明 */
+.table-view .virtual-flow,
+.table-view .virtual-flow .viewport,
+.table-view .virtual-flow .viewport .sheet {
+    -fx-background-color: transparent !important;
+}
+
+/* 2. 强制普通状态下的大白板行、奇偶交替行也透明 */
+.table-row-cell,
+.table-row-cell:odd,
+.table-row-cell:even {
+    -fx-background-color: transparent !important;
+}
+
+/* 3. （可选）如果你发现表头下面有一条奇怪的黑线，可以加这个去掉 */
+.table-view .column-header-background {
+    -fx-background-color: #09090B !important; /* 保持你表头的原色 */
+}
 /* ==============================================
    7. Toggles & Tabs (替换单选框/复选框部分)
    ============================================== */
@@ -404,7 +430,7 @@
 }
 /* ==============================================
    8. Backgrounds
-   ============================================== */
+   ==============================================
 .hub-bg-pane { -fx-background-image: url('../images/hub_bg.png'); -fx-background-size: cover; -fx-background-color: #000000; }
-.main-bg-pane { -fx-background-image: url('../images/main_bg.png'); -fx-background-size: cover; -fx-background-color: #000000; }
+.main-bg-pane { -fx-background-image: url('../images/main_bg.png'); -fx-background-size: cover; -fx-background-color: #000000; }*/
 .heatmap-bg-pane { -fx-background-image: url('../images/ftc_bg.jpg'); -fx-background-size: cover; -fx-background-color: #000000; }

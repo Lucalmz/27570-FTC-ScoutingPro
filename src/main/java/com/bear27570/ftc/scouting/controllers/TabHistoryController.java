@@ -110,6 +110,7 @@ public class TabHistoryController {
                 }
             }
         });
+        AnimationUtils.attachGlidingHighlight(historyTableView);
     }
 
     public void setDependencies(MainController mainController, MatchDataService matchDataService,

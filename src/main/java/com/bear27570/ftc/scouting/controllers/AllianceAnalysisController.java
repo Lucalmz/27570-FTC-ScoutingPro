@@ -173,6 +173,7 @@ public class AllianceAnalysisController {
         proxyPortField.setText("7890");
         proxyHostField.disableProperty().bind(useProxyCheck.selectedProperty().not());
         proxyPortField.disableProperty().bind(useProxyCheck.selectedProperty().not());
+        AnimationUtils.attachGlidingHighlight(analysisTable);
     }
 
     private void safeExecuteScript(String script) {

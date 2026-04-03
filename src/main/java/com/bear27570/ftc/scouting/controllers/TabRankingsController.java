@@ -201,6 +201,7 @@ public class TabRankingsController {
             }
         });
         rankingLegendLabel.setText("Penalty: Major=15, Minor=5. Auto Score now correctly skips matches with 0 points from average calculation.");
+        AnimationUtils.attachGlidingHighlight(rankingsTableView);
     }
 
     public void setDependencies(MainController mainController, MainApplication mainApp, Competition competition, boolean isHost, SharedDataViewModel viewModel) {

@@ -111,6 +111,7 @@ public class HeatmapController {
         colScore.setCellValueFactory(cell -> new SimpleIntegerProperty(cell.getValue().getScore()).asObject());
         colPenalties.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getPenalties()));
         colStatus.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getStatus()));
+        AnimationUtils.attachGlidingHighlight(matchTable);
     }
 
     public void setData(int teamNumber, List<ScoreEntry> matches, Map<Integer, PenaltyRepository.FullPenaltyRow> penaltyMap) {
