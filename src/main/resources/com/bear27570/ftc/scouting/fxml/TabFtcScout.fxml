@@ -5,13 +5,13 @@
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <VBox alignment="CENTER" spacing="20" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.TabFtcScoutController">
-    <VBox maxWidth="550" spacing="30" styleClass="mac-card">
+    <VBox fx:id="ftcScoutContainer" maxWidth="550" spacing="30" styleClass="mac-card">
         <padding><Insets bottom="50" left="50" right="50" top="50" /></padding>
 
         <Label styleClass="title-3" text="FTCScout Integration" />
         <Label text="Host only. Bind an event to fetch the official name and automatically sync all penalty data from the cloud." styleClass="text-muted" wrapText="true" style="-fx-line-spacing: 4px;"/>
 
-        <GridPane hgap="20" vgap="20" styleClass="panel-inner">
+        <GridPane  hgap="20" vgap="20" styleClass="panel-inner">
             <Label text="Season:" style="-fx-font-weight: bold;"/>
             <TextField fx:id="ftcScoutSeasonField" text="2024" GridPane.columnIndex="1" prefWidth="200"/>
             <Label text="Event Code:" style="-fx-font-weight: bold;" GridPane.rowIndex="1"/>

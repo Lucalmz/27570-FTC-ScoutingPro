@@ -7,11 +7,14 @@ import com.bear27570.ftc.scouting.services.NetworkService;
 import com.bear27570.ftc.scouting.services.domain.MatchDataService;
 import com.bear27570.ftc.scouting.utils.FxThread;
 import com.bear27570.ftc.scouting.viewmodels.ScoringViewModel;
-import javafx.animation.PauseTransition;
+import javafx.animation.*;
 import javafx.beans.binding.Bindings;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.util.Duration;
 
 import java.util.ArrayList;
@@ -45,6 +48,7 @@ public class TabScoringController {
     private String editingOriginalTime = null;
     private ScoreEntry.SyncStatus editingOriginalSyncStatus = null;
 
+    private final ObjectProperty<Color> themeColor = new SimpleObjectProperty<>(Color.WHITE);
     private final ScoringViewModel viewModel = new ScoringViewModel();
 
     @FXML
@@ -56,12 +60,30 @@ public class TabScoringController {
         team2IgnoreCheck.setDisable(true);
         team1Field.focusedProperty().addListener((obs, o, n) -> { if (!n) updateWeakStatus(team1Field.getText(), team1IgnoreCheck); });
         team2Field.focusedProperty().addListener((obs, o, n) -> { if (!n) updateWeakStatus(team2Field.getText(), team2IgnoreCheck); });
+        AnimationUtils.attachCyberpunkGlow(scoringFormVBox, themeColor);
 
+        // 监听红蓝联盟 ToggleGroup 的变化
+        allianceToggleGroup.selectedToggleProperty().addListener((obs, old, newVal) -> {
+            if (newVal == redAllianceToggle) {
+                animateThemeColor(Color.web("#EF4444")); // 切换到红色
+            } else if (newVal == blueAllianceToggle) {
+                animateThemeColor(Color.web("#0A84FF")); // 切换到蓝色
+            } else {
+                animateThemeColor(Color.WHITE); // 没有选中时恢复白色
+            }
+        });
         statusLabel.textProperty().bind(viewModel.statusTextProperty());
         statusLabel.styleProperty().bind(Bindings.concat("-fx-text-fill: ", viewModel.statusColorProperty(), ";"));
         errorLabel.textProperty().bind(viewModel.errorTextProperty());
     }
-
+    private void animateThemeColor(Color targetColor) {
+        Timeline timeline = new Timeline(
+                new KeyFrame(Duration.millis(350),
+                        new KeyValue(themeColor, targetColor, Interpolator.EASE_OUT)
+                )
+        );
+        timeline.play();
+    }
     public void setDependencies(MainController mainController, MatchDataService matchDataService, Competition competition, String username, boolean isHost) {
         this.mainController = mainController;
         this.matchDataService = matchDataService;
@@ -83,7 +105,7 @@ public class TabScoringController {
             return val;
         } catch (Exception e) {
             showFieldError(field, errorMsg);
-            throw new RuntimeException("VALIDATION_FAILED"); // 抛出运行时异常，直接打断提交流程
+            throw new RuntimeException("VALIDATION_FAILED");
         }
     }
 
@@ -98,7 +120,6 @@ public class TabScoringController {
             ToggleButton selectedAlliance = (ToggleButton) allianceToggleGroup.getSelectedToggle();
             if (selectedAlliance == null) { viewModel.setError("Select an Alliance (Red/Blue)."); throw new RuntimeException("VALIDATION_FAILED"); }
 
-            // 优雅的字段校验提取
             String alliance = selectedAlliance.getText().toUpperCase();
             int matchNum = parseField(matchNumberField, "Valid Match Number required.");
             int team1 = parseField(team1Field, "Valid Team 1 required.");
@@ -109,7 +130,6 @@ public class TabScoringController {
             int t2Auto = isSingle ? 0 : parseField(t2AutoScoreField, "Team 2 Auto must be a number.");
             int teleop = parseField(teleopArtifactsField, "TeleOp Hits must be a valid number.");
 
-            // 构建对象
             ScoreEntry entry = new ScoreEntry(
                     editingScoreId == -1 ? 0 : editingScoreId,
                     isSingle ? ScoreEntry.Type.SINGLE : ScoreEntry.Type.ALLIANCE,
@@ -129,7 +149,6 @@ public class TabScoringController {
             processSubmission(entry, matchNum, editingScoreId != -1);
 
         } catch (RuntimeException e) {
-            // 校验失败会抛出 RuntimeException 跳到这里，恢复按钮状态即可
             if (!"VALIDATION_FAILED".equals(e.getMessage())) viewModel.setError("Error: " + e.getMessage());
             restoreSubmitState();
         }
@@ -142,7 +161,6 @@ public class TabScoringController {
             viewModel.setStatus("✔ Score saved and broadcasted!", "#34D399");
             finalizeSubmissionUI(currentMatchNum, wasEditing);
         } else {
-            // 💥 异步发送分数
             NetworkService.getInstance().sendScoreToServer(entry)
                     .thenAccept(sent -> FxThread.run(() -> {
                         if (sent) {
@@ -214,9 +232,6 @@ public class TabScoringController {
         currentClickLocations = ""; viewModel.setError("Editing record loaded.");
     }
 
-    // ==========================================
-    // 私有辅助方法
-    // ==========================================
     private void initToggleGroups() {
         allianceToggleGroup = new ToggleGroup(); redAllianceToggle.setToggleGroup(allianceToggleGroup); blueAllianceToggle.setToggleGroup(allianceToggleGroup);
         t1ProjGroup = new ToggleGroup(); t1ProjNearBtn.setToggleGroup(t1ProjGroup); t1ProjFarBtn.setToggleGroup(t1ProjGroup);

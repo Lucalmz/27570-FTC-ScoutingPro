@@ -4,17 +4,25 @@ package com.bear27570.ftc.scouting.controllers;
 import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.geometry.Pos;
-import javafx.geometry.Point2D;
 import javafx.scene.CacheHint;
+import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.effect.*;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
+import javafx.scene.paint.*;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Polygon;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.shape.StrokeType;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+
+import java.util.stream.Stream;
 
 public class AnimationUtils {
 
@@ -97,7 +105,6 @@ public class AnimationUtils {
         ParallelTransition entry = new ParallelTransition();
         TranslateTransition ttIn = new TranslateTransition(Duration.millis(500), toastNode);
         ttIn.setToY(30);
-        // ✅ 这里修复了 IllegalArgumentException: Control point coordinates must all be in range [0,1]
         ttIn.setInterpolator(Interpolator.SPLINE(0.17, 0.89, 0.32, 1.0));
         FadeTransition ftIn = new FadeTransition(Duration.millis(300), toastNode);
         ftIn.setToValue(1.0);
@@ -126,9 +133,6 @@ public class AnimationUtils {
         tt.playFromStart();
     }
 
-    /**
-     * 极简工业风：扎实的物理按压反馈
-     */
     public static void attachSolidPressAnimation(Node button) {
         button.setOnMousePressed(e -> {
             ScaleTransition st = new ScaleTransition(Duration.millis(50), button);
@@ -163,9 +167,6 @@ public class AnimationUtils {
             Pane parent = (Pane) table.getParent();
             if (parent == null) return;
 
-            // =========================================================================
-            // 1. 获取垂直滚动条 (需在最前获取，方便后续绑定)
-            // =========================================================================
             ScrollBar vBar = null;
             for (Node n : table.lookupAll(".scroll-bar:vertical")) {
                 if (n instanceof ScrollBar) {
@@ -175,9 +176,6 @@ public class AnimationUtils {
             }
             final ScrollBar finalVBar = vBar;
 
-            // =========================================================================
-            // 2. 平滑滚动注入 (✅ 修复：采用更舒适的步长，告别“一滑到底”)
-            // =========================================================================
             final double[] scrollTarget = {-1};
             final Timeline scrollTimeline = new Timeline();
 
@@ -205,9 +203,6 @@ public class AnimationUtils {
                 scrollTimeline.play();
             });
 
-            // =========================================================================
-            // 3. 布局包裹与高亮块初始化
-            // =========================================================================
             int index = parent.getChildren().indexOf(table);
             StackPane wrapper = new StackPane();
 
@@ -232,21 +227,14 @@ public class AnimationUtils {
             parent.getChildren().set(index, wrapper);
             wrapper.getChildren().addAll(highlight, table);
             StackPane.setAlignment(highlight, Pos.TOP_LEFT);
-// =========================================================================
-            // 3. 核心物理引擎 (✅ 终极版：以列表为参考系，带物理弹簧追踪感)
-            // =========================================================================
+
             class HighlightController {
                 TableRow<?> targetRow = null;
                 int targetIndex = -1;
-
-                // 记录上一帧目标行的物理Y轴位置，用于计算列表的滚动偏移量
                 double lastRowScreenY = -1;
-
-                // 全局缓存鼠标的真实屏幕坐标
                 double lastSceneX = -1;
                 double lastSceneY = -1;
                 boolean isHovering = false;
-
                 double targetY = 0;
                 double targetH = 40;
                 double targetW = 100;
@@ -261,7 +249,6 @@ public class AnimationUtils {
                             return;
                         }
 
-                        // 【魔法步骤 1】：计算列表这一帧是否发生了滚动？
                         if (targetRow != null && targetRow.isVisible() && targetRow.getIndex() == targetIndex && targetRow.getScene() != null && lastRowScreenY != -1) {
                             javafx.geometry.Bounds bScene = targetRow.localToScene(targetRow.getBoundsInLocal());
                             if (bScene != null) {
@@ -270,7 +257,6 @@ public class AnimationUtils {
                                     double currentYOfOldRow = bWrapper.getMinY();
                                     double scrollDelta = currentYOfOldRow - lastRowScreenY;
 
-                                    // 如果列表滚了，瞬间将高亮块按同样幅度位移，制造“钉在列表里”的错觉！
                                     if (Math.abs(scrollDelta) > 0.1 && targetOpacity > 0.5) {
                                         highlight.setTranslateY(highlight.getTranslateY() + scrollDelta);
                                     }
@@ -278,29 +264,25 @@ public class AnimationUtils {
                             }
                         }
 
-                        // 【魔法步骤 2】：判断鼠标是否脱离了当前绑定的行？
                         boolean needsRescan = true;
                         if (targetRow != null && targetRow.isVisible() && targetRow.getIndex() == targetIndex && targetRow.getScene() != null) {
-                            // 把全局鼠标坐标映射到当前行的内部，看看还在不在里面
                             javafx.geometry.Point2D pt = targetRow.sceneToLocal(lastSceneX, lastSceneY);
                             if (pt != null && targetRow.contains(pt)) {
-                                needsRescan = false; // 还在老地方，不用重新扫描
+                                needsRescan = false;
                             }
                         }
 
-                        // 【魔法步骤 3】：如果列表滚走导致鼠标指到新的一行了，立即重新抓取！
                         if (needsRescan) {
                             updateMouse(lastSceneX, lastSceneY);
                         }
 
-                        // 【步骤 4】：更新目标行的标准物理参数
                         if (targetRow != null && targetRow.getIndex() == targetIndex && targetRow.isVisible() && targetRow.getScene() != null) {
                             javafx.geometry.Bounds bScene = targetRow.localToScene(targetRow.getBoundsInLocal());
                             if (bScene != null) {
                                 javafx.geometry.Bounds bWrapper = wrapper.sceneToLocal(bScene);
                                 if (bWrapper != null) {
                                     targetY = bWrapper.getMinY();
-                                    lastRowScreenY = targetY; // 保存当前行的物理Y，留给下一帧算偏移用！
+                                    lastRowScreenY = targetY;
                                     targetH = targetRow.getHeight();
                                     targetW = targetRow.getWidth();
                                     targetOpacity = 1.0;
@@ -317,7 +299,6 @@ public class AnimationUtils {
                             lastRowScreenY = -1;
                         }
 
-                        // 应用物理缓动
                         applyPhysics();
                     }
                 };
@@ -328,13 +309,12 @@ public class AnimationUtils {
                     double curW = highlight.getPrefWidth();
                     double curOp = highlight.getOpacity();
 
-                    // 如果是刚出现，直接闪现到目标位置，防止从天而降
                     if (curOp < 0.05 && targetOpacity > 0.5) {
                         highlight.setTranslateY(targetY);
                         curY = targetY;
                     }
 
-                    double moveFactor = 0.1;
+                    double moveFactor = 0.09;
                     double fadeFactor = 0.1;
 
                     highlight.setTranslateY(curY + (targetY - curY) * moveFactor);
@@ -376,9 +356,6 @@ public class AnimationUtils {
 
             HighlightController ctrl = new HighlightController();
 
-            // =========================================================================
-            // 4. 事件绑定：现在只管投喂鼠标坐标，剩下的全交给 AnimationTimer 引擎！
-            // =========================================================================
             table.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_MOVED, e -> {
                 ctrl.isHovering = true;
                 ctrl.lastSceneX = e.getSceneX();
@@ -395,7 +372,160 @@ public class AnimationUtils {
             table.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_EXITED, e -> {
                 ctrl.clear();
             });
-
         });
+    }
+    public static void attachCyberpunkGlow(Region card, ObjectProperty<Color> themeColorProperty) {
+        Platform.runLater(() -> {
+            Pane parent = (Pane) card.getParent();
+            if (parent == null) return;
+
+            int index = parent.getChildren().indexOf(card);
+            StackPane wrapper = new StackPane();
+            wrapper.setPickOnBounds(false); // 确保包装器不吞噬鼠标事件
+
+            // 保持卡片原有的自适应生长属性
+            if (parent instanceof VBox) VBox.setVgrow(wrapper, VBox.getVgrow(card));
+            if (parent instanceof HBox) HBox.setHgrow(wrapper, HBox.getHgrow(card));
+
+            // ============== 1. 底层：霓虹灯管发射器 (承载多段雾化光晕) ==============
+            Region neonTube = new Region();
+            neonTube.setMouseTransparent(true);
+            neonTube.prefWidthProperty().bind(card.widthProperty());
+            neonTube.prefHeightProperty().bind(card.heightProperty());
+            neonTube.maxWidthProperty().bind(card.widthProperty());
+            neonTube.maxHeightProperty().bind(card.heightProperty());
+
+            themeColorProperty.addListener((obs, oldC, newC) -> {
+                String hex = String.format("#%02X%02X%02X",
+                        (int)(newC.getRed() * 255), (int)(newC.getGreen() * 255), (int)(newC.getBlue() * 255));
+                neonTube.setStyle("-fx-border-color: " + hex + "; -fx-border-width: 4px; -fx-border-radius: 8px; -fx-background-color: transparent;");
+            });
+            String initHex = String.format("#%02X%02X%02X",
+                    (int)(themeColorProperty.get().getRed() * 255), (int)(themeColorProperty.get().getGreen() * 255), (int)(themeColorProperty.get().getBlue() * 255));
+            neonTube.setStyle("-fx-border-color: " + initHex + "; -fx-border-width: 4px; -fx-border-radius: 8px; -fx-background-color: transparent;");
+
+            // 多段不对称 DropShadow 链
+            DropShadow ds1 = new DropShadow(); ds1.setBlurType(BlurType.GAUSSIAN);
+            DropShadow ds2 = new DropShadow(); ds2.setBlurType(BlurType.GAUSSIAN); ds2.setInput(ds1);
+            DropShadow ds3 = new DropShadow(); ds3.setBlurType(BlurType.GAUSSIAN); ds3.setInput(ds2);
+            DropShadow ds4 = new DropShadow(); ds4.setBlurType(BlurType.GAUSSIAN); ds4.setInput(ds3);
+            neonTube.setEffect(ds4);
+
+            // ============== 2. 顶层：静息亮光带核心 (锋利的边缘静态亮线) ==============
+            Rectangle brightCore = new Rectangle();
+            brightCore.setMouseTransparent(true);
+            brightCore.widthProperty().bind(card.widthProperty());
+            brightCore.heightProperty().bind(card.heightProperty());
+            brightCore.setArcWidth(16); // 对应 8px 的 border-radius (直径16)
+            brightCore.setArcHeight(16);
+            brightCore.setFill(Color.TRANSPARENT);
+            brightCore.setStrokeWidth(1.5);
+            brightCore.setStrokeType(StrokeType.INSIDE); // 画在内侧避免模糊
+            brightCore.strokeProperty().bind(themeColorProperty);
+            brightCore.setEffect(new Glow(0.6)); // 基础发光
+
+            // ============== 3. 顶层：流动高光带 (绕着框跑动的流光) ==============
+            Rectangle runningLight = new Rectangle();
+            runningLight.setMouseTransparent(true);
+            runningLight.widthProperty().bind(card.widthProperty());
+            runningLight.heightProperty().bind(card.heightProperty());
+            runningLight.setArcWidth(16);
+            runningLight.setArcHeight(16);
+            runningLight.setFill(Color.TRANSPARENT);
+            runningLight.setStrokeWidth(3.0); // 比核心稍宽，显得更有能量
+            runningLight.setStrokeType(StrokeType.INSIDE);
+            runningLight.strokeProperty().bind(themeColorProperty);
+            // 虚线设置：一段长为150的光带，配上一段长为3000的空白(确保一次只跑一小段)
+            runningLight.getStrokeDashArray().addAll(150.0, 3000.0);
+            runningLight.setEffect(new Glow(1.0)); // 最强泛光
+
+            // 替换节点
+            parent.getChildren().set(index, wrapper);
+
+            // 【关键层级】：光晕底座最下 -> 实际卡片在中间 -> 静态亮框在顶层 -> 流动流光在最上层
+            wrapper.getChildren().addAll(neonTube, card, brightCore, runningLight);
+
+            // 启动异步不对称光晕系统 + 亮光带动画
+            playAsymmetricAuraAnimation(new DropShadow[]{ds1, ds2, ds3, ds4}, neonTube, brightCore, runningLight, themeColorProperty);
+        });
+    }
+
+    // ==========================================
+    // 异步多段不对称光晕系统 (随机扩散) + 亮带流光控制
+    // ==========================================
+    private static void playAsymmetricAuraAnimation(DropShadow[] shadows, Region neonTube, Rectangle brightCore, Rectangle runningLight, ObjectProperty<Color> themeColor) {
+        // 灯管实体本身的基础呼吸
+        Timeline tubeTimeline = new Timeline(
+                new KeyFrame(Duration.ZERO, new KeyValue(neonTube.opacityProperty(), 0.5, Interpolator.EASE_BOTH)),
+                new KeyFrame(Duration.millis(2000), new KeyValue(neonTube.opacityProperty(), 1.0, Interpolator.EASE_BOTH))
+        );
+        tubeTimeline.setAutoReverse(true);
+        tubeTimeline.setCycleCount(Timeline.INDEFINITE);
+        tubeTimeline.play();
+
+        // 【新增】静态亮光框的高频呼吸 (电涌感)
+        Timeline coreTimeline = new Timeline(
+                new KeyFrame(Duration.ZERO, new KeyValue(brightCore.opacityProperty(), 0.4, Interpolator.EASE_BOTH)),
+                new KeyFrame(Duration.millis(1200), new KeyValue(brightCore.opacityProperty(), 0.9, Interpolator.EASE_BOTH))
+        );
+        coreTimeline.setAutoReverse(true);
+        coreTimeline.setCycleCount(Timeline.INDEFINITE);
+        coreTimeline.play();
+
+        // 【新增】跑马灯流光的无限循环跑动
+        double totalLength = runningLight.getStrokeDashArray().get(0) + runningLight.getStrokeDashArray().get(1); // 150 + 3000 = 3150
+        Timeline runningTimeline = new Timeline(
+                new KeyFrame(Duration.ZERO, new KeyValue(runningLight.strokeDashOffsetProperty(), 0)),
+                new KeyFrame(Duration.millis(3500), new KeyValue(runningLight.strokeDashOffsetProperty(), -totalLength, Interpolator.LINEAR))
+        );
+        runningTimeline.setCycleCount(Timeline.INDEFINITE);
+        runningTimeline.play();
+
+        // 4个基础发射方向（左上、右上、左下、右下）用于不对称阴影
+        double[][] baseOffsets = {
+                {-20, -20},
+                { 20, -20},
+                {-20,  20},
+                { 20,  20}
+        };
+
+        for (int i = 0; i < shadows.length; i++) {
+            startIndependentShadowAnimation(shadows[i], themeColor, baseOffsets[i][0], baseOffsets[i][1]);
+        }
+    }
+
+    private static void startIndependentShadowAnimation(DropShadow ds, ObjectProperty<Color> themeColor, double baseX, double baseY) {
+        DoubleProperty opacityProp = new SimpleDoubleProperty(0.5);
+
+        ds.colorProperty().bind(javafx.beans.binding.Bindings.createObjectBinding(() -> {
+            Color c = themeColor.get();
+            if (c == null) return Color.TRANSPARENT;
+            double op = Math.max(0, Math.min(1.0, opacityProp.get()));
+            return new Color(c.getRed(), c.getGreen(), c.getBlue(), op);
+        }, themeColor, opacityProp));
+
+        animateShadowRandomly(ds, opacityProp, baseX, baseY);
+    }
+
+    private static void animateShadowRandomly(DropShadow ds, DoubleProperty opacityProp, double baseX, double baseY) {
+        double duration = 1000 + Math.random() * 2000;
+        double targetRadius = 25 + Math.random() * 60;
+        double targetSpread = 0.05 + Math.random() * 0.35;
+        double targetX = baseX * (0.2 + Math.random() * 1.5);
+        double targetY = baseY * (0.2 + Math.random() * 1.5);
+        double targetOpacity = 0.3 + Math.random() * 0.7;
+
+        Timeline timeline = new Timeline(
+                new KeyFrame(Duration.millis(duration),
+                        new KeyValue(ds.radiusProperty(), targetRadius, Interpolator.EASE_BOTH),
+                        new KeyValue(ds.spreadProperty(), targetSpread, Interpolator.EASE_BOTH),
+                        new KeyValue(ds.offsetXProperty(), targetX, Interpolator.EASE_BOTH),
+                        new KeyValue(ds.offsetYProperty(), targetY, Interpolator.EASE_BOTH),
+                        new KeyValue(opacityProp, targetOpacity, Interpolator.EASE_BOTH)
+                )
+        );
+
+        timeline.setOnFinished(e -> animateShadowRandomly(ds, opacityProp, baseX, baseY));
+        timeline.play();
     }
 }
