@@ -66,13 +66,11 @@ public class HubController {
 
         refreshMyCompetitionsList();
 
-        // ★ 只有从 Login 界面过来才播放胶囊动画
         if (isFromLogin) {
             toastLabel.setText("Welcome back " + username);
             Platform.runLater(() -> AnimationUtils.playWelcomeToast(toastCapsule));
         }
     }
-// 在 HubController.java 中修改：
 
     @FXML
     private void selectHostMode() {
@@ -103,10 +101,9 @@ public class HubController {
             hostPane.setVisible(false); hostPane.setManaged(false);
             joinPane.setVisible(true); joinPane.setManaged(true);
 
-            statusLabel.setStyle("-fx-text-fill: #A1A1AA;"); // 改用新的暗色
+            statusLabel.setStyle("-fx-text-fill: #A1A1AA;");
             statusLabel.setText("Searching for local competitions via UDP...");
 
-            // 【关键修复】
             joinModeButton.getStyleClass().add("mode-button-active");
             hostModeButton.getStyleClass().remove("mode-button-active");
 

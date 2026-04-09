@@ -11,8 +11,10 @@ import javafx.geometry.Pos;
 import javafx.scene.CacheHint;
 import javafx.scene.Group;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.effect.*;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.*;
 import javafx.scene.shape.Circle;
@@ -38,6 +40,52 @@ public class AnimationUtils {
         timeline.play();
     }
 
+    private static ButtonBase currentlyPressedButton = null;
+
+    /**
+     * 为整个 Scene 启用全局按钮缩放动效
+     */
+    public static void enableGlobalButtonAnimations(Scene scene) {
+        // 拦截鼠标按下事件
+        scene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+            if (e.getTarget() instanceof Node) {
+                ButtonBase btn = findButtonParent((Node) e.getTarget());
+                if (btn != null) {
+                    currentlyPressedButton = btn;
+                    ScaleTransition st = new ScaleTransition(Duration.millis(50), btn);
+                    st.setToX(0.96);
+                    st.setToY(0.96);
+                    st.play();
+                }
+            }
+        });
+
+        // 拦截鼠标松开事件
+        scene.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> {
+            if (currentlyPressedButton != null) {
+                ScaleTransition st = new ScaleTransition(Duration.millis(120), currentlyPressedButton);
+                st.setToX(1.0);
+                st.setToY(1.0);
+                st.setInterpolator(Interpolator.EASE_OUT);
+                st.play();
+                currentlyPressedButton = null; // 重置
+            }
+        });
+    }
+
+    /**
+     * 向上遍历节点树，寻找触发事件的真实按钮
+     * （因为用户可能点到了按钮里面的图标或文字，而不是按钮本身）
+     */
+    private static ButtonBase findButtonParent(Node node) {
+        while (node != null) {
+            if (node instanceof ButtonBase) {
+                return (ButtonBase) node;
+            }
+            node = node.getParent();
+        }
+        return null;
+    }
     public static void playSmoothEntrance(Node node) {
         if (node == null) return;
         node.setOpacity(0);
@@ -131,22 +179,6 @@ public class AnimationUtils {
         tt.setAutoReverse(true);
         tt.setOnFinished(e -> node.setTranslateX(0));
         tt.playFromStart();
-    }
-
-    public static void attachSolidPressAnimation(Node button) {
-        button.setOnMousePressed(e -> {
-            ScaleTransition st = new ScaleTransition(Duration.millis(50), button);
-            st.setToX(0.96);
-            st.setToY(0.96);
-            st.play();
-        });
-        button.setOnMouseReleased(e -> {
-            ScaleTransition st = new ScaleTransition(Duration.millis(120), button);
-            st.setToX(1.0);
-            st.setToY(1.0);
-            st.setInterpolator(Interpolator.EASE_OUT);
-            st.play();
-        });
     }
 
     public static void playLoginSuccessTransition(StackPane root, Node cardNode, Stage stage, String username, Runnable onFinished) {
@@ -481,7 +513,6 @@ public class AnimationUtils {
         runningTimeline.setCycleCount(Timeline.INDEFINITE);
         runningTimeline.play();
 
-        // 4个基础发射方向（左上、右上、左下、右下）用于不对称阴影
         double[][] baseOffsets = {
                 {-20, -20},
                 { 20, -20},

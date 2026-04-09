@@ -56,6 +56,7 @@ public class MainApplication extends Application {
         } else {
             log.warn("Could not find 'styles/style.css'. Check your resource folder structure.");
         }
+        AnimationUtils.enableGlobalButtonAnimations(scene);
     }
 
     private void setStageIcon(Stage stage) {
@@ -113,6 +114,7 @@ public class MainApplication extends Application {
         this.primaryStage = primaryStage;
         primaryStage.setTitle("FTC Scouting Pro");
         primaryStage.setOnCloseRequest(event -> {
+            primaryStage.hide();
             // 彻底关闭网络服务释放端口
             if (NetworkService.getInstance() != null) {
                 NetworkService.getInstance().stop();

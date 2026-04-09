@@ -43,14 +43,6 @@ public class LoginController {
         usernameField.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ENTER) passwordField.requestFocus();
         });
-
-        // 挂载高级空间计算按钮光效
-        if (loginButton != null) {
-            AnimationUtils.attachSolidPressAnimation(loginButton);
-        }
-        if (createUserButton != null) {
-            AnimationUtils.attachSolidPressAnimation(createUserButton);
-        }
     }
 
     private void handleLoginWrapper() {

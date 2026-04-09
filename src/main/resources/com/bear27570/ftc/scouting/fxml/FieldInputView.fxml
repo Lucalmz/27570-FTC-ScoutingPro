@@ -23,14 +23,14 @@
 
             <VBox fx:id="teamSelectBox" spacing="15" alignment="CENTER" styleClass="panel-inner">
                 <Label text="Active Team" styleClass="title-4"/>
-                <ToggleButton fx:id="team1Btn" text="Team 1" prefWidth="180" selected="true" styleClass="accent"/>
-                <ToggleButton fx:id="team2Btn" text="Team 2" prefWidth="180" styleClass="danger"/>
+                <ToggleButton fx:id="team1Btn" text="Team 1" prefWidth="180" selected="true" styleClass="toggle-green"/>
+                <ToggleButton fx:id="team2Btn" text="Team 2" prefWidth="180" styleClass="toggle-green"/>
             </VBox>
 
             <VBox spacing="15" alignment="CENTER" styleClass="panel-inner">
                 <Label text="Input Mode" styleClass="title-4"/>
-                <ToggleButton fx:id="addModeBtn" text="Add (+)" prefWidth="180" selected="true" styleClass="success"/>
-                <ToggleButton fx:id="removeModeBtn" text="Remove (-)" prefWidth="180"/>
+                <ToggleButton fx:id="addModeBtn" text="Add (+)" prefWidth="180" selected="true" styleClass="toggle-green"/>
+                <ToggleButton fx:id="removeModeBtn" text="Remove (-)" prefWidth="180" styleClass="toggle-green"/>
             </VBox>
 
             <VBox spacing="10" alignment="CENTER" styleClass="panel-inner">
@@ -51,8 +51,8 @@
                 <graphic><FontIcon iconLiteral="fth-trash-2" iconSize="14" iconColor="#F87171"/></graphic>
             </Button>
 
-            <Button onAction="#handleConfirm" text="Confirm &amp; Save" prefWidth="200" styleClass="accent" prefHeight="55">
-                <graphic><FontIcon iconLiteral="fth-check-circle" iconSize="18" iconColor="#18181B"/></graphic>
+            <Button onAction="#handleConfirm" text="Confirm &amp; Save" prefWidth="200" styleClass="success" prefHeight="55">
+                <graphic><FontIcon iconLiteral="fth-check-circle" iconSize="18" iconColor="#34D399"/></graphic>
             </Button>
         </VBox>
     </right>

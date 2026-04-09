@@ -417,7 +417,27 @@
     -fx-border-color: transparent !important;
     -fx-text-fill: #FFFFFF !important;
 }
+/* 绿方/通用绿色悬浮和选中状态 */
+.toggle-green {
+    -fx-background-color: #000000;
+    -fx-text-fill: #A1A1AA;
+    -fx-border-color: #3F3F46;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+}
 
+.toggle-green:hover {
+    -fx-border-color: #34D399 !important;
+    -fx-text-fill: #34D399 !important;
+}
+
+.toggle-green:selected {
+    -fx-background-color: #34D399 !important;
+    -fx-border-color: transparent !important;
+    -fx-text-fill: #000000 !important; /* 绿色背景配黑色文字对比度更好 */
+}
 /* 蓝方悬浮和选中状态 */
 .toggle-blue:hover {
     -fx-border-color: #0A84FF !important;

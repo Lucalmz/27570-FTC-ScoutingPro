@@ -100,11 +100,16 @@ public class NetworkService {
     Javalin hostServer;
     MulticastSocket multicastSocket;
     WebSocket webSocketClient;
+    Thread beaconThread;
 
     public synchronized void stop() {
         this.running = false;
         if (hostServer != null) { hostServer.stop(); hostServer = null; }
         if (multicastSocket != null) { multicastSocket.close(); multicastSocket = null; }
+        if(beaconThread != null){
+            beaconThread.interrupt();
+            beaconThread = null;
+        }
         if (webSocketClient != null) {
             try {
                 webSocketClient.sendClose(WebSocket.NORMAL_CLOSURE, "User left waiting room or logged out");
@@ -155,7 +160,6 @@ class HostManager {
                 } catch (Exception e) { ctx.status(400).result("Invalid Score"); }
             });
 
-            // 3. WebSocket 数据推送与等待室管道
             // 3. WebSocket 数据推送与等待室管道
             config.routes.ws("/ws/updates", ws -> {
                 ws.onConnect(ctx -> {
@@ -226,7 +230,7 @@ class ClientManager {
                     NetworkPacket respPacket = core.gson.fromJson(response.body(), NetworkPacket.class);
                     Platform.runLater(() -> onPacketReceived.accept(respPacket));
 
-                    // 💥 无论主机是否同意，只要 HTTP 连通了，立马建立 WebSocket 进入等待室蹲守！
+                    // 无论主机是否同意，只要 HTTP 连通了，立马建立 WebSocket 进入等待室蹲守
                     String wsUrl = "ws://" + hostAddress + ":" + NetworkService.HTTP_PORT + "/ws/updates?user=" + myUsername;
                     return httpClient.newWebSocketBuilder()
                             .buildAsync(URI.create(wsUrl), new WebSocket.Listener() {
@@ -236,7 +240,6 @@ class ClientManager {
                                     partialMsg.append(data);
                                     if (last) {
                                         try {
-                                            // 只要从机收到了主机通过 WS 砸过来的包，立刻传给外层 UI 触发跳转
                                             NetworkPacket p = core.gson.fromJson(partialMsg.toString(), NetworkPacket.class);
                                             Platform.runLater(() -> onPacketReceived.accept(p));
                                         } catch (Exception e) { e.printStackTrace(); }
@@ -246,7 +249,7 @@ class ClientManager {
                                 }
                             }).thenApply(ws -> {
                                 core.webSocketClient = ws;
-                                return respPacket.isApproved(); // 向上层返回 HTTP 阶段获取的初始状态
+                                return respPacket.isApproved();
                             });
                 });
     }
@@ -274,7 +277,7 @@ class UdpManager {
     UdpManager(NetworkService core) { this.core = core; }
 
     void startBeacon(Competition comp) {
-        new Thread(() -> {
+        core.beaconThread = new Thread(() -> {
             try (MulticastSocket beacon = new MulticastSocket()) {
                 beacon.setTimeToLive(1);
                 InetAddress group = InetAddress.getByName(NetworkService.MULTICAST_IP);
@@ -295,7 +298,8 @@ class UdpManager {
                     } catch (Exception e) { if (core.running) e.printStackTrace(); }
                 }
             } catch (Exception e) { e.printStackTrace(); }
-        }, "Multicast-Beacon-Thread").start();
+        }, "Multicast-Beacon-Thread");
+        core.beaconThread.start();
     }
 
     void startDiscovery(ObservableList<Competition> discoveredCompetitions) {
