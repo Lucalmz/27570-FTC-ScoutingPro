@@ -220,7 +220,7 @@ public class AnimationUtils {
                     scrollTarget[0] = finalVBar.getValue();
                 }
 
-                double step = finalVBar.getUnitIncrement() * (Math.abs(e.getDeltaY()) / 15.0)* 0.1;
+                double step = finalVBar.getUnitIncrement() * (Math.abs(e.getDeltaY()) / 15.0)* 0.02;
                 if (step <= 0) step = 1.0;
 
                 scrollTarget[0] += -Math.signum(e.getDeltaY()) * step;
