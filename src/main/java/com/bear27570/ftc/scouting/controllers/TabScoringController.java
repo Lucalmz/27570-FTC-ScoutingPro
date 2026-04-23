@@ -76,6 +76,7 @@ public class TabScoringController {
         statusLabel.styleProperty().bind(Bindings.concat("-fx-text-fill: ", viewModel.statusColorProperty(), ";"));
         errorLabel.textProperty().bind(viewModel.errorTextProperty());
     }
+
     private void animateThemeColor(Color targetColor) {
         Timeline timeline = new Timeline(
                 new KeyFrame(Duration.millis(350),
@@ -84,6 +85,7 @@ public class TabScoringController {
         );
         timeline.play();
     }
+
     public void setDependencies(MainController mainController, MatchDataService matchDataService, Competition competition, String username, boolean isHost) {
         this.mainController = mainController;
         this.matchDataService = matchDataService;
@@ -229,7 +231,8 @@ public class TabScoringController {
         team2IgnoreCheck.setDisable(false); team2IgnoreCheck.setSelected(s.isTeam2Ignored());
         team1BrokenCheck.setSelected(s.isTeam1Broken()); team2BrokenCheck.setSelected(s.isTeam2Broken());
 
-        currentClickLocations = ""; viewModel.setError("Editing record loaded.");
+        currentClickLocations = s.getClickLocations() != null ? s.getClickLocations() : "";
+        viewModel.setError("Editing record loaded.");
     }
 
     private void initToggleGroups() {

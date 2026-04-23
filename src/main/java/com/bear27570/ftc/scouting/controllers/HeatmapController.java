@@ -186,7 +186,6 @@ public class HeatmapController {
             int mHits = 0, mNearShots = 0, mFarShots = 0;
             List<Long> matchTimestamps = new ArrayList<>();
 
-            // 🌟 修复：严谨拦截热力图矩阵的崩溃源
             for (String p : locs.split(";")) {
                 if (p == null || p.trim().isEmpty()) continue;
 
@@ -215,7 +214,13 @@ public class HeatmapController {
 
                         if (ts > 0) matchTimestamps.add(ts);
 
-                        if (isHit) { hitPoints.add(new Point(x, y)); mHits++; }
+                        if (isHit) {
+                            double scaleX = 500.0 / 650.0;
+                            double scaleY = 500.0 / 650.0;
+                            hitPoints.add(new Point(x * scaleX, y * scaleY));
+                            mHits++;
+                        }
+
                         if (y < ZONE_DIVIDER_Y) { mNearShots++; if (isHit) globalNearHits++; }
                         else { mFarShots++; if (isHit) globalFarHits++; }
                     }
@@ -346,7 +351,9 @@ public class HeatmapController {
 
         gc.clearRect(0, 0, w, h);
         gc.setStroke(Color.web("#FFFFFF", 0.3));
-        gc.strokeLine(0, ZONE_DIVIDER_Y, w, ZONE_DIVIDER_Y);
+
+        double scaledDividerY = ZONE_DIVIDER_Y * (h / 650.0);
+        gc.strokeLine(0, scaledDividerY, w, scaledDividerY);
 
         if (points.isEmpty()) return;
 
