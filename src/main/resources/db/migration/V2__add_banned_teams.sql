@@ -1,0 +1,1 @@
+ALTER TABLE competitions ADD COLUMN bannedTeams VARCHAR(2000) DEFAULT '';

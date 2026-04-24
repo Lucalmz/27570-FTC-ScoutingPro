@@ -11,6 +11,7 @@ public class Competition implements Serializable {
     private String creatorUsername;
     private String ratingFormula;
     private String hostAddress;
+    private String bannedTeams = "";
 
     private int eventSeason;
     private String eventCode;
@@ -38,6 +39,7 @@ public class Competition implements Serializable {
     public int getEventSeason() { return eventSeason; }
     public String getEventCode() { return eventCode; }
     public String getOfficialEventName() { return officialEventName; }
+    public String getBannedTeams() { return bannedTeams; }
 
     // --- Setters (3. 补全之前因为 final 缺失的 Setters) ---
     public void setName(String name) { this.name = name; }
@@ -47,6 +49,18 @@ public class Competition implements Serializable {
     public void setEventSeason(int eventSeason) { this.eventSeason = eventSeason; }
     public void setEventCode(String eventCode) { this.eventCode = eventCode; }
     public void setOfficialEventName(String officialEventName) { this.officialEventName = officialEventName; }
+    public void setBannedTeams(String bannedTeams) { this.bannedTeams = bannedTeams; }
+
+    public boolean isTeamBanned(int teamNumber) {
+        if (bannedTeams == null || bannedTeams.isEmpty()) return false;
+        String[] teams = bannedTeams.split(",");
+        for (String t : teams) {
+            if (t.trim().equals(String.valueOf(teamNumber))) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     @Override
     public String toString() {

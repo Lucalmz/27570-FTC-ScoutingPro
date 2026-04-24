@@ -50,6 +50,7 @@ public class MainController {
     @FXML private TabFtcScoutController tabFtcScoutController;
     @FXML private TabRankingsController tabRankingsController;
     @FXML private TabHistoryController tabHistoryController;
+    @FXML private Button manageBannedTeamsBtn;
 
     private MainApplication mainApp;
     private Competition currentCompetition;
@@ -115,6 +116,9 @@ public class MainController {
         if (isHost) {
             manageMembersBtn.setVisible(true);
             manageMembersBtn.setManaged(true);
+            manageBannedTeamsBtn.setVisible(true);
+            manageBannedTeamsBtn.setManaged(true);
+            NetworkService.getInstance().setCurrentBannedTeams(currentCompetition.getBannedTeams());
             startAsHost();
         } else {
             if (this.userService != null && currentCompetition.getCreatorUsername() != null) {
@@ -124,6 +128,8 @@ public class MainController {
 
             manageMembersBtn.setVisible(false);
             manageMembersBtn.setManaged(false);
+            manageBannedTeamsBtn.setVisible(false);
+            manageBannedTeamsBtn.setManaged(false);
 
             Platform.runLater(() -> mainTabPane.getTabs().remove(ftcScoutTab));
             startAsClient();
@@ -189,12 +195,15 @@ public class MainController {
 
         sharedViewModel.updateData(fullHistory, newRankings, reliabilities);
         tabRankingsController.updateCompetition(currentCompetition);
+
+        tabScoringController.updateCompetition(currentCompetition);
     }
 
     private void broadcastUpdate() {
         List<ScoreEntry> fullHistory = matchDataService.getHistory(currentCompetition.getName());
         List<TeamRanking> newRankings = rankingService.calculateRankings(currentCompetition.getName());
-        NetworkService.getInstance().broadcastUpdateToClients(new NetworkPacket(fullHistory, newRankings, officialEventName));
+        NetworkService.getInstance().setCurrentBannedTeams(currentCompetition.getBannedTeams()); // 更新缓存
+        NetworkService.getInstance().broadcastUpdateToClients(new NetworkPacket(fullHistory, newRankings, officialEventName, currentCompetition.getBannedTeams()));
     }
 
     private void handleScoreReceivedFromClient(ScoreEntry scoreEntry) {
@@ -208,7 +217,10 @@ public class MainController {
             if (packet.getOfficialEventName() != null && !packet.getOfficialEventName().isEmpty()) {
                 FxThread.run(() -> updateOfficialEventName(packet.getOfficialEventName()));
             }
-
+            if (packet.getBannedTeams() != null && !packet.getBannedTeams().isEmpty()) {
+                currentCompetition.setBannedTeams(packet.getBannedTeams());
+                competitionRepository.updateBannedTeams(currentCompetition.getName(), packet.getBannedTeams());
+            }
             matchDataService.syncWithHostData(currentCompetition.getName(), packet.getScoreHistory());
             List<ScoreEntry> pending = matchDataService.getPendingExports(currentCompetition.getName());
 
@@ -489,6 +501,89 @@ public class MainController {
             writer.write(String.format("%d,%d,%s,%d,%s,%s,%s,%s,%s,%s,%s", rank++, r.getTeamNumber(), r.getRatingFormatted(), r.getMatchesPlayed(), r.getAvgAutoArtifactsFormatted(), r.getAvgTeleopArtifactsFormatted(), r.getAccuracyFormatted(), r.getAvgPenaltyCommittedFormatted(), r.getAvgOpponentPenaltyFormatted(), r.getL2Capable(), r.getCanSequence()));
             writer.newLine();
         }
+    }
+    @FXML
+    private void handleManageBannedTeams() {
+        Stage dialog = new Stage();
+        dialog.initOwner(competitionNameLabel.getScene().getWindow());
+        dialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+        dialog.setTitle("Manage Banned Teams");
+
+        VBox vbox = new VBox(20);
+        vbox.setPadding(new javafx.geometry.Insets(30));
+        vbox.getStyleClass().add("mac-card");
+
+        Label title = new Label("Banned Teams List");
+        title.getStyleClass().add("title-3");
+
+        // 列表视图
+        ListView<String> listView = new ListView<>();
+        listView.setPrefHeight(250);
+        if (currentCompetition.getBannedTeams() != null && !currentCompetition.getBannedTeams().trim().isEmpty()) {
+            listView.getItems().addAll(currentCompetition.getBannedTeams().split(","));
+        }
+
+        // 添加操作区
+        HBox inputBox = new HBox(10);
+        inputBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        TextField teamInput = new TextField();
+        teamInput.setPromptText("Enter Team #");
+        Button addBtn = new Button("Add");
+        addBtn.getStyleClass().addAll("button", "success");
+        inputBox.getChildren().addAll(teamInput, addBtn);
+
+        // 移除按钮 (选中时才可用)
+        Button removeBtn = new Button("Remove");
+        removeBtn.getStyleClass().addAll("button", "danger");
+        removeBtn.setDisable(true);
+        listView.getSelectionModel().selectedItemProperty().addListener((obs, o, n) -> removeBtn.setDisable(n == null));
+
+        // 按钮事件逻辑
+        addBtn.setOnAction(e -> {
+            String t = teamInput.getText().trim();
+            if (!t.isEmpty() && !listView.getItems().contains(t)) {
+                listView.getItems().add(t);
+                teamInput.clear();
+            }
+        });
+
+        // 绑定回车快捷添加
+        teamInput.setOnKeyPressed(e -> {
+            if (e.getCode() == javafx.scene.input.KeyCode.ENTER) addBtn.fire();
+        });
+
+        removeBtn.setOnAction(e -> {
+            String sel = listView.getSelectionModel().getSelectedItem();
+            if (sel != null) listView.getItems().remove(sel);
+        });
+
+        // 底部保存区
+        HBox actionBox = new HBox(15);
+        actionBox.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
+        Button saveBtn = new Button("Save & Sync");
+        saveBtn.getStyleClass().add("accent");
+
+        saveBtn.setOnAction(e -> {
+            // 将 List 重新拼装成底层需要的逗号分隔字符串
+            String newBanned = String.join(",", listView.getItems());
+            currentCompetition.setBannedTeams(newBanned);
+            competitionRepository.updateBannedTeams(currentCompetition.getName(), newBanned);
+
+            triggerDataRefreshAndBroadcast(); // 自动通过 WebSocket 把新列表推给所有从机
+            showToast("Ban list updated!", true);
+            dialog.close();
+        });
+
+        actionBox.getChildren().addAll(removeBtn, saveBtn);
+        vbox.getChildren().addAll(title, listView, inputBox, actionBox);
+
+        Scene scene = new Scene(vbox, 400, 500);
+        try {
+            scene.getStylesheets().add(getClass().getResource("/com/bear27570/ftc/scouting/styles/style.css").toExternalForm());
+        } catch (Exception ignored) {}
+
+        dialog.setScene(scene);
+        dialog.showAndWait();
     }
 
     @FXML private void handleManageMembers() throws IOException { mainApp.showCoordinatorView(currentCompetition); }

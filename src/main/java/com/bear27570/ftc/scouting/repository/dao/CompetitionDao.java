@@ -1,3 +1,4 @@
+// File: src/main/java/com/bear27570/ftc/scouting/repository/dao/CompetitionDao.java
 package com.bear27570.ftc.scouting.repository.dao;
 
 import com.bear27570.ftc.scouting.models.Competition;
@@ -18,12 +19,15 @@ public interface CompetitionDao {
     @SqlQuery("SELECT COUNT(*) FROM competitions WHERE name = :name")
     int checkExists(@Bind("name") String name);
 
-    @SqlUpdate("INSERT INTO competitions(name, creatorUsername, ratingFormula, eventSeason, eventCode, officialEventName) VALUES(:name, :creator, :formula, :season, :code, :officialName)")
-    void insert(@Bind("name") String name, @Bind("creator") String creator, @Bind("formula") String formula, @Bind("season") int season, @Bind("code") String code, @Bind("officialName") String officialName);
+    @SqlUpdate("INSERT INTO competitions(name, creatorUsername, ratingFormula, eventSeason, eventCode, officialEventName, bannedTeams) VALUES(:name, :creator, :formula, :season, :code, :officialName, :bannedTeams)")
+    void insert(@Bind("name") String name, @Bind("creator") String creator, @Bind("formula") String formula, @Bind("season") int season, @Bind("code") String code, @Bind("officialName") String officialName, @Bind("bannedTeams") String bannedTeams);
 
     @SqlUpdate("UPDATE competitions SET ratingFormula = :formula WHERE name = :name")
     void updateFormula(@Bind("name") String name, @Bind("formula") String formula);
 
     @SqlUpdate("UPDATE competitions SET eventSeason = :season, eventCode = :code, officialEventName = :officialName WHERE name = :name")
     void updateEventInfo(@Bind("name") String name, @Bind("season") int season, @Bind("code") String code, @Bind("officialName") String officialName);
+
+    @SqlUpdate("UPDATE competitions SET bannedTeams = :bannedTeams WHERE name = :name")
+    void updateBannedTeams(@Bind("name") String name, @Bind("bannedTeams") String bannedTeams);
 }

@@ -58,8 +58,8 @@ public class TabScoringController {
 
         team1IgnoreCheck.setDisable(true);
         team2IgnoreCheck.setDisable(true);
-        team1Field.focusedProperty().addListener((obs, o, n) -> { if (!n) updateWeakStatus(team1Field.getText(), team1IgnoreCheck); });
-        team2Field.focusedProperty().addListener((obs, o, n) -> { if (!n) updateWeakStatus(team2Field.getText(), team2IgnoreCheck); });
+        team1Field.focusedProperty().addListener((obs, o, n) -> { if (!n) validateTeamInput(team1Field, team1IgnoreCheck); });
+        team2Field.focusedProperty().addListener((obs, o, n) -> { if (!n) validateTeamInput(team2Field, team2IgnoreCheck); });
         AnimationUtils.attachCyberpunkGlow(scoringFormVBox, themeColor);
 
         // 监听红蓝联盟 ToggleGroup 的变化
@@ -77,6 +77,29 @@ public class TabScoringController {
         errorLabel.textProperty().bind(viewModel.errorTextProperty());
     }
 
+    private void validateTeamInput(TextField field, CheckBox weakCheck) {
+        String txt = field.getText().trim();
+        if (txt.isEmpty()) return;
+
+        // 1. 检查是否为 Weak 队伍
+        updateWeakStatus(txt, weakCheck);
+
+        // 2. 检查是否为 Banned 队伍
+        try {
+            int teamNum = Integer.parseInt(txt);
+            if (currentCompetition != null && currentCompetition.isTeamBanned(teamNum)) {
+                // 触发红框和红色警告字
+                showFieldError(field, "🚫 Warning: Team " + teamNum + " is BANNED!");
+                AnimationUtils.playShakeAnimation(field);
+            } else {
+                // 如果队伍合法，且当前正显示 Ban 警告，则清除错误状态
+                if (errorLabel.getText().contains("BANNED")) {
+                    field.setStyle("");
+                    viewModel.clear();
+                }
+            }
+        } catch (NumberFormatException ignored) {}
+    }
     private void animateThemeColor(Color targetColor) {
         Timeline timeline = new Timeline(
                 new KeyFrame(Duration.millis(350),
@@ -127,6 +150,45 @@ public class TabScoringController {
             int team1 = parseField(team1Field, "Valid Team 1 required.");
             int team2 = isSingle ? 0 : parseField(team2Field, "Valid Team 2 required.");
             if (!isSingle && team1 == team2) { showFieldError(team2Field, "Teams cannot be same."); throw new RuntimeException("VALIDATION_FAILED"); }
+
+            boolean t1Banned = currentCompetition.isTeamBanned(team1);
+            boolean t2Banned = !isSingle && currentCompetition.isTeamBanned(team2);
+
+            if (t1Banned || t2Banned) {
+                String bannedTeamStr = t1Banned ? String.valueOf(team1) : String.valueOf(team2);
+                if (t1Banned && t2Banned) bannedTeamStr = team1 + " & " + team2;
+
+                Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                alert.setTitle("Banned Team Detected");
+                alert.setHeaderText("Team " + bannedTeamStr + " is Banned!");
+                alert.setContentText("This team's data will NOT be recorded. \n\nDo you want to DISCARD this entry? \n• 'Yes' to throw it away and clear the form. \n• 'No' to go back and fix the team number.");
+
+                try {
+                    alert.getDialogPane().getStylesheets().add(getClass().getResource("/com/bear27570/ftc/scouting/styles/style.css").toExternalForm());
+                    alert.getDialogPane().getStyleClass().add("mac-card");
+                } catch (Exception ignored) {}
+
+                ButtonType btnYes = new ButtonType("Yes (Discard)", ButtonBar.ButtonData.YES);
+                ButtonType btnNo = new ButtonType("No (Edit)", ButtonBar.ButtonData.NO);
+                alert.getButtonTypes().setAll(btnYes, btnNo);
+
+                // 因为此方法是由按钮点击触发，处于 UI 线程，可以直接使用 showAndWait() 阻塞等待用户选择
+                alert.showAndWait().ifPresent(type -> {
+                    if (type == btnYes) {
+                        // 选择了“是”：直接丢弃，重置表单
+                        resetFormState();
+                        restoreSubmitState();
+                        viewModel.setStatus("Entry discarded (Banned Team).", "#FBBF24"); // 亮个黄灯提示丢弃成功
+                    } else {
+                        // 选择了“否”：标红填错的框，恢复按钮状态让用户继续编辑
+                        if (t1Banned) showFieldError(team1Field, "Please correct the team number.");
+                        if (t2Banned) showFieldError(team2Field, "Please correct the team number.");
+                        restoreSubmitState();
+                    }
+                });
+                return; // ⚠️ 拦截成功，直接退出整个提交流程
+            }
+            // ==========================================
 
             int t1Auto = parseField(t1AutoScoreField, "Team 1 Auto must be a number.");
             int t2Auto = isSingle ? 0 : parseField(t2AutoScoreField, "Team 2 Auto must be a number.");
@@ -296,5 +358,8 @@ public class TabScoringController {
     }
     private void setRowsByText(String t, ToggleButton r1, ToggleButton r2, ToggleButton r3) {
         r1.setSelected(t != null && t.contains("R1")); r2.setSelected(t != null && t.contains("R2")); r3.setSelected(t != null && t.contains("R3"));
+    }
+    public void updateCompetition(Competition competition) {
+        this.currentCompetition = competition;
     }
 }

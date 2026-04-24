@@ -1,31 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<?import javafx.geometry.Insets?>
+
+<?import javafx.geometry.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import org.kordamp.ikonli.javafx.FontIcon?>
+<?import org.kordamp.ikonli.javafx.*?>
 
-<StackPane stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.MainController">
+<StackPane stylesheets="@../styles/style.css" xmlns="http://javafx.com/javafx/17.0.12" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.bear27570.ftc.scouting.controllers.MainController">
 
-    <BorderPane styleClass="main-bg-pane" prefHeight="900.0" prefWidth="1440.0">
+    <BorderPane prefHeight="900.0" prefWidth="1440.0" styleClass="main-bg-pane">
         <top>
             <HBox alignment="CENTER_LEFT" spacing="20" styleClass="top-bar">
                 <padding><Insets bottom="20" left="40" right="40" top="20" /></padding>
                 <Label fx:id="competitionNameLabel" styleClass="title-3" text="Competition Name" />
                 <Region HBox.hgrow="ALWAYS" />
                 <Button fx:id="offlineSyncBtn" onAction="#handleOfflineSync" styleClass="warning" text="Offline Sync">
-                    <graphic><FontIcon iconLiteral="fth-refresh-cw" iconSize="14" iconColor="#FBBF24"/></graphic>
+                    <graphic><FontIcon iconColor="#FBBF24" iconLiteral="fth-refresh-cw" iconSize="14" /></graphic>
                 </Button>
                 <Button onAction="#handleExport" styleClass="button" text="Export CSV">
-                    <graphic><FontIcon iconLiteral="fth-download" iconSize="14"/></graphic>
+                    <graphic><FontIcon iconLiteral="fth-download" iconSize="14" /></graphic>
                 </Button>
-                <Button fx:id="manageMembersBtn" onAction="#handleManageMembers" styleClass="accent" text="Members" visible="false" managed="false">
-                    <graphic><FontIcon iconLiteral="fth-users" iconSize="14" iconColor="#18181B"/></graphic>
+
+                <Button fx:id="manageMembersBtn" managed="false" onAction="#handleManageMembers" styleClass="accent" text="Members" visible="false">
+                    <graphic><FontIcon iconColor="#18181B" iconLiteral="fth-users" iconSize="14" /></graphic>
                 </Button>
+
+                <Button fx:id="manageBannedTeamsBtn" managed="false" onAction="#handleManageBannedTeams" styleClass="danger" text="Ban Teams" visible="false">
+                    <graphic><FontIcon iconColor="#EF4444" iconLiteral="fth-slash" iconSize="14" /></graphic>
+                </Button>
+
                 <Button onAction="#handleAllianceAnalysis" text="Analysis">
-                    <graphic><FontIcon iconLiteral="fth-pie-chart" iconSize="14"/></graphic>
+                    <graphic><FontIcon iconLiteral="fth-pie-chart" iconSize="14" /></graphic>
                 </Button>
                 <Button onAction="#handleBackButton" text="Hub">
-                    <graphic><FontIcon iconLiteral="fth-arrow-left" iconSize="14"/></graphic>
+                    <graphic><FontIcon iconLiteral="fth-arrow-left" iconSize="14" /></graphic>
                 </Button>
             </HBox>
         </top>
@@ -35,22 +42,22 @@
                 <tabs>
                     <Tab text="Scoring">
                         <content>
-                            <fx:include fx:id="tabScoring" source="TabScoring.fxml"/>
+                            <fx:include fx:id="tabScoring" source="TabScoring.fxml" />
                         </content>
                     </Tab>
                     <Tab fx:id="ftcScoutTab" text="FTCScout Integrations">
                         <content>
-                            <fx:include fx:id="tabFtcScout" source="TabFtcScout.fxml"/>
+                            <fx:include fx:id="tabFtcScout" source="TabFtcScout.fxml" />
                         </content>
                     </Tab>
                     <Tab text="Team Rankings">
                         <content>
-                            <fx:include fx:id="tabRankings" source="TabRankings.fxml"/>
+                            <fx:include fx:id="tabRankings" source="TabRankings.fxml" />
                         </content>
                     </Tab>
                     <Tab text="Match History">
                         <content>
-                            <fx:include fx:id="tabHistory" source="TabHistory.fxml"/>
+                            <fx:include fx:id="tabHistory" source="TabHistory.fxml" />
                         </content>
                     </Tab>
                 </tabs>
@@ -58,10 +65,10 @@
         </center>
     </BorderPane>
 
-    <HBox fx:id="toastCapsule" alignment="CENTER" spacing="10" maxWidth="-Infinity" maxHeight="-Infinity" StackPane.alignment="TOP_CENTER" visible="false" styleClass="toast-capsule" translateY="-60">
-        <StackPane.margin><Insets top="20"/></StackPane.margin>
-        <FontIcon fx:id="toastIcon" iconLiteral="fth-check-circle" iconSize="20" iconColor="#000000"/>
-        <Label fx:id="toastLabel" text="Notification" styleClass="toast-text"/>
+    <HBox fx:id="toastCapsule" alignment="CENTER" maxHeight="-Infinity" maxWidth="-Infinity" spacing="10" styleClass="toast-capsule" translateY="-60" visible="false" StackPane.alignment="TOP_CENTER">
+        <StackPane.margin><Insets top="20" /></StackPane.margin>
+        <FontIcon fx:id="toastIcon" iconColor="#000000" iconLiteral="fth-check-circle" iconSize="20" />
+        <Label fx:id="toastLabel" styleClass="toast-text" text="Notification" />
     </HBox>
 
 </StackPane>

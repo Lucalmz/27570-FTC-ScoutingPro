@@ -4,7 +4,7 @@ import java.io.Serializable;
 import java.util.List;
 
 public class NetworkPacket implements Serializable {
-    private static final long serialVersionUID = 3L; // 更新版本号
+    private static final long serialVersionUID = 4L;
 
     public enum PacketType {
         JOIN_REQUEST,   // Client -> Host
@@ -19,8 +19,8 @@ public class NetworkPacket implements Serializable {
     private ScoreEntry scoreEntry;
     private List<ScoreEntry> scoreHistory;
     private List<TeamRanking> teamRankings;
+    private String bannedTeams;
 
-    // 新增：用于向从机广播官方赛事全称
     private String officialEventName;
 
     // 申请加入构造
@@ -42,11 +42,12 @@ public class NetworkPacket implements Serializable {
     }
 
     // 广播更新构造 (已修改：支持传入赛事全称)
-    public NetworkPacket(List<ScoreEntry> scoreHistory, List<TeamRanking> teamRankings, String officialEventName) {
+    public NetworkPacket(List<ScoreEntry> scoreHistory, List<TeamRanking> teamRankings, String officialEventName, String bannedTeams) {
         this.type = PacketType.UPDATE_DATA;
         this.scoreHistory = scoreHistory;
         this.teamRankings = teamRankings;
         this.officialEventName = officialEventName;
+        this.bannedTeams = bannedTeams;
     }
 
     public PacketType getType() { return type; }
@@ -55,7 +56,6 @@ public class NetworkPacket implements Serializable {
     public ScoreEntry getScoreEntry() { return scoreEntry; }
     public List<ScoreEntry> getScoreHistory() { return scoreHistory; }
     public List<TeamRanking> getTeamRankings() { return teamRankings; }
-
-    // 新增 Getter
+    public String getBannedTeams() { return bannedTeams; }
     public String getOfficialEventName() { return officialEventName; }
 }

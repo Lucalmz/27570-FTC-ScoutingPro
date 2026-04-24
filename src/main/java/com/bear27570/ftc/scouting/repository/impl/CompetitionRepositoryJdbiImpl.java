@@ -26,12 +26,17 @@ public class CompetitionRepositoryJdbiImpl implements CompetitionRepository {
     @Override
     public boolean create(String name, String creator, String formula) {
         try {
-            dao().insert(name, creator, formula, 0, "", "");
+            dao().insert(name, creator, formula, 0, "", "", "");
             return true;
         } catch (Exception e) {
             log.error("Failed to create competition: {}", name, e);
             return false;
         }
+    }
+
+    @Override
+    public void updateBannedTeams(String compName, String bannedTeams) {
+        dao().updateBannedTeams(compName, bannedTeams);
     }
 
     @Override
@@ -44,13 +49,16 @@ public class CompetitionRepositoryJdbiImpl implements CompetitionRepository {
         if (dao().checkExists(comp.getName()) == 0) {
             String creator = comp.getCreatorUsername() != null ? comp.getCreatorUsername() : "HOST_SYNC";
             String formula = comp.getRatingFormula() != null ? comp.getRatingFormula() : "total";
+            String banned = comp.getBannedTeams() != null ? comp.getBannedTeams() : "";
             try {
-                dao().insert(comp.getName(), creator, formula, comp.getEventSeason(), comp.getEventCode(), comp.getOfficialEventName());
+                dao().insert(comp.getName(), creator, formula, comp.getEventSeason(), comp.getEventCode(), comp.getOfficialEventName(), banned);
             } catch (Exception e) {
                 log.warn("Failed to sync local competition (might already exist): {}", comp.getName());
             }
         } else {
             updateEventInfo(comp.getName(), comp.getEventSeason(), comp.getEventCode(), comp.getOfficialEventName());
+            // 同步主机传来的黑名单
+            updateBannedTeams(comp.getName(), comp.getBannedTeams());
         }
     }
 

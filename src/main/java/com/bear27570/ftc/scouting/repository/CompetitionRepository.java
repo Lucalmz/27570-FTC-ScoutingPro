@@ -11,4 +11,5 @@ public interface CompetitionRepository {
     void updateEventInfo(String competitionName, int season, String eventCode, String officialName);
     void ensureLocalCompetitionSync(Competition competition);
     boolean deleteByName(String name);
+    void updateBannedTeams(String competitionName, String bannedTeams);
 }

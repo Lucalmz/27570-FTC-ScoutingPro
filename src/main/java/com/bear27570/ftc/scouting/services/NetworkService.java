@@ -51,6 +51,7 @@ public class NetworkService {
     String hostingCompetitionName;
     Runnable onMemberJoinCallback;
     String officialEventName = null;
+    String currentBannedTeams = "";
 
     private final HostManager hostManager = new HostManager(this);
     private final ClientManager clientManager = new ClientManager(this);
@@ -59,6 +60,7 @@ public class NetworkService {
     public void setDataHandler(NetworkDataHandler dataHandler) { this.dataHandler = dataHandler; }
     public void setOfficialEventName(String name) { this.officialEventName = name; }
     public void setOnMemberJoinCallback(Runnable callback) { this.onMemberJoinCallback = callback; }
+    public void setCurrentBannedTeams(String bannedTeams) { this.currentBannedTeams = bannedTeams; }
 
     public synchronized void startHost(Competition competition, Consumer<ScoreEntry> onScoreReceived) {
         this.hostingCompetitionName = competition.getName();
@@ -71,11 +73,10 @@ public class NetworkService {
 
     public void approveClient(String username) {
         if (dataHandler == null) return;
-        // 核心逻辑：只要主机点击了批准，立刻向所有连在 WebSocket 上的从机（包括正在等待室里的）广播最新数据
         broadcastUpdateToClients(new NetworkPacket(
                 new java.util.ArrayList<>(dataHandler.getScores(hostingCompetitionName)),
                 new java.util.ArrayList<>(dataHandler.getRankings(hostingCompetitionName)),
-                officialEventName));
+                officialEventName, currentBannedTeams)); // 🌟 挂载 currentBannedTeams
     }
 
     public void broadcastUpdateToClients(NetworkPacket updatePacket) {
@@ -175,7 +176,8 @@ class HostManager {
                             ctx.send(core.gson.toJson(new NetworkPacket(
                                     new java.util.ArrayList<>(core.dataHandler.getScores(core.hostingCompetitionName)),
                                     new java.util.ArrayList<>(core.dataHandler.getRankings(core.hostingCompetitionName)),
-                                    core.officialEventName)));
+                                    core.officialEventName,
+                                    core.currentBannedTeams)));
                         }
                     }
                 });
