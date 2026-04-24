@@ -103,31 +103,57 @@ public class RankingService {
     private Map<String, Double> calculateScouterWeights(List<ScoreEntry> scores, Map<Integer, PenaltyRepository.FullPenaltyRow> officialData) {
         Map<String, List<Double>> userErrors = new HashMap<>();
 
+        // 1. 按比赛场次和联盟颜色对分数进行分组 (MatchNum_Alliance -> List<Score>)
+        Map<String, List<ScoreEntry>> allianceGroups = new HashMap<>();
         for (ScoreEntry score : scores) {
-            if (score.getScoreType() != ScoreEntry.Type.ALLIANCE) continue;
+            String key = score.getMatchNumber() + "_" + score.getAlliance().toUpperCase();
+            allianceGroups.computeIfAbsent(key, k -> new ArrayList<>()).add(score);
+        }
 
-            PenaltyRepository.FullPenaltyRow official = officialData.get(score.getMatchNumber());
+        // 2. 遍历每一个联队的数据
+        for (Map.Entry<String, List<ScoreEntry>> entry : allianceGroups.entrySet()) {
+            List<ScoreEntry> groupScores = entry.getValue();
+            if (groupScores.isEmpty()) continue;
+
+            ScoreEntry firstEntry = groupScores.get(0);
+            PenaltyRepository.FullPenaltyRow official = officialData.get(firstEntry.getMatchNumber());
             if (official == null) continue;
 
-            boolean isRed = score.getAlliance().equalsIgnoreCase("RED");
+            boolean isRed = firstEntry.getAlliance().equalsIgnoreCase("RED");
             int officialTotal = isRed ? official.rScore : official.bScore;
-
             if (officialTotal <= 0) continue;
 
             int penaltyGained = isRed ? (official.bMaj * 15 + official.bMin * 5) : (official.rMaj * 15 + official.rMin * 5);
-            int scoutPredictedTotal = score.getTotalScore() + penaltyGained;
 
+            // 3. 计算联队侦查总分！无论是 ALLIANCE 模式(单人记2队) 还是 两个 SINGLE 模式(两人各记1队)，全加起来
+            int combinedScoutTotal = 0;
+            for (ScoreEntry s : groupScores) {
+                combinedScoutTotal += s.getTotalScore();
+            }
+
+            // 注意：如果是两个 SINGLE 组成了一个联盟，加上犯规得分
+            // 如果是 ALLIANCE 模式，本身已经是总分了
+            int scoutPredictedTotal = combinedScoutTotal + penaltyGained;
+
+            // 4. 计算出联盟层面的总误差
             double error = Math.abs(scoutPredictedTotal - officialTotal) / (double) officialTotal;
-            userErrors.computeIfAbsent(score.getSubmitter(), k -> new ArrayList<>()).add(error);
+
+            // 5. 误差分摊：把这笔账记到所有参与记录这个联盟的人头上（连坐）
+            for (ScoreEntry s : groupScores) {
+                userErrors.computeIfAbsent(s.getSubmitter(), k -> new ArrayList<>()).add(error);
+            }
         }
 
+        // 6. 统计所有人的平均误差，揪出内鬼（大数定律生效的地方）
         Map<String, Double> weights = new HashMap<>();
         for (Map.Entry<String, List<Double>> entry : userErrors.entrySet()) {
             double avgError = entry.getValue().stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+
+            // 只要平均误差超过 20%，说明这个人就是不准，他的历史权重降低到 0.5 (也可以调得更低)
             if (avgError > 0.20) {
                 weights.put(entry.getKey(), 0.5);
             } else {
-                weights.put(entry.getKey(), 1.0);
+                weights.put(entry.getKey(), 1.0); // 好人一生平安
             }
         }
         return weights;
