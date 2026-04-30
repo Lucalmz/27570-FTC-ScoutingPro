@@ -6,7 +6,7 @@
 
     <groupId>com.bear27570.ftc</groupId>
     <artifactId>ftc-scouting-pro</artifactId>
-    <version>2.2.3</version>
+    <version>2.2.4</version>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -169,7 +169,7 @@
                 <version>1.6.0</version>
                 <configuration>
                     <name>FTCScoutingPro</name>
-                    <appVersion>2.2.3</appVersion>
+                    <appVersion>2.2.4</appVersion>
                     <vendor>Bear27570</vendor>
                     <destination>${project.build.directory}/dist</destination>
 

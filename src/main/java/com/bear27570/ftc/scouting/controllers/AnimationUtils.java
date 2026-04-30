@@ -6,10 +6,8 @@ import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleDoubleProperty;
-import javafx.beans.property.SimpleObjectProperty;
 import javafx.geometry.Pos;
 import javafx.scene.CacheHint;
-import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -17,14 +15,10 @@ import javafx.scene.effect.*;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.*;
-import javafx.scene.shape.Circle;
-import javafx.scene.shape.Polygon;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.StrokeType;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-
-import java.util.stream.Stream;
 
 public class AnimationUtils {
 
@@ -42,11 +36,7 @@ public class AnimationUtils {
 
     private static ButtonBase currentlyPressedButton = null;
 
-    /**
-     * 为整个 Scene 启用全局按钮缩放动效
-     */
     public static void enableGlobalButtonAnimations(Scene scene) {
-        // 拦截鼠标按下事件
         scene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
             if (e.getTarget() instanceof Node) {
                 ButtonBase btn = findButtonParent((Node) e.getTarget());
@@ -60,7 +50,6 @@ public class AnimationUtils {
             }
         });
 
-        // 拦截鼠标松开事件
         scene.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> {
             if (currentlyPressedButton != null) {
                 ScaleTransition st = new ScaleTransition(Duration.millis(120), currentlyPressedButton);
@@ -68,15 +57,11 @@ public class AnimationUtils {
                 st.setToY(1.0);
                 st.setInterpolator(Interpolator.EASE_OUT);
                 st.play();
-                currentlyPressedButton = null; // 重置
+                currentlyPressedButton = null;
             }
         });
     }
 
-    /**
-     * 向上遍历节点树，寻找触发事件的真实按钮
-     * （因为用户可能点到了按钮里面的图标或文字，而不是按钮本身）
-     */
     private static ButtonBase findButtonParent(Node node) {
         while (node != null) {
             if (node instanceof ButtonBase) {
@@ -86,6 +71,7 @@ public class AnimationUtils {
         }
         return null;
     }
+
     public static void playSmoothEntrance(Node node) {
         if (node == null) return;
         node.setOpacity(0);
@@ -220,7 +206,7 @@ public class AnimationUtils {
                     scrollTarget[0] = finalVBar.getValue();
                 }
 
-                double step = finalVBar.getUnitIncrement() * (Math.abs(e.getDeltaY()) / 15.0)* 0.02;
+                double step = finalVBar.getUnitIncrement() * (Math.abs(e.getDeltaY()) / 15.0) * 0.02;
                 if (step <= 0) step = 1.0;
 
                 scrollTarget[0] += -Math.signum(e.getDeltaY()) * step;
@@ -406,6 +392,7 @@ public class AnimationUtils {
             });
         });
     }
+
     public static void attachCyberpunkGlow(Region card, ObjectProperty<Color> themeColorProperty) {
         Platform.runLater(() -> {
             Pane parent = (Pane) card.getParent();
@@ -413,13 +400,38 @@ public class AnimationUtils {
 
             int index = parent.getChildren().indexOf(card);
             StackPane wrapper = new StackPane();
-            wrapper.setPickOnBounds(false); // 确保包装器不吞噬鼠标事件
+            wrapper.setPickOnBounds(false);
 
-            // 保持卡片原有的自适应生长属性
             if (parent instanceof VBox) VBox.setVgrow(wrapper, VBox.getVgrow(card));
             if (parent instanceof HBox) HBox.setHgrow(wrapper, HBox.getHgrow(card));
 
-            // ============== 1. 底层：霓虹灯管发射器 (承载多段雾化光晕) ==============
+            // ============== 1. 底层光晕：使用静态高斯模糊 + 缓存 + 形变动画 ==============
+            Node[] auras = new Node[4];
+            for (int i = 0; i < 4; i++) {
+                Rectangle aura = new Rectangle();
+                aura.setMouseTransparent(true);
+                aura.widthProperty().bind(card.widthProperty());
+                aura.heightProperty().bind(card.heightProperty());
+                aura.setArcWidth(16);
+                aura.setArcHeight(16);
+                aura.setFill(Color.TRANSPARENT);
+
+                // 【修改】边框大幅度加粗 (从 6 提升到 16)，配合模糊，显得非常饱满
+                aura.setStrokeWidth(16);
+                aura.strokeProperty().bind(themeColorProperty);
+
+                // 【修改】模糊半径稍微调大 (35 -> 45)，让粗线条柔和化
+                GaussianBlur blur = new GaussianBlur(45);
+                aura.setEffect(blur);
+
+                aura.setCache(true);
+                aura.setCacheHint(CacheHint.SPEED);
+                auras[i] = aura;
+
+                wrapper.getChildren().add(aura);
+            }
+
+            // ============== 2. 灯管底座 ==============
             Region neonTube = new Region();
             neonTube.setMouseTransparent(true);
             neonTube.prefWidthProperty().bind(card.widthProperty());
@@ -427,36 +439,38 @@ public class AnimationUtils {
             neonTube.maxWidthProperty().bind(card.widthProperty());
             neonTube.maxHeightProperty().bind(card.heightProperty());
 
-            themeColorProperty.addListener((obs, oldC, newC) -> {
-                String hex = String.format("#%02X%02X%02X",
-                        (int)(newC.getRed() * 255), (int)(newC.getGreen() * 255), (int)(newC.getBlue() * 255));
-                neonTube.setStyle("-fx-border-color: " + hex + "; -fx-border-width: 4px; -fx-border-radius: 8px; -fx-background-color: transparent;");
-            });
-            String initHex = String.format("#%02X%02X%02X",
-                    (int)(themeColorProperty.get().getRed() * 255), (int)(themeColorProperty.get().getGreen() * 255), (int)(themeColorProperty.get().getBlue() * 255));
-            neonTube.setStyle("-fx-border-color: " + initHex + "; -fx-border-width: 4px; -fx-border-radius: 8px; -fx-background-color: transparent;");
+            Runnable updateNeonStyle = () -> {
+                Color c = themeColorProperty.get();
+                if (c != null) {
+                    String hex = String.format("#%02X%02X%02X",
+                            (int) (c.getRed() * 255), (int) (c.getGreen() * 255), (int) (c.getBlue() * 255));
+                    // 【修改】基础亮框的宽度从 4px 加强到 5px
+                    neonTube.setStyle("-fx-border-color: " + hex + "; -fx-border-width: 5px; -fx-border-radius: 8px; -fx-background-color: transparent;");
+                }
+            };
+            themeColorProperty.addListener((obs, oldC, newC) -> updateNeonStyle.run());
+            updateNeonStyle.run();
 
-            // 多段不对称 DropShadow 链
-            DropShadow ds1 = new DropShadow(); ds1.setBlurType(BlurType.GAUSSIAN);
-            DropShadow ds2 = new DropShadow(); ds2.setBlurType(BlurType.GAUSSIAN); ds2.setInput(ds1);
-            DropShadow ds3 = new DropShadow(); ds3.setBlurType(BlurType.GAUSSIAN); ds3.setInput(ds2);
-            DropShadow ds4 = new DropShadow(); ds4.setBlurType(BlurType.GAUSSIAN); ds4.setInput(ds3);
-            neonTube.setEffect(ds4);
+            neonTube.setCache(true);
+            neonTube.setCacheHint(CacheHint.SPEED);
 
-            // ============== 2. 顶层：静息亮光带核心 (锋利的边缘静态亮线) ==============
+            // ============== 3. 顶层：静息亮光带核心 ==============
             Rectangle brightCore = new Rectangle();
             brightCore.setMouseTransparent(true);
             brightCore.widthProperty().bind(card.widthProperty());
             brightCore.heightProperty().bind(card.heightProperty());
-            brightCore.setArcWidth(16); // 对应 8px 的 border-radius (直径16)
+            brightCore.setArcWidth(16);
             brightCore.setArcHeight(16);
             brightCore.setFill(Color.TRANSPARENT);
-            brightCore.setStrokeWidth(1.5);
-            brightCore.setStrokeType(StrokeType.INSIDE); // 画在内侧避免模糊
+            // 【修改】核心亮线从 1.5 强化到 2.0，更粗更锋利
+            brightCore.setStrokeWidth(2.0);
+            brightCore.setStrokeType(StrokeType.INSIDE);
             brightCore.strokeProperty().bind(themeColorProperty);
-            brightCore.setEffect(new Glow(0.6)); // 基础发光
+            brightCore.setEffect(new Glow(0.6));
+            brightCore.setCache(true);
+            brightCore.setCacheHint(CacheHint.SPEED);
 
-            // ============== 3. 顶层：流动高光带 (绕着框跑动的流光) ==============
+            // ============== 4. 顶层：流动高光带 (绕着框跑动的流光) ==============
             Rectangle runningLight = new Rectangle();
             runningLight.setMouseTransparent(true);
             runningLight.widthProperty().bind(card.widthProperty());
@@ -464,29 +478,22 @@ public class AnimationUtils {
             runningLight.setArcWidth(16);
             runningLight.setArcHeight(16);
             runningLight.setFill(Color.TRANSPARENT);
-            runningLight.setStrokeWidth(3.0); // 比核心稍宽，显得更有能量
+            // 【修改】流光线条从 3.0 加强到 4.5
+            runningLight.setStrokeWidth(4.5);
             runningLight.setStrokeType(StrokeType.INSIDE);
             runningLight.strokeProperty().bind(themeColorProperty);
-            // 虚线设置：一段长为150的光带，配上一段长为3000的空白(确保一次只跑一小段)
             runningLight.getStrokeDashArray().addAll(150.0, 3000.0);
-            runningLight.setEffect(new Glow(1.0)); // 最强泛光
+            runningLight.setEffect(new Glow(1.0));
 
-            // 替换节点
             parent.getChildren().set(index, wrapper);
 
-            // 【关键层级】：光晕底座最下 -> 实际卡片在中间 -> 静态亮框在顶层 -> 流动流光在最上层
             wrapper.getChildren().addAll(neonTube, card, brightCore, runningLight);
 
-            // 启动异步不对称光晕系统 + 亮光带动画
-            playAsymmetricAuraAnimation(new DropShadow[]{ds1, ds2, ds3, ds4}, neonTube, brightCore, runningLight, themeColorProperty);
+            playAsymmetricAuraAnimation(auras, neonTube, brightCore, runningLight);
         });
     }
 
-    // ==========================================
-    // 异步多段不对称光晕系统 (随机扩散) + 亮带流光控制
-    // ==========================================
-    private static void playAsymmetricAuraAnimation(DropShadow[] shadows, Region neonTube, Rectangle brightCore, Rectangle runningLight, ObjectProperty<Color> themeColor) {
-        // 灯管实体本身的基础呼吸
+    private static void playAsymmetricAuraAnimation(Node[] auras, Region neonTube, Rectangle brightCore, Rectangle runningLight) {
         Timeline tubeTimeline = new Timeline(
                 new KeyFrame(Duration.ZERO, new KeyValue(neonTube.opacityProperty(), 0.5, Interpolator.EASE_BOTH)),
                 new KeyFrame(Duration.millis(2000), new KeyValue(neonTube.opacityProperty(), 1.0, Interpolator.EASE_BOTH))
@@ -495,7 +502,6 @@ public class AnimationUtils {
         tubeTimeline.setCycleCount(Timeline.INDEFINITE);
         tubeTimeline.play();
 
-        // 【新增】静态亮光框的高频呼吸 (电涌感)
         Timeline coreTimeline = new Timeline(
                 new KeyFrame(Duration.ZERO, new KeyValue(brightCore.opacityProperty(), 0.4, Interpolator.EASE_BOTH)),
                 new KeyFrame(Duration.millis(1200), new KeyValue(brightCore.opacityProperty(), 0.9, Interpolator.EASE_BOTH))
@@ -504,8 +510,7 @@ public class AnimationUtils {
         coreTimeline.setCycleCount(Timeline.INDEFINITE);
         coreTimeline.play();
 
-        // 【新增】跑马灯流光的无限循环跑动
-        double totalLength = runningLight.getStrokeDashArray().get(0) + runningLight.getStrokeDashArray().get(1); // 150 + 3000 = 3150
+        double totalLength = runningLight.getStrokeDashArray().get(0) + runningLight.getStrokeDashArray().get(1);
         Timeline runningTimeline = new Timeline(
                 new KeyFrame(Duration.ZERO, new KeyValue(runningLight.strokeDashOffsetProperty(), 0)),
                 new KeyFrame(Duration.millis(3500), new KeyValue(runningLight.strokeDashOffsetProperty(), -totalLength, Interpolator.LINEAR))
@@ -513,50 +518,43 @@ public class AnimationUtils {
         runningTimeline.setCycleCount(Timeline.INDEFINITE);
         runningTimeline.play();
 
+        // 【修改】减小基准的 X/Y 偏移量基数，原来是 20，现在降到 10，让光晕不会跑出很远
         double[][] baseOffsets = {
-                {-20, -20},
-                { 20, -20},
-                {-20,  20},
-                { 20,  20}
+                {-10, -10},
+                {10, -10},
+                {-10, 10},
+                {10, 10}
         };
 
-        for (int i = 0; i < shadows.length; i++) {
-            startIndependentShadowAnimation(shadows[i], themeColor, baseOffsets[i][0], baseOffsets[i][1]);
+        for (int i = 0; i < auras.length; i++) {
+            animateAuraRandomly(auras[i], baseOffsets[i][0], baseOffsets[i][1]);
         }
     }
 
-    private static void startIndependentShadowAnimation(DropShadow ds, ObjectProperty<Color> themeColor, double baseX, double baseY) {
-        DoubleProperty opacityProp = new SimpleDoubleProperty(0.5);
-
-        ds.colorProperty().bind(javafx.beans.binding.Bindings.createObjectBinding(() -> {
-            Color c = themeColor.get();
-            if (c == null) return Color.TRANSPARENT;
-            double op = Math.max(0, Math.min(1.0, opacityProp.get()));
-            return new Color(c.getRed(), c.getGreen(), c.getBlue(), op);
-        }, themeColor, opacityProp));
-
-        animateShadowRandomly(ds, opacityProp, baseX, baseY);
-    }
-
-    private static void animateShadowRandomly(DropShadow ds, DoubleProperty opacityProp, double baseX, double baseY) {
+    private static void animateAuraRandomly(Node aura, double baseX, double baseY) {
         double duration = 1000 + Math.random() * 2000;
-        double targetRadius = 25 + Math.random() * 60;
-        double targetSpread = 0.05 + Math.random() * 0.35;
-        double targetX = baseX * (0.2 + Math.random() * 1.5);
-        double targetY = baseY * (0.2 + Math.random() * 1.5);
-        double targetOpacity = 0.3 + Math.random() * 0.7;
+
+        // 【修改】大幅收紧缩放极限，原来是 0.95~1.15，现在改为 0.98~1.06，防止放大导致向外飞走
+        double targetScale = 0.98 + Math.random() * 0.08;
+
+        // 【修改】削弱随机移动的乘数。原来是 (0.2 ~ 1.7)，现在降到 (0.1 ~ 0.7)，让光晕紧贴卡片中心
+        double targetX = baseX * (0.1 + Math.random() * 0.6);
+        double targetY = baseY * (0.1 + Math.random() * 0.6);
+
+        // 【修改】因为光晕收紧了，稍微提高发光的下限透明度 (原来是 0.3~1.0，现在是 0.5~1.0)，防止看起来暗淡
+        double targetOpacity = 0.5 + Math.random() * 0.5;
 
         Timeline timeline = new Timeline(
                 new KeyFrame(Duration.millis(duration),
-                        new KeyValue(ds.radiusProperty(), targetRadius, Interpolator.EASE_BOTH),
-                        new KeyValue(ds.spreadProperty(), targetSpread, Interpolator.EASE_BOTH),
-                        new KeyValue(ds.offsetXProperty(), targetX, Interpolator.EASE_BOTH),
-                        new KeyValue(ds.offsetYProperty(), targetY, Interpolator.EASE_BOTH),
-                        new KeyValue(opacityProp, targetOpacity, Interpolator.EASE_BOTH)
+                        new KeyValue(aura.scaleXProperty(), targetScale, Interpolator.EASE_BOTH),
+                        new KeyValue(aura.scaleYProperty(), targetScale, Interpolator.EASE_BOTH),
+                        new KeyValue(aura.translateXProperty(), targetX, Interpolator.EASE_BOTH),
+                        new KeyValue(aura.translateYProperty(), targetY, Interpolator.EASE_BOTH),
+                        new KeyValue(aura.opacityProperty(), targetOpacity, Interpolator.EASE_BOTH)
                 )
         );
 
-        timeline.setOnFinished(e -> animateShadowRandomly(ds, opacityProp, baseX, baseY));
+        timeline.setOnFinished(e -> animateAuraRandomly(aura, baseX, baseY));
         timeline.play();
     }
 }
