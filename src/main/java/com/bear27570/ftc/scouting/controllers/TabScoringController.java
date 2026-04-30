@@ -76,7 +76,6 @@ public class TabScoringController {
         statusLabel.styleProperty().bind(Bindings.concat("-fx-text-fill: ", viewModel.statusColorProperty(), ";"));
         errorLabel.textProperty().bind(viewModel.errorTextProperty());
     }
-
     private void validateTeamInput(TextField field, CheckBox weakCheck) {
         String txt = field.getText().trim();
         if (txt.isEmpty()) return;
@@ -88,8 +87,10 @@ public class TabScoringController {
         try {
             int teamNum = Integer.parseInt(txt);
             if (currentCompetition != null && currentCompetition.isTeamBanned(teamNum)) {
-                // 触发红框和红色警告字
-                showFieldError(field, "🚫 Warning: Team " + teamNum + " is BANNED!");
+                // 💡 核心修改：改为“软警告”
+                // 不调用 showFieldError()，避免 requestFocus() 强推光标，允许侦查员继续填写其他框
+                viewModel.setError("🚫 Warning: Team " + teamNum + " is BANNED!");
+                field.setStyle("-fx-border-color: #F87171; -fx-border-width: 2px; -fx-border-radius: 6px; -fx-background-color: rgba(248, 113, 113, 0.1);");
                 AnimationUtils.playShakeAnimation(field);
             } else {
                 // 如果队伍合法，且当前正显示 Ban 警告，则清除错误状态

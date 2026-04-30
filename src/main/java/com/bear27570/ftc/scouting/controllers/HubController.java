@@ -36,6 +36,8 @@ public class HubController {
     @FXML private TextField newCompetitionField;
     @FXML private HBox toastCapsule;
     @FXML private Label toastLabel;
+    @FXML private Button startHostBtn;
+
     private MainApplication mainApp;
     private String currentUsername;
     private CompetitionService competitionService;
@@ -70,6 +72,15 @@ public class HubController {
             toastLabel.setText("Welcome back " + username);
             Platform.runLater(() -> AnimationUtils.playWelcomeToast(toastCapsule));
         }
+        myCompetitionsListView.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && startHostBtn != null) {
+                if (newVal.getCreatorUsername().equals(currentUsername)) {
+                    startHostBtn.setText("Start Hosting");
+                } else {
+                    startHostBtn.setText("Offline Scoring");
+                }
+            }
+        });
     }
 
     @FXML
@@ -143,7 +154,13 @@ public class HubController {
             statusLabel.setText("Please select a competition first!");
             return;
         }
-        mainApp.showScoringView(selected, currentUsername, true);
+
+        // 💡 核心修复：根据创建者动态判断身份角色
+        // 如果是你创建的，你是 Host (true)
+        // 如果不是你创建的（说明是从文件导入的），你是离线 Scouter (false)
+        boolean isHostRole = selected.getCreatorUsername().equals(currentUsername);
+
+        mainApp.showScoringView(selected, currentUsername, isHostRole);
     }
 
     @FXML

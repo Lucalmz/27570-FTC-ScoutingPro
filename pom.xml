@@ -169,7 +169,7 @@
                 <version>1.6.0</version>
                 <configuration>
                     <name>FTCScoutingPro</name>
-                    <appVersion>2.2.0</appVersion>
+                    <appVersion>2.2.3</appVersion>
                     <vendor>Bear27570</vendor>
                     <destination>${project.build.directory}/dist</destination>
 

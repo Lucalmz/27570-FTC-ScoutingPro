@@ -51,10 +51,7 @@ public class CompetitionServiceImpl implements CompetitionService {
 
     @Override
     public List<Competition> getCompetitionsCreatedByUser(String username) {
-        // 在业务层进行过滤，而不是在 UI 控制器里写过滤代码
-        return competitionRepository.findAll().stream()
-                .filter(c -> c.getCreatorUsername().equals(username))
-                .collect(Collectors.toList());
+        return competitionRepository.findAll();
     }
 
     @Override

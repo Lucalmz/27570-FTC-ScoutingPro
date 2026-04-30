@@ -38,7 +38,7 @@
                     <ListView fx:id="myCompetitionsListView" prefHeight="220"/>
                     <VBox spacing="15" alignment="CENTER">
                         <HBox spacing="20" alignment="CENTER">
-                            <Button onAction="#handleHostButton" text="Start Hosting" styleClass="success" prefWidth="180">
+                            <Button fx:id="startHostBtn" onAction="#handleHostButton" text="Start Hosting" styleClass="success" prefWidth="180">
                                 <graphic><FontIcon iconLiteral="fth-play" iconSize="16" iconColor="#34D399"/></graphic>
                             </Button>
                             <Button onAction="#handleManageMembers" text="Members" styleClass="accent" prefWidth="140">
